@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Ambientes virtuais
+.venv
+
+# Material de referência de terceiros: dissertações em PDF.
+# Obras protegidas — não redistribuir. As citações no PRD e nas specs
+# referenciam seção e página, o que basta para reproduzir o raciocínio.
+tmp/
+
+# Artefatos de execução
+runs/
+checkpoints/
+*.parquet
+.pytest_cache/
