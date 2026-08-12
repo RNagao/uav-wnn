@@ -144,16 +144,38 @@ Duas observações que mudam expectativa:
 
 **O ganho do filtro é limitado pelo pior canal.** Como a observação é relativa, `σ_rel = √(σ_own² + σ_sensor²)`. Filtrar `σ_own` de 10 m para 0,7 m com `σ_sensor = 5 m` leva `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**, não 15×. O achado A3 do PRD (18,8×) é sobre a posição própria, não sobre o que a política enxerga. Isto é a pendência **T2**.
 
-### 3.4 A ordenação: uma idealização a declarar
+### 3.4 Seleção e ordenação sob ruído — MEDIDO, e não é efeito de segunda ordem
 
-O ambiente seleciona e ordena os `N*_s` sensores não visitados mais próximos usando as posições **verdadeiras**. Com posição própria ruidosa, um agente real ordenaria pela distância **percebida**, e ocasionalmente veria outro conjunto ou outra ordem.
+O ambiente usa a posição **verdadeira** do drone para decidir **quais** `N*_s` sensores entram em `P^s` e **em que ordem**. Quando a posição própria vira estimativa, as duas coisas passam a depender dela.
 
-Duas leituras possíveis:
+Duas leituras:
 
-- **(i) Herdar seleção e ordenação verdadeiras** e apenas deslocar as coordenadas. Simples, e o erro é de segunda ordem — só muda quando dois sensores distam menos que `σ` entre si.
-- **(ii) Reordenar pelas posições estimadas.** Mais fiel, e exige recomputar a seleção a partir de todos os sensores — acessível na subclasse por leitura do `Simulator`.
+- **(i)** herdar seleção e ordenação verdadeiras, deslocando só as coordenadas;
+- **(ii)** recomputar as duas a partir das posições estimadas.
 
-**Recomendação: (ii)**, porque é o que um agente real faria e porque em `Ns = 36` num quadrado de 200 m a distância típica entre vizinhos é da ordem de 30 m, comparável a `σ = 10 m`. A opção (i) fica como ablação para quantificar quanto a idealização vale. A escolha entra na tabela de desvios §5.4 do PRD como **efeito de observação**, não de MDP.
+**Medido** (ruído só na posição própria, 2400 decisões amostradas do ambiente de referência):
+
+| | σ=1 m | σ=3 m | σ=5 m | σ=10 m |
+|---|---|---|---|---|
+| `Ns=12` — muda o sensor mais próximo | 3,3 % | 8,6 % | 14,8 % | 26,3 % |
+| `Ns=12` — muda os membros do top-12 | 0 % | 0 % | 0 % | 0 % |
+| `Ns=36` — muda o sensor mais próximo | 6,1 % | 17,1 % | 24,3 % | **42,9 %** |
+| `Ns=36` — muda os membros do top-12 | 17,5 % | 44,3 % | 64,1 % | **83,0 %** |
+
+**Correção a uma afirmação anterior deste documento:** isto foi descrito como "erro de segunda ordem". Não é. A σ=10 m com 36 sensores, a opção (i) entregaria o conjunto certo de sensores em 83 % dos casos em que o agente real erraria — é a maior parte do canal global que a Etapa 2 existe justamente para fechar.
+
+**Refinamento estrutural.** O problema de **seleção** só existe enquanto `n_não_visitados > N*_s = 12`; com 12 ou menos o top-12 é "todos" e nenhum ruído muda isso (daí a linha de zeros). Como a célula base das Etapas 1–2 é `Ns = 12`, ali **só a ordenação está em jogo**.
+
+**Decisão: opção (ii), implementada em dois níveis.**
+
+| Célula | Como | Custo |
+|---|---|---|
+| `Ns ≤ 12` (Etapas 1–2) | pós-processar a saída do pai: somar o deslocamento comum e **reordenar os 12 slots pela própria norma** | trivial; nenhuma reimplementação |
+| `Ns > 12` (Etapa 3) | recomputar seleção e ordenação a partir das estimadas, dentro da subclasse | reimplementa ~45 linhas |
+
+O segundo nível reintroduz, em escala pequena, o risco que a SPEC-00 eliminou — mas é **uma função pura com teste bit-exato**: com `σ = 0` a recomputação tem de devolver exatamente a saída do pai. Guard incomparavelmente mais forte do que quando ambiente, protocolos e recompensa eram reimplementados juntos.
+
+**A opção (i) fica como ablação**, não como descarte: a diferença entre (i) e (ii) mede quanto vale o "oráculo de ranking" — isto é, quanto da vantagem do resultado publicado vem de a política enxergar o estado verdadeiro. É resultado publicável por si só.
 
 ### 3.5 Onde o filtro de Kalman se encaixa
 
