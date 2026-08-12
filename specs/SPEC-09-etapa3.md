@@ -254,7 +254,7 @@ Se a coordenação depende de conhecer a posição dos demais, então degradar e
 
 Enunciado do PRD: política treinada em **4×24**, aplicada a **2×12** e **8×36** sem retreino. As duas dimensões **não** são igualmente difíceis, e a spec trata isso com honestidade.
 
-**Transferência em `Ns` — legítima e barata.** A observação já lida com número decrescente de sensores não visitados: `N*_s = 12` é fixo, com zero-padding e o **bit de validade por slot** (PRD §5.4). Lamenza confirma (§7.4.1) que a generalização em `Ns` é direta e que o modelo com `Ns` variável fica competitivo com os modelos fixos. Logo, **4×24 → 4×12 e 4×36 é transferência de primeira classe** e deve ser medida sempre.
+**Transferência em `Ns` — legítima e barata.** A observação já lida com número decrescente de sensores não visitados: `N*_s = 12` é fixo, com padding **`-1`** — que está fora da faixa dos valores válidos e portanto já distingue slot vazio de sensor sobre o UAV, sem precisar de bit de validade. Lamenza confirma (§7.4.1) que a generalização em `Ns` é direta e que o modelo com `Ns` variável fica competitivo com os modelos fixos. Logo, **4×24 → 4×12 e 4×36 é transferência de primeira classe** e deve ser medida sempre.
 
 **Transferência em `Na` — não trivial, e Lamenza falhou.** A dimensão da observação depende de `Na`, porque `N*_a = Na − 1`: são 31 escalares em `Na = 4` e 39 em `Na = 8`. Para a rede n-tuple o problema é **pior** que para uma MLP: mudar o número de bits `B` muda o mapeamento das tuplas, e uma LUT indexada por um mapeamento diferente **não significa nada** — a transferência entre contagens de agentes não é apenas ruim, ela é **indefinida** sem uma providência explícita.
 
@@ -263,7 +263,7 @@ Três variantes, com honestidade sobre o que cada uma vale:
 | id | Variante | Estado |
 |---|---|---|
 | **V1** | largura nativa (`N*_a = Na − 1`), transferência direta | **impossível**; registrar por quê, é conteúdo do relatório |
-| **V2** | **codificador de largura fixa** `N*_a = 7` com zero-padding e bit de validade por slot, treinado em 4×24, avaliado em 2×12 e 8×36 | única variante em que a transferência é sequer **definida**. É a mesma convenção já usada para sensores, aplicada aos agentes |
+| **V2** | **codificador de largura fixa** `N*_a = 7` com padding `-1` (o mesmo sentinela que o ambiente já usa), treinado em 4×24, avaliado em 2×12 e 8×36 | única variante em que a transferência é sequer **definida**. É a mesma convenção já usada para sensores, aplicada aos agentes |
 | **V3** | retreino por `Na` (o padrão da campanha de Lamenza) | **referência obrigatória**: o custo da transferência só é mensurável contra ela — `Δ = T_transferido − T_retreinado` |
 
 **Ressalva que precisa aparecer no relatório, não em nota de rodapé.** V2 é a mesma ideia (zero-padding para largura fixa) que Lamenza tentou no crítico centralizado e que **funcionou em cenários pequenos e falhou em cenários grandes** (§7.4.2, fig. 7.10: 80 % de sucesso, mas desempenho muito aquém). A diferença estrutural do nosso caso é que **não temos crítico centralizado** — o crítico n-tuple estima `V` sobre a própria observação do agente, então o modo de falha específico que Lamenza diagnosticou (entrada do crítico de tamanho variável) **não se aplica**. O que resta é o problema do **ator**, que é real e que ninguém resolveu. **A expectativa registrada antes do experimento é de degradação material, sobretudo em 4→8.** Se for confirmada, é resultado; se for refutada, é resultado melhor.
@@ -402,7 +402,7 @@ Portão não atingido é resultado publicável (PRD §2). Diagnóstico prescrito
 
 **Q5 — Qual definição de "alvo implícito" (M2) sobrevive a inspeção?** O cone de ±30° em torno do vetor de velocidade comandado é uma escolha arbitrária. Alternativas: sensor de menor tempo-para-alcance sob velocidade constante; atribuição por transporte ótimo entre UAVs e sensores não visitados. Propõe-se fixar uma definição **antes** de olhar os resultados e reportar a sensibilidade a ela como anexo. Sem isso, M2 é ajustável a posteriori e não vale nada.
 
-**Q6 — `communication_range` (P1 do PRD) segue pendente?** M1 e M3 dependem dele diretamente — o disco varrido e a redundância no instante da coleta são definidos por ele. Se P1 não estiver resolvido ao entrar nesta spec, as métricas de divisão de trabalho ficam com valores calibrados por um parâmetro desconhecido, e a comparação com Lamenza (inclusive a leitura visual da fig. 7.4, cujas áreas semitransparentes são justamente esse alcance) fica sem escala.
+**Q6 — ~~`communication_range` pendente~~. FECHADA:** `communication_range = 20 m`. M1 e M3 podem ser calibradas, e as áreas semitransparentes da fig. 7.4 de Lamenza correspondem a esse raio, o que torna a comparação visual utilizável.
 
 **Q7 — Qual é o `Na` da célula base se o orçamento de treino medido no G1 não fechar?** O PRD fixa `Na = 4, Ns = 24`; a linha de corte global permite `Na = 2`. Com `Na = 2` há **um único vizinho**, e várias métricas desta spec (M4, equilíbrio de carga; a dependência de ordem da CI sequencial; a contagem de agentes ociosos) perdem quase todo o poder discriminante — e o achado de retornos decrescentes de Lamenza fica inacessível. Cortar para `Na = 2` deveria ser a última opção, e não a sexta.
 

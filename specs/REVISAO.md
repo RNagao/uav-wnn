@@ -1,5 +1,29 @@
 # Revisão cruzada das specs — lacunas e pontos a decidir
 
+> ## Estado desta revisão
+>
+> Documento de **um momento**: a revisão cruzada das 11 specs, feita antes de qualquer implementação. Vários achados já foram resolvidos ou reformulados desde então. O registro vigente de pendências é [`../PENDENCIAS.md`](../PENDENCIAS.md).
+>
+> | Achado | Estado |
+> |---|---|
+> | **A** — o ator WNN pode sair maior que a MLP pareada | **aberto** (T1). Segue sendo a decisão mais consequente |
+> | **B** — parâmetros ausentes (P1, P4–P8) | **fechados**, exceto P4 e P7. Extraídos do código de referência |
+> | **C.1** — θ circular vs média linear | **aberto**. Recomendação: normal projetada |
+> | **C.2** — esquecimento vs gradiente funcional | **aberto** |
+> | **C.3** — estrutura de armazenamento das LUTs | **aberto** |
+> | **C.4** — cobertura de bits `N·n/B` | **aberto**, e a SPEC-01 foi corrigida para varrer `(T, N)` juntos |
+> | **C.5** — filtro de informação sem o que fundir | **resolvido** pelo novo modelo de ruído: o relatório vem do canal global reinterpretado |
+> | **D.1** — canal de sensores degenerado | **resolvido** junto com C.5 |
+> | **D.2** — CI reprova no G3 por funcionar | **aberto** (E2). Precisa de critério assimétrico |
+> | **E** — achados de API do `gradysim` | **confirmados por execução**, mas na versão **0.6.11**, não 0.8.0 |
+> | **E.6** — célula cara é `Ns=36`, não `Na=8` | **corrigido novamente**: em horas de treino a célula cara é `Na=1` |
+> | **F.1** — sementes de treino | **aberto** (E1) |
+> | **G.1** — cobertura de bits na SPEC-01 | **aplicado** |
+>
+> Achados novos, posteriores a esta revisão: **T3** (física do ruído no sensor), **P9**/**P10** (parâmetros dos canais), e a separação da Etapa 2 em blocos 2a/2b.
+
+---
+
 Consolidação dos achados das 11 specs, deduplicada e priorizada. Cada item traz o que foi achado, por que importa, e a recomendação.
 
 **Como ler:** os itens de **decisão** precisam de resposta humana antes de codificar. Os de **achado** mudam o plano mas não bloqueiam. Os de **correção** já foram aplicados.

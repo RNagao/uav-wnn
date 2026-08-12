@@ -442,20 +442,24 @@ A alternativa (estado compartilhado + inversão de controle, dando API PettingZo
 
 ## 8. Cronograma — 4 semanas
 
-A execução é decomposta em specs pequenas, com escopo fechado e critério de saída medido: ver **[`specs/README.md`](specs/README.md)**. A primeira é o **[estudo de binarização (SPEC-01)](specs/SPEC-01-binarizacao.md)**, que roda sem simulador e sem laço de RL, e portanto em paralelo com a montagem do ambiente.
+A execução é decomposta em specs pequenas, com escopo fechado e critério de saída medido: ver **[`specs/README.md`](specs/README.md)**.
 
-| Semana | Etapa | Entrega | Portão / critério de pronto |
+| Semana | Bloco | Entrega | Portão / critério de pronto |
 |---|---|---|---|
-| **1** | 1 (infra) | **SPEC-01** (binarização, portão G0) em paralelo com **SPEC-00** (cenário, protocolos, ponte, `rewards.py` verbatim, baselines, harness de custo) | **G0**: codificador escolhido com evidência; P1 e P2 resolvidas; asserção `η = c/N` ativa; orçamento de simulação medido |
-| **2** | 1 (aprendizado) | n-tuple Actor-Critic em 1b, `Na = 1 → 2 → 4`; ablação MLP pareada; varreduras `T × n × N`; tabela de memória e latência | **G1** |
-| **3** | 2 | Ruído (GPS + enlace local); KF com entrada de controle; filtro de informação; NEES/NIS; degraus 0–5; varredura σ × T | **G2** |
-| **4** | 3 + fechamento | Multiagente 3a e 3b; degraus 6a/6b/6c; interseção de covariância; relatório e slides | **G3**; `make repro` verde; E2 e E3 |
+| ~~**1**~~ | ~~SPEC-00~~ | **Concluída.** Ambiente de referência via submodule, `gradysim==0.6.11`, 18 testes, P1 e P2 fechadas, guloso reproduzindo a fig. 7.3 em 9/9 células | ✔ |
+| **1** | SPEC-01, 02, 03, 07 | Binarização (**G0**) · baselines e harness · harness de custo · ruído e KF. As quatro são independentes e rodam em paralelo | **G0**: codificador escolhido com evidência, `(T, N)` varridos juntos |
+| **2** | SPEC-04, 05, 06 | Núcleo n-tuple · Actor-Critic e MLP pareado · Etapa 1 (réplicas 1a/1b, varreduras, tabela de custo da §5.5) | **G1** e veredito de H1 |
+| **3** | SPEC-08, bloco **2a** | Ruído no GPS do drone; KF com entrada de controle; NEES/NIS; escada 0–5; varredura `σ_own × T` | H2 e H3 |
+| **4** | SPEC-08 bloco **2b** + SPEC-09 + fechamento | Canal do sensor *(se T3 resolver)*; multiagente 3a/3b; degraus 6a/6b/6c; relatório e slides | **G2**, **G3**; `make repro` verde; E2 e E3 |
+
+**A SPEC-00 saiu antes do prazo e mais barata que o previsto** — o ambiente veio pronto do repositório de referência em vez de ser escrito. Isso liberou a semana 1 para quatro specs em paralelo.
 
 A redação **não** espera a semana 4: cada tabela entra no relatório assim que sai.
 
 ### Linha de corte (o que cai primeiro se atrasar)
 
-1. Varreduras de `n × N` → fixar `n = 12`, `N = 48` (já testados no protótipo) e varrer só `T`
+1. Bloco **2b** inteiro (canal do sensor). É a metade cortável da Etapa 2: 2a sozinha ainda entrega H2, H3 e a réplica de A3
+2. Varreduras de `n × N` → fixar `n = 12`, `N = 48` (já testados no protótipo) e varrer só `T` — com a ressalva de que `T` e `N` não são independentes (achado C4)
 2. Células `Ns ∈ {24, 36}` e `Na = 8` na Etapa 1
 3. Esquema de codificação circular (manter só o termômetro simples)
 4. Varredura σ × T → reduzir a `σ ∈ {1, 10}` × `T ∈ {8, 128}`

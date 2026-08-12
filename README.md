@@ -18,8 +18,11 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | Etapa | Configuração | Dificuldade nova | Hipóteses | Portão |
 |---|---|---|---|---|
 | 1 | 1 UAV, sem ruído | aproximação de função sobre entrada binarizada | H1 | G1 |
-| 2 | 1 UAV, com ruído | observabilidade parcial e filtragem | H2, H3, H4 | G2 |
+| **2a** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
+| **2b** | 1 UAV, + ruído no **canal do sensor** | filtro de informação; ranking sobre estimativas | H4 | G2 |
 | 3 | `Na` UAVs, com ruído | coordenação e erros correlacionados | H5, H6 | G3 |
+
+A Etapa 2 roda em dois blocos porque os canais têm estruturas opostas — o do drone é deslocamento comum a todas as entradas da observação, o do sensor é por slot — e ligá-los juntos tornaria qualquer degradação inatribuível. Como as features se encaixam sem tocar no cenário: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 
 ## Documentos
 
@@ -29,6 +32,7 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | [`PENDENCIAS.md`](PENDENCIAS.md) | Registro único das pendências, ordenadas por impacto |
 | [`specs/`](specs/) | 11 specs de execução, cada uma com critério de saída **medido** |
 | [`specs/REVISAO.md`](specs/REVISAO.md) | Revisão cruzada das specs: lacunas e pontos a decidir |
+| [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) | Como as features entram sem tocar no cenário, com os diagramas |
 | [`reports/`](reports/) | Relatórios com números medidos |
 
 ## Estado
@@ -36,8 +40,9 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | Spec | Estado |
 |---|---|
 | SPEC-00 — Ambiente de referência | **pronta**; o ambiente é o de Lamenza verbatim (submodule), 15 testes, P1 e P2 fechadas |
-| SPEC-01 — Estudo de binarização | especificada; próxima |
-| SPEC-02 a SPEC-10 | especificadas, em revisão |
+| SPEC-01 — Estudo de binarização | revisada; **próxima** |
+| SPEC-02, 03, 07 | revisadas; rodam em paralelo com a 01 |
+| SPEC-04 a SPEC-06, 08 a SPEC-10 | revisadas |
 
 ## Instalação e uso
 

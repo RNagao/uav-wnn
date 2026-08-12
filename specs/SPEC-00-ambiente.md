@@ -5,6 +5,33 @@
 
 ---
 
+> ## ⚠ Documento histórico — executado, e a execução mudou a abordagem
+>
+> Esta spec foi escrita **antes** de o código de referência ser lido, e projetava uma **reimplementação** do MDP: `build_observation`, `EpisodeRunner`, `StateView`, protocolos próprios, gerador analítico e o invariante V-1.
+>
+> **Nada disso está no repositório.** A execução da spec levou à conclusão oposta: o ambiente passou a ser o `GrADySEnvironment` de Lamenza, verbatim, num submodule fixado na tag `dissertation`, com `gradysim==0.6.11`. O que está implementado é `src/uavwnn/refenv/`, que apenas carrega, configura e semeia aquele código.
+>
+> | O que a spec projetava | O que foi entregue |
+> |---|---|
+> | `build_observation` como fonte única | o método do ambiente de referência, intocado |
+> | `EpisodeRunner` com injeção de política | `run_episode()` sobre a API PettingZoo do próprio ambiente |
+> | `StateView` como ponto de inserção de ruído | **subclasse** sobrescrevendo `observe_simulation_relative_positions()` |
+> | Gerador analítico + invariante V-1 (teste KS) | **descartados** — o corpus sai do ambiente real, que roda a 0,02–0,15 s por episódio |
+> | Padding `(0,0)` + bit de validade | padding **`-1`**, fora da faixa dos válidos; bit de validade **desnecessário** |
+> | `update_rate` escolhido por nós (`interval/16`) | fixado pelo ambiente de referência em `interval/2` |
+> | Superfície de API verificada no `gradysim 0.8.0` | **0.6.11** — o `environment.py` importa `VisualizationController`, que sumiu na série 0.7 |
+> | P1 (`communication_range`) bloqueante | **20 m**, resolvida no código de referência |
+>
+> **Por que a reversão.** A reimplementação era provadamente equivalente (`max|Δobs| = 7,9×10⁻⁸` contra a referência, em 60 passos × 5 sementes). Mas uma "correção" de **uma linha** — inicializar a posição do drone no spawn em vez de `(0,0,0)`, que é o que o original faz — levava a divergência a `8,5×10⁻¹` por efeito caótico. Manter implementação paralela é superfície de risco permanente contra o único ativo do trabalho: a comparabilidade com o baseline.
+>
+> **Estado dos critérios de saída:** P1 e P2 fechadas; grade completa rodando; **o guloso de referência reproduz a fig. 7.3 em 9/9 células** (erro mediano 1,7 %). V-1 deixou de existir.
+>
+> Proveniência e ressalvas: [`../reports/spec00-parametros.md`](../reports/spec00-parametros.md). Arquitetura vigente: [`ARQUITETURA.md`](ARQUITETURA.md).
+>
+> O restante deste documento fica como **registro do raciocínio** que levou até aqui — em particular a §4, cujo levantamento de API foi o que revelou as armadilhas do simulador. Não o use como especificação do que construir.
+
+---
+
 ## 1. Objetivo
 
 Entregar o ambiente de simulação que reproduz o problema de Lamenza **sem alteração**, sobre o `gradysim` (GrADyS-SIM NextGen 0.8.0, Python): geração de cenário semeada, `SensorProtocol` e `UAVProtocol`, coleta automática por proximidade, gestão de episódio, a ponte entre o simulador orientado a eventos e o treinador, e a recompensa verbatim.
