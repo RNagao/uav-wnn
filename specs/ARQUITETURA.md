@@ -174,7 +174,18 @@ Herdar o ranking verdadeiro devolveria, por outra porta, a maior parte do canal 
 
 **A opção de herdar o ranking verdadeiro fica como ablação**, não descarte: a diferença entre as duas mede quanto vale o "oráculo de ranking" — isto é, quanto do resultado publicado vem de a política enxergar o estado verdadeiro.
 
-### 3.5 O canal do GPS próprio: presente, com σ fixo, fora da varredura
+### 3.5 Os dois canais entram em blocos separados
+
+**A Etapa 2 roda em dois blocos**, um canal por vez, porque as estruturas são opostas — o do drone é deslocamento **comum**, o do sensor é **por slot** — e ligá-los juntos torna qualquer degradação inatribuível.
+
+| Bloco | Ruído | Filtro | Hipóteses | Bloqueado? |
+|---|---|---|---|---|
+| **2a** | só GPS do drone | KF + entrada de controle | H2, H3 | não |
+| **2b** | + canal do sensor | filtro de informação | H4 | sim, por **T3** |
+
+O bloco 2a **varre** `σ_own` e mede o valor a usar em 2b — não o fixamos por decreto. E ele não depende da física do canal do sensor, que segue em discussão (T3), então pode começar imediatamente.
+
+### 3.5.1 Por que o canal do GPS próprio permanece
 
 O erro de posição própria **continua existindo**, com `σ_own` fixo num valor declarado e filtrado por **KF com entrada de controle** (a ação que a política acabou de tomar). Ele **não** entra na varredura experimental — a varredura é toda do canal do sensor.
 

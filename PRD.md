@@ -51,7 +51,8 @@ E uma regra de projeto que amarra as duas metades do trabalho:
 | Etapa | Configuração | O que muda em relação a Lamenza | Responde |
 |---|---|---|---|
 | **1** | 1 UAV, sem ruído | só o aproximador | H1 — a rede sem peso aprende o problema? |
-| **2** | 1 UAV, com ruído | + medição ruidosa e KF | H2, H3, H4 |
+| **2a** | 1 UAV, ruído no **GPS do drone** | + medição ruidosa e KF com entrada de controle | H2, H3 |
+| **2b** | 1 UAV, + ruído no **canal do sensor** | + filtro de informação e ranking sobre estimativas | H4 |
 | **3** | `Na` UAVs, com ruído | + coordenação e estimativas correlacionadas | H5, H6 |
 
 A Etapa 1 é a **reprodução**. As Etapas 2 e 3 são a **extensão de Fusão de Dados**.
@@ -65,9 +66,9 @@ Cada etapa tem um **portão** (`G1`, `G2`, `G3`): critério objetivo a ser ating
 | ID | Etapa | Hipótese | Como é falsificada |
 |---|---|---|---|
 | **H1** | 1 | Sobre o problema **inalterado**, a política n-tuple atinge desempenho comparável ao de uma rede densa, a custo de **modelo** e **inferência** materialmente menor | Comparação pareada: mesmo ambiente, mesma observação, mesma recompensa, **mesmo algoritmo**, trocando só o aproximador. Critério detalhado em **§5.5** — H1 cai se o tempo de conclusão da WNN for pior além do IC, ou se o ator não couber em poucas dezenas de KB **realizados**, ou se a contagem de operações não mostrar o aproximador livre de **multiplicações em ponto flutuante**. **Atenção:** três specs independentes (03, 04, 05) estimam que o ator WNN realizado fica entre ~12 e ~15 KB contra ~8,6 KB da MLP pareada — isto é, provavelmente **maior**. Ver §5.5 e a nota de revisão |
-| **H2** | 2 | A binarização por termômetro **não** torna a WNN mais frágil a ruído de medição que uma rede densa | Curvas de degradação WNN vs MLP sobre σ crescente. H2 cai se os ICs separarem |
-| **H3** | 2 | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
-| **H4** | 2 | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
+| **H2** | 2a | A binarização por termômetro **não** torna a WNN mais frágil a ruído de medição que uma rede densa | Curvas de degradação WNN vs MLP sobre σ crescente. H2 cai se os ICs separarem |
+| **H3** | 2a | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
+| **H4** | 2b | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
 | **H5** | 3 | Fundir estimativas entre UAVs por **interseção de covariância** supera o KF local isolado e não diverge, ao contrário do KF ingênuo | Erro de estimativa e NEES/NIS. H5 cai se CI não bater o KF local, ou se o KF ingênuo não divergir |
 | **H6** | 3 | A coordenação emerge também com aproximador sem peso: o enxame supera a heurística gulosa, como em Lamenza | Tempo de conclusão vs heurística gulosa. H6 cai se a política não bater o guloso |
 
@@ -296,16 +297,26 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado e a extensão é declarada.
 
-**Onde o ruído entra.** Em Lamenza o "canal global" entrega o estado verdadeiro. Substituímos por medição corrompida em dois canais:
+**Dois blocos, um canal por vez.** A Etapa 2 introduz dois canais de ruído com estruturas **opostas** — o do drone é deslocamento comum a todas as entradas da observação, o do sensor é por slot. Ligá-los juntos torna qualquer degradação inatribuível. Um portão só (G2), um capítulo só, mas ordenação interna que isola os canais:
 
-| Canal | Modelo | Natureza | Filtro | Varrido? |
+| Bloco | Ruído | Filtro | Hipóteses | Varredura |
 |---|---|---|---|---|
-| **Posição dos sensores** (primário) | `z = p_i + b_i + v_t`, viés fixo + branco por relatório, `R(d)` crescente com a distância | estado **estático**, sem controle | **filtro de informação** | **sim**, `σ_sensor ∈ {1,3,5,10}` |
-| Posição própria (GPS) | `σ_own` fixo, declarado | estado **móvel**, **entrada de controle conhecida** | KF 2 estados, predição `x̂ + u·dt` | não |
+| **2a** | só GPS do drone | KF + **entrada de controle** | H2, H3 | `σ_own ∈ {1,3,5,10}` × `T ∈ {8,32,128}` |
+| **2b** | + canal do sensor | filtro de informação | H4 | `σ_sensor × T`, com `σ_own` **fixado pelo resultado de 2a** |
 
-O canal primário é o do **sensor**: o drone recebe a posição suja e a refina, e **todo dado derivado — inclusive o ranking dos sensores — é computado sobre a estimativa filtrada**, nunca sobre a verdade. O relatório entra pelo **canal global reinterpretado**, não por rádio: no mecanismo de referência ouvir o drone é ser coletado, então um relatório por rádio já teria tirado o sensor do problema. Desenho completo em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
+Custo medido de dobrar a grade: **~5 h de um núcleo** a 2 M passos por corrida, com as configurações paralelizando trivialmente. Não é o gargalo; o gargalo seria calendário, e por isso os blocos ficam dentro de uma etapa em vez de virarem uma quarta.
 
-`R` crescer com a distância é o que faz **aproximar-se ser informativo**, e portanto é o mecanismo físico que sustenta **H4**. O GPS próprio fica fora da varredura mas presente, porque o achado A3 só existe nele e porque sem ele a interseção de covariância da Etapa 3 perde o objeto.
+Três razões para a separação, além da atribuição:
+
+1. **2a não depende da física do canal do sensor** (ver T3), que segue em discussão. Pode começar imediatamente.
+2. **2a mede `σ_own`** em vez de o fixarmos por decreto — resolve a pendência P10.
+3. **Linha de corte honesta:** se o tempo apertar, 2b é a metade cortável, e 2a sozinha ainda entrega H2, H3 e a réplica do achado A3.
+
+**Bloco 2a — GPS do drone.** `p̂_k = p_k + e_k`. O erro é **comum** a todas as entradas válidas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)`. Estado móvel, comando conhecido: é onde vive o achado A3 e onde o KF com entrada de controle faz sentido. Modelo fechado, nada pendente.
+
+**Bloco 2b — canal do sensor.** O drone obtém a posição do sensor pelo **canal global reinterpretado**, não por rádio: no mecanismo de referência ouvir o drone é ser coletado, então um relatório por rádio já teria tirado o sensor do problema antes de haver medições a acumular. **Todo dado derivado — inclusive o ranking dos sensores — é computado sobre a estimativa filtrada**, nunca sobre a verdade. Desenho em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
+
+> **T3 — pendente.** A física deste canal ainda não foi decidida, e ela determina se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância, e é dominado por **viés fixo** — o canal vira piso irredutível, não objeto de fusão, e a H4 perde a causa física. Se o drone **localiza o sensor por rádio**, o erro é branco e **cresce com a distância**, a filtragem tem função e aproximar-se compra informação — ao custo de declarar na §5.4 um alcance de detecção maior que o de coleta. O bloco 2b não roda antes dessa decisão; o 2a roda.
 
 **Escada de ablação:**
 
@@ -318,11 +329,13 @@ O canal primário é o do **sensor**: o drone recebe a posição suja e a refina
 | 4 | **KF + entrada de controle** | a proposta |
 | 5 | 4 + covariância na observação | política consciente da incerteza |
 
+A escada roda **em cada bloco**: em 2a sobre o canal do drone, em 2b sobre o do sensor. Os degraus 2 e 3 mudam de sentido entre eles — para alvo estático não existe "KF de velocidade constante", e o degrau 3 vira "média simples sem ponderar pela precisão".
+
 O degrau 5 acrescenta canais à observação e portanto **entra na tabela de desvios (§5.4) quando executado** — é ablação explícita, com resultado reportado com e sem.
 
 Cruzado com o regime de treino: **treino limpo → avaliação ruidosa** vs **treino ruidoso → avaliação ruidosa**. Se o degrau 4 tornar os dois equivalentes, é o argumento mais forte possível a favor do filtro.
 
-**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ_GPS ∈ {1, 3, 5, 10} m` × `T ∈ {8, 32, 128}`. É o experimento mais caro do projeto e roda muito mais barato com 1 UAV — razão de ele vir antes do multiagente.
+**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ × T` dentro de cada bloco, **12 configurações por bloco**. Medido: ~5 h de um núcleo por bloco a 2 M passos com 3 sementes. Roda muito mais barato com 1 UAV — razão de a Etapa 2 vir antes do multiagente.
 
 **RF-04 (invariante de vazamento).** A verdade **nunca** chega à política. `handle_telemetry` do gradysim entrega posição exata; a corrupção acontece na entrada do protocolo e a verdade fica guardada só para métricas. Teste automatizado obrigatório.
 

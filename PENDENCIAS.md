@@ -39,6 +39,7 @@ Todas dependem do repositório público `Project-GrADyS/gradys-data-collection`,
 | ID | Pendência | Impacto |
 |---|---|---|
 | **T1** | **Reformular H1: "modelo menor" → "aproximador sem multiplicação"?** | Três specs independentes (03, 04, 05) estimam o ator WNN entre ~12 e ~15 KB realizados contra ~8,6 KB da MLP pareada. **A WNN provavelmente sai maior.** Decidir agora custa uma reescrita de parágrafo; decidir na semana 3 custa reescrever a conclusão e refazer a apresentação |
+| **T3** | **Qual é a física do ruído no sensor?** Decide se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância e é dominado por **viés fixo** — o canal vira piso irredutível e a busca ativa perde a causa. Se o drone **localiza o sensor por rádio**, o erro é branco e cresce com a distância, a filtragem tem função e aproximar-se compra informação — ao custo de um alcance de detecção maior que o de coleta, declarado na §5.4. **Bloqueia o bloco 2b; não bloqueia 2a** |
 | **T2** | **Recalibrar o que a fusão pode prometer** | A observação é **relativa**, então `σ_rel = √(σ_a² + σ_s²)`. Se o levantamento dos sensores tiver ~5 m irredutíveis, o 18,8× medido no GPS vira **~2,2×** no que a política enxerga. O achado A3 é sobre a posição própria, não sobre a entrada da política |
 
 **Impacto agregado:** nenhuma das duas mata o projeto. Ambas mudam o que o relatório pode afirmar. Adiar as duas é o cenário caro: significa descobrir na redação que a manchete não se sustenta.
@@ -76,7 +77,7 @@ Não são "pendências de informação externa", são decisões de projeto que n
 | ID | Parâmetro | Por que importa |
 |---|---|---|
 | **P9** | Parâmetros do canal do sensor: `σ_b` (viés fixo), `σ_0` e `κ` de `R(d) = (σ_0 + κ·d)²` | Agora é o canal **primário**. `σ_b` é o piso irredutível do filtro; `κ` é o que faz aproximar-se ser informativo e portanto o que sustenta a H4. Faixas a fixar na SPEC-07 |
-| **P10** | `σ_own` — valor fixo do GPS próprio | Fora da varredura, mas precisa de valor declarado. Sustenta A3 e o objeto da Etapa 3 |
+| ~~**P10**~~ | ~~`σ_own` — valor fixo do GPS próprio~~ | **RESOLVIDA por construção.** O bloco 2a passa a **varrer** `σ_own` e a medir qual valor usar em 2b, em vez de fixá-lo por decreto |
 | **N1** | `dt_gps` — taxa do GPS | **Escolher `dt_gps` é escolher o resultado.** O achado A3 (18,8×) foi medido com decisão a 0,5 s; com `algorithm_iteration_interval = 2 s` e GPS a 1 Hz são só 2 correções por decisão |
 | **N2** | Mobilidade com ou sem inércia na Etapa 2 | Sem inércia o modelo de processo é exato, `Q` degenera e o degrau 4 fica quase trivialmente correto — o experimento perde valor. Com inércia, `Q` vira mensurável |
 | **N3** | Orçamento de treino `S₂` da Etapa 2 | Se a Etapa 1 mostrar melhora até `10⁷` passos e a Etapa 2 rodar `2·10⁶`, comparam-se políticas subtreinadas |
