@@ -27,14 +27,32 @@ O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos �
 
 **(c) Guardas fortes e baratas.** Com `σ = 0` a subclasse devolve observação **bit-idêntica** ao pai (verificado). E o tempo de conclusão com `σ = 0` tem de continuar reproduzindo a fig. 7.3, que a SPEC-00 já travou em 9/9 células.
 
-### Correções de modelagem que saem daí
+### O modelo de ruído mudou: o canal primário é o SENSOR
+
+Esta spec supunha o GPS do drone como canal principal. **Inverteu-se.** O desenho agora é: o drone recebe, a cada época, um relatório corrompido da posição de cada sensor e o refina recursivamente; **tudo que ele deriva daí, inclusive o ranking, é computado sobre a estimativa filtrada.** Detalhe completo em `specs/ARQUITETURA.md` §3.
+
+```
+z_{i,t} = p_i + b_i + v_{i,t}      b_i ~ N(0, σ_b²)  viés FIXO por sensor
+                                   v_{i,t} ~ N(0, R(d))  BRANCO por relatório
+R(d) = (σ_0 + κ·d)² I              precisão PIORA com a distância
+```
 
 | # | A spec dizia | Correção |
 |---|---|---|
-| 1 | Ruído dos sensores como canal a ser fundido no episódio | O erro do levantamento é **constante no episódio**, não branco por passo — o sensor não se move. Sortear por passo tornaria o problema artificialmente fácil, porque a média temporal cancelaria o erro |
-| 2 | Ganho do filtro ≈ o 18,8× do achado A3 | A observação é **relativa**: `σ_rel = √(σ_own² + σ_sensor²)`. Com `σ_sensor = 5 m`, filtrar `σ_own` de 10 m para 0,7 m leva `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**. O ganho é limitado pelo pior canal (pendência **T2**) |
-| 3 | `dt` de decisão a definir | É **0,5 s**, fixado pelo `benchmark.py`. E a posição lida numa decisão está **um tique de mobilidade atrasada** (quirk Q3): o KF precisa modelar isso, ou o resíduo terá viés sistemático |
-| 4 | Mobilidade com inércia como ablação fácil | A mobilidade é configurada **dentro do `reset()`** de referência. Trocá-la exigiria sobrescrever `reset()`, bem mais invasivo que a observação. Com mobilidade sem massa o modelo de processo é quase exato e `Q` degenera — o degrau 4 fica mais fácil do que seria com dinâmica realista, e isso precisa ser **declarado como limitação** |
+| 1 | O erro dos sensores é **constante no episódio**; sortear por passo seria modelar errado | **Invertido.** A componente branca é o que dá sentido à filtragem — sem ela não há o que filtrar. O que existe é branco **mais** um viés fixo, e o viés é o piso irredutível |
+| 2 | O canal dos sensores é degenerado na Etapa 2 porque ouvir = coletar (achado C5) | **Resolvido.** O relatório não vem por rádio: vem do **canal global reinterpretado**. Nenhuma mudança de protocolo, e o canal deixa de ser degenerado — há medições repetidas a fundir |
+| 3 | O filtro dos sensores é um KF | É **filtro de informação**: estado estático, `F=I`, `Q=0`, sem entrada de controle. Mais barato e mais estável para constante |
+| 4 | Ganho ≈ o 18,8× do achado A3 | A3 é sobre a posição **própria**. Com `σ_rel = √(σ_own² + σ_sensor²)`, o ganho no que a política enxerga é limitado pelo pior canal (pendência **T2**) |
+| 5 | `dt` a definir | É **0,5 s**, do `benchmark.py`. E a posição lida está **um tique atrasada** (quirk Q3): o KF do canal próprio precisa modelar isso |
+| 6 | Mobilidade com inércia como ablação fácil | Está **dentro do `reset()`** de referência; trocá-la é mais invasivo que sobrescrever a observação. Sem inércia o modelo de processo é quase exato e `Q` degenera — declarar como limitação |
+
+### O experimento que esta spec ganha de presente
+
+Se o filtro de informação **ignorar o viés `b_i`**, ele converge para `p_i + b_i` com `P → 0`: fica arbitrariamente confiante num valor errado, e o **NEES estoura**. É predição falsificável, e é o melhor material da Etapa 2 para a disciplina — o filtro ingênuo passa em qualquer inspeção visual e **só a validação de consistência o denuncia**. A correção é limitar `P` inferiormente por `σ_b²`; a diferença entre as duas versões é resultado a reportar.
+
+### O canal do GPS próprio permanece
+
+`σ_own` **fixo**, com KF de entrada de controle, **fora da varredura** (que é toda do canal do sensor). A grade continua `σ_sensor × T` = 12 configurações. Duas razões: o achado A3 só existe neste canal, e sem incerteza na posição própria a **interseção de covariância da Etapa 3 perde o objeto** — drones transmitiriam posições exatas e não haveria erro correlacionado a fundir.
 
 ### Uma decisão que esta spec precisa tomar
 

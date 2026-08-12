@@ -298,10 +298,14 @@ Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado
 
 **Onde o ruído entra.** Em Lamenza o "canal global" entrega o estado verdadeiro. Substituímos por medição corrompida em dois canais:
 
-| Canal | Modelo | Natureza | Filtro |
-|---|---|---|---|
-| Posição própria | GPS, σ ≈ 1–10 m | ruído branco, **entrada de controle conhecida** | KF linear 2 estados `[x, y]`, predição `x̂ + u·dt` |
-| Posição dos sensores | descoberta por enlace local | estática; linear se o sensor transmite sua posição estimada | **filtro de informação** (média ponderada recursiva pela precisão) |
+| Canal | Modelo | Natureza | Filtro | Varrido? |
+|---|---|---|---|---|
+| **Posição dos sensores** (primário) | `z = p_i + b_i + v_t`, viés fixo + branco por relatório, `R(d)` crescente com a distância | estado **estático**, sem controle | **filtro de informação** | **sim**, `σ_sensor ∈ {1,3,5,10}` |
+| Posição própria (GPS) | `σ_own` fixo, declarado | estado **móvel**, **entrada de controle conhecida** | KF 2 estados, predição `x̂ + u·dt` | não |
+
+O canal primário é o do **sensor**: o drone recebe a posição suja e a refina, e **todo dado derivado — inclusive o ranking dos sensores — é computado sobre a estimativa filtrada**, nunca sobre a verdade. O relatório entra pelo **canal global reinterpretado**, não por rádio: no mecanismo de referência ouvir o drone é ser coletado, então um relatório por rádio já teria tirado o sensor do problema. Desenho completo em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
+
+`R` crescer com a distância é o que faz **aproximar-se ser informativo**, e portanto é o mecanismo físico que sustenta **H4**. O GPS próprio fica fora da varredura mas presente, porque o achado A3 só existe nele e porque sem ele a interseção de covariância da Etapa 3 perde o objeto.
 
 **Escada de ablação:**
 

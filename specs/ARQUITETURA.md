@@ -103,57 +103,53 @@ Descobertas ao ler o código, e que a SPEC-01/SPEC-05 precisam respeitar:
 
 ---
 
-## 3. Feature 2 — ruído gaussiano na posição dos drones
+## 3. Feature 2 — medição ruidosa e fusão
 
-### 3.1 O princípio: corromper a percepção, nunca a física
+### 3.1 O modelo: o drone recebe a posição suja do sensor e a filtra
 
-Em Lamenza a política recebe o estado verdadeiro por um "canal global". O ruído fecha esse buraco. Mas ele entra **só na observação**:
+O canal **primário** é a **posição do sensor**, não o GPS do drone. A cada época de decisão o drone recebe um relatório corrompido da posição de cada sensor que enxerga, e o refina recursivamente. Tudo que ele deriva daí — inclusive **o ranking dos sensores** — passa a ser computado sobre a estimativa filtrada, nunca sobre a verdade.
 
-- a posição **verdadeira** continua governando movimento, alcance de comunicação e coleta;
-- a posição **estimada** é o que a política enxerga.
+**Onde esse relatório entra.** Não pode ser por rádio: no mecanismo de referência, ouvir o drone **é** ser coletado, no mesmo instante — um sensor que transmitisse sua posição já teria saído do problema, e não haveria medições a acumular. O relatório entra **reinterpretando o canal global** de Lamenza, que é justamente como o drone sabe onde os sensores estão. Declaramos que esse canal é ruidoso. Nenhuma linha do cenário é tocada.
 
-Isso é RF-04 do PRD, e agora é verificável por construção: a subclasse só sobrescreve o método que **constrói a observação**. Tudo que é física está no `Simulator`, fora do alcance dela.
-
-### 3.2 O achado que simplifica tudo: o erro de GPS próprio é deslocamento comum
-
-Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`, com `p_k` = posição do agente. Se a estimativa própria erra por `e`:
+### 3.2 Modelo de medição
 
 ```
-(p̂_k − p_i + S)/(2S)  =  (p_k − p_i + S)/(2S)  +  e/(2S)
+z_{i,t}  =  p_i  +  b_i  +  v_{i,t}
+
+b_i     ~ N(0, σ_b² I)        viés FIXO por sensor, sorteado no início do episódio
+v_{i,t} ~ N(0, R_i(d_t))      ruído BRANCO por relatório
+R_i(d)  = (σ_0 + κ·d)² I      a precisão PIORA com a distância
 ```
 
-**O mesmo `e/(2S)` é somado a todas as entradas válidas** — sensores e vizinhos —, e o padding `-1` não é tocado. Verificado numericamente.
+Três decisões registradas, cada uma com consequência:
 
-Três consequências práticas:
+**O ruído é branco por relatório, mais um viés fixo.** É preciso ser branco, senão não há o que filtrar — um sensor que reporta sempre o mesmo valor errado faz o filtro convergir para o valor errado. E é preciso ter viés, senão o filtro levaria o erro a zero, o que nenhum GPS real faz. O viés é o **piso irredutível**, e medi-lo é resultado.
 
-1. **A corrupção é uma soma vetorial de duas linhas**, não uma reconstrução da observação.
-2. **A correção do filtro também é**: aplicar o KF equivale a somar `(p̃_k − p̂_k)/(2S)`.
-3. **A escala do erro é `σ/(2S)`.** Com `S = 100 m`, `σ = 5 m` desloca 0,025 em unidades de observação — o que se compara diretamente à largura do bin do termômetro. É a regra *bin ≈ σ* do PRD, agora em unidades da entrada real.
+> **Correção a uma afirmação anterior.** A SPEC-07 dizia que "o erro dos sensores é constante no episódio, não branco por passo — sortear a cada passo seria modelar errado". Sob este desenho isso está invertido: a componente branca é o que dá sentido à filtragem. O que era "modelar errado" é, na verdade, **as duas componentes juntas**.
 
-### 3.3 Os três canais e onde cada um entra
+**`R` cresce com a distância.** É isto que faz **aproximar-se ser informativo**, e portanto é o mecanismo físico que sustenta a **H4** (a política que enxerga a própria incerteza aprende busca ativa). Com `R` constante, só o tempo reduz incerteza e a H4 fica sem motivação.
 
-| Canal | Modelo | Como entra na observação | Etapa |
-|---|---|---|---|
-| **Posição própria (GPS)** | `p̂_k = p_k + e_k`, `e_k ~ N(0, σ_own² I)` | deslocamento **comum** `+e_k/(2S)` em todas as entradas válidas | 2 |
-| **Posição dos sensores** | `p̂_i = p_i + e_i`, do levantamento; **fixa no episódio** | deslocamento `−e_i/(2S)` na entrada daquele sensor | 2 |
-| **Posição dos vizinhos** | `p̂_j = p_j + e_j`, recebida por broadcast, **atrasada** | deslocamento `−e_j/(2S)` na entrada daquele vizinho | 3 |
+**O drone conserva ruído de GPS próprio, com σ fixo.** Ver §3.5.
 
-Duas observações que mudam expectativa:
+### 3.3 O filtro certo é de informação, não KF de movimento
 
-**O erro dos sensores é constante no episódio, não branco por passo.** O sensor não se move e a posição vem de um levantamento. Sortear `e_i` a cada passo seria modelar errado — e tornaria o problema artificialmente mais fácil, porque a média temporal cancelaria o erro.
+O sensor é **estático**: `F = I`, `Q = 0`, sem entrada de controle. O KF degenera no filtro de informação — média ponderada recursiva pela precisão:
 
-**O ganho do filtro é limitado pelo pior canal.** Como a observação é relativa, `σ_rel = √(σ_own² + σ_sensor²)`. Filtrar `σ_own` de 10 m para 0,7 m com `σ_sensor = 5 m` leva `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**, não 15×. O achado A3 do PRD (18,8×) é sobre a posição própria, não sobre o que a política enxerga. Isto é a pendência **T2**.
+```
+Ω_i ← Ω_i + R_i(d_t)⁻¹              (matriz de informação)
+ξ_i ← ξ_i + R_i(d_t)⁻¹ z_{i,t}      (vetor de informação)
+p̃_i = Ω_i⁻¹ ξ_i ,   P_i = Ω_i⁻¹
+```
 
-### 3.4 Seleção e ordenação sob ruído — MEDIDO, e não é efeito de segunda ordem
+Mais barato e numericamente mais estável que a forma de covariância para estado constante. Com `R` constante, `σ_k = σ/√k`; com `R(d)`, medições feitas de perto pesam mais — que é exatamente o efeito procurado.
 
-O ambiente usa a posição **verdadeira** do drone para decidir **quais** `N*_s` sensores entram em `P^s` e **em que ordem**. Quando a posição própria vira estimativa, as duas coisas passam a depender dela.
+**Uma armadilha desenhada de propósito.** Se o filtro ignorar o viés `b_i`, ele converge para `p_i + b_i` **com `P → 0`** — isto é, fica arbitrariamente confiante num valor errado. O NEES vai estourar. Esta é uma predição falsificável e o melhor material que a Etapa 2 tem para a disciplina: o filtro ingênuo passa em toda inspeção visual e **só a validação de consistência o denuncia**. A correção é limitar `P` inferiormente por `σ_b²`, e a diferença entre as duas versões é resultado a reportar.
 
-Duas leituras:
+### 3.4 O ranking é computado sobre as estimativas
 
-- **(i)** herdar seleção e ordenação verdadeiras, deslocando só as coordenadas;
-- **(ii)** recomputar as duas a partir das posições estimadas.
+Consequência direta do modelo: o drone ordena e seleciona os `N*_s` sensores por `|p̂_k − p̃_i|`, com **ambas** as posições estimadas. Nunca pela verdade.
 
-**Medido** (ruído só na posição própria, 2400 decisões amostradas do ambiente de referência):
+Isto não é detalhe. **Medido**, com ruído só na posição própria, 2400 decisões amostradas:
 
 | | σ=1 m | σ=3 m | σ=5 m | σ=10 m |
 |---|---|---|---|---|
@@ -162,55 +158,55 @@ Duas leituras:
 | `Ns=36` — muda o sensor mais próximo | 6,1 % | 17,1 % | 24,3 % | **42,9 %** |
 | `Ns=36` — muda os membros do top-12 | 17,5 % | 44,3 % | 64,1 % | **83,0 %** |
 
-**Correção a uma afirmação anterior deste documento:** isto foi descrito como "erro de segunda ordem". Não é. A σ=10 m com 36 sensores, a opção (i) entregaria o conjunto certo de sensores em 83 % dos casos em que o agente real erraria — é a maior parte do canal global que a Etapa 2 existe justamente para fechar.
+Herdar o ranking verdadeiro devolveria, por outra porta, a maior parte do canal global que a Etapa 2 existe para fechar.
 
-**Refinamento estrutural.** O problema de **seleção** só existe enquanto `n_não_visitados > N*_s = 12`; com 12 ou menos o top-12 é "todos" e nenhum ruído muda isso (daí a linha de zeros). Como a célula base das Etapas 1–2 é `Ns = 12`, ali **só a ordenação está em jogo**.
+**Refinamento estrutural.** A **seleção** só é ambígua enquanto `n_não_visitados > N*_s = 12`. Como a célula base das Etapas 1–2 é `Ns = 12`, ali só a **ordenação** está em jogo — e ela se resolve pós-processando a saída do pai: aplicar os deslocamentos e reordenar os 12 slots pela própria norma. A recomputação completa da seleção fica restrita à Etapa 3, como função pura com teste bit-exato em `σ = 0`.
 
-**Decisão: opção (ii), implementada em dois níveis.**
+**A opção de herdar o ranking verdadeiro fica como ablação**, não descarte: a diferença entre as duas mede quanto vale o "oráculo de ranking" — isto é, quanto do resultado publicado vem de a política enxergar o estado verdadeiro.
 
-| Célula | Como | Custo |
-|---|---|---|
-| `Ns ≤ 12` (Etapas 1–2) | pós-processar a saída do pai: somar o deslocamento comum e **reordenar os 12 slots pela própria norma** | trivial; nenhuma reimplementação |
-| `Ns > 12` (Etapa 3) | recomputar seleção e ordenação a partir das estimadas, dentro da subclasse | reimplementa ~45 linhas |
+### 3.5 O canal do GPS próprio: presente, com σ fixo, fora da varredura
 
-O segundo nível reintroduz, em escala pequena, o risco que a SPEC-00 eliminou — mas é **uma função pura com teste bit-exato**: com `σ = 0` a recomputação tem de devolver exatamente a saída do pai. Guard incomparavelmente mais forte do que quando ambiente, protocolos e recompensa eram reimplementados juntos.
+O erro de posição própria **continua existindo**, com `σ_own` fixo num valor declarado e filtrado por **KF com entrada de controle** (a ação que a política acabou de tomar). Ele **não** entra na varredura experimental — a varredura é toda do canal do sensor.
 
-**A opção (i) fica como ablação**, não como descarte: a diferença entre (i) e (ii) mede quanto vale o "oráculo de ranking" — isto é, quanto da vantagem do resultado publicado vem de a política enxergar o estado verdadeiro. É resultado publicável por si só.
+Isto custa **um módulo a mais, não uma campanha maior**: a grade permanece `σ_sensor × T` = 12 configurações, a mesma que teria sem este canal. O custo é escrever o KF e validar sua consistência, trabalho da SPEC-07, que roda em paralelo.
 
-### 3.5 Onde o filtro de Kalman se encaixa
+Duas razões para mantê-lo:
 
-O KF estima a posição própria a partir do GPS ruidoso **e da ação que a política acabou de tomar**:
+1. **O achado A3 depende dele.** KF com entrada de controle dando 18,8× de redução, e o KF de velocidade constante ficando *pior* que a medida crua, é sobre a posição própria — o estado se move e o comando é conhecido. Para alvo estático não há comando a injetar.
+2. **A Etapa 3 perde o objeto sem ele.** O que um drone transmite por broadcast é a estimativa da **própria** posição. Se ela for exata, o broadcast é exato, não há erro correlacionado a fundir, e a **interseção de covariância deixa de ter razão de existir** — a H5 desaparece junto.
+
+### 3.6 Como os dois canais compõem, e por que isso limita o ganho
+
+A observação é relativa, então o erro do que a política vê é `e_k − e_i`:
 
 ```
-predição:   p̃⁻ = p̃ + u·dt,    u = 15·u₁·[cos(2π·u₀), sin(2π·u₀)]
-            P⁻  = P + Q
-correção:   K   = P⁻(P⁻ + R)⁻¹,  R = σ_own² I
-            p̃   = p̃⁻ + K(z − p̃⁻),  P = (I − K)P⁻
+σ_rel  =  √( σ_own²  +  σ_sensor² )
 ```
 
-Três amarras com o que já foi medido:
+Filtrar um canal só melhora a percepção até o piso do outro. Com `σ_sensor = 5 m` irredutível, levar `σ_own` de 10 m a 0,7 m move `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**, não 15×. **O achado A3 é sobre a posição própria, não sobre o que a política enxerga**, e essa distinção precisa aparecer no relatório (pendência T2).
 
-1. **`u` é a ação do passo anterior**, disponível no wrapper — é o que o achado A3 explora, e a razão de o KF de velocidade constante falhar: a política muda de rumo a cada decisão.
-2. **`dt = algorithm_iteration_interval = 0,5 s`**, e o comando é cumprido quase exatamente (mobilidade sem massa), então `Q` é pequeno e representa sobretudo a discretização. Com mobilidade sem inércia o modelo de processo é quase exato — a Etapa 2 deve declarar isso como limitação, porque torna o degrau 4 mais fácil do que seria com dinâmica realista.
-3. **A posição lida numa decisão está um tique de mobilidade atrasada** (quirk Q3 do relatório). O KF precisa saber disso, ou o resíduo terá viés sistemático.
+Contrapartida favorável: os dois canais têm naturezas de estimação **opostas** — estático sem controle contra móvel com controle —, e tê-los lado a lado é o contraste de livro-texto que a disciplina pede.
 
-A saída do KF entra na observação como o deslocamento `(p̃_k − p̂_k)/(2S)` da §3.2 — nenhuma reconstrução.
+### 3.7 A álgebra que barateia a implementação
 
-### 3.6 A observação consciente da incerteza (degrau 5)
+Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`. Logo:
 
-O KF entrega `P` além de `p̃`. Acrescentar `√tr(P)` à observação **aumenta a dimensão do vetor** e portanto é a única parte desta feature que altera a entrada da rede. Isto **exige linha na tabela de desvios §5.4** e é ablação explícita, reportada com e sem.
+- erro na posição **própria** `e_k` ⇒ **deslocamento comum** `+e_k/(2S)` em todas as entradas válidas;
+- erro na posição do **sensor** `e_i` ⇒ deslocamento `−e_i/(2S)` **só na entrada daquele sensor**;
+- o padding `-1` nunca é tocado.
 
-### 3.7 Guardas desta costura
+Verificado numericamente para o canal próprio. A escala em unidades de observação é `σ/(2S)`: com `S = 100 m`, `σ = 5 m` desloca **0,025** — comparável direto à largura do bin do termômetro. É a regra *bin ≈ σ* em unidades da entrada real.
+
+### 3.8 Guardas desta costura
 
 | Guarda | O que garante |
 |---|---|
 | `σ = 0` ⇒ observação **bit-idêntica** à do pai | a subclasse não introduz diferença por si |
-| Deslocamento medido == `e/(2S)` em todas as entradas válidas; padding intacto | a álgebra da §3.2 vale na implementação |
-| Posições verdadeiras no `Simulator` inalteradas após corrupção | o ruído não vazou para a física |
+| Deslocamentos medidos == previstos; padding intacto | a álgebra da §3.7 vale na implementação |
+| Posições verdadeiras no `Simulator` inalteradas | o ruído não vazou para a física (RF-04) |
 | Tempo de conclusão com `σ = 0` == fig. 7.3 | a corrupção desligada não muda o baseline |
-| NEES/NIS no intervalo qui-quadrado | o filtro é consistente (RF-05) |
-
-Os dois primeiros já estão verificados; entram como teste na SPEC-07.
+| `P_i` decai como `R/k` sob `R` constante | o filtro de informação está correto |
+| **NEES do filtro ingênuo estoura; do filtro com piso, não** | o viés está sendo tratado (§3.3) |
 
 ---
 
