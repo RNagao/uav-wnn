@@ -51,9 +51,24 @@ Requer [uv](https://docs.astral.sh/uv/). O ambiente vem de um **submodule**:
 ```bash
 git submodule update --init --recursive
 uv sync
-uv run pytest -q                          # 15 testes
-uv run python scripts/spec00_budget.py    # custo por célula da grade
+uv run pytest -q                                # 18 testes
 ```
+
+| Script | O que faz |
+|---|---|
+| `spec00_demo.py` | roda um episódio imprimindo o traço; `--plot` salva as trajetórias |
+| `spec00_visualizar.py` | **visualização 3D ao vivo** no navegador, em tempo real |
+| `spec00_validar_guloso.py` | reproduz a fig. 7.3 nas 9 células da grade |
+| `spec00_budget.py` | custo de simulação por célula |
+
+```bash
+uv run python scripts/spec00_demo.py --policy smart --plot traj.png
+uv run python scripts/spec00_visualizar.py --policy greedy
+```
+
+A visualização sobe um servidor WebSocket em `localhost:5678`; abra
+<https://project-gradys.github.io/gradys-sim-nextgen-visualization/> e o
+visualizador conecta sozinho.
 
 Um episódio com a heurística gulosa **do próprio trabalho de referência**:
 
