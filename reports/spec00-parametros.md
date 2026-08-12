@@ -74,6 +74,7 @@ Registradas porque afetam o comportamento e porque um leitor do código pode ach
 |---|---|---|
 | Q1 | O waypoint mede a distância até a borda **mais próxima** em cada eixo (`limit − |x|`), independentemente do **sentido** do movimento | Perto de uma borda o UAV quase para, mesmo apontando para dentro. Reproduzida; `edge_behavior="corrected"` existe só para quantificar o efeito |
 | Q2 | A primeira decisão ocorre em `t = update_rate`, não em `t = 0`, e a primeira época é mais curta | `reset()` consome um evento antes da primeira observação. Efeito de um único epoch por episódio |
+| Q5 | `DroneProtocol` inicializa `current_position = (0,0,0)` em vez da posição de spawn | Ver §4.2: "corrigir" isto quebra a equivalência com a referência por efeito caótico |
 | Q3 | A posição lida numa decisão está **um tique de mobilidade atrasada** | Barreira e tique compartilham timestamp; a barreira é processada primeiro. **Importa para a SPEC-07**: o KF vai estimar uma posição que a política observa com atraso |
 | Q4 | O guloso de referência filtra slots por `== 0` (posição relativa nula), mas o padding é `-1` | Não filtra o padding; funciona só porque `(-3, -3)` tem norma grande. Nossa `GreedyPolicy` filtra pelo sentinela correto |
 
@@ -89,6 +90,25 @@ Registradas porque afetam o comportamento e porque um leitor do código pode ach
 | C4 | Um timer `"decide"` por agente | **Barreira global de época** (`GrADySHandler`, `environment.py:485-508`): todos os agentes decidem no mesmo instante, sobre o mesmo estado. Isto fecha a pergunta nº 10 da SPEC-05 |
 | C5 | Nós inseridos com UAVs primeiro | Sensores primeiro, depois UAVs |
 | C6 | `MasslessMobilityHandler` / `MasslessMobilityConfiguration` | O código usa os aliases `MobilityHandler` / `MobilityConfiguration` — verificado: são o mesmo objeto |
+
+### 4.1 Equivalência provada, não argumentada
+
+`tests/test_referencia.py` roda o `GrADySEnvironment` de referência e o nosso `EpisodeRunner` sobre o **mesmo cenário** e a **mesma sequência de ações**, e compara passo a passo:
+
+| Grandeza | Pior diferença em 60 passos × 5 sementes |
+|---|---|
+| Observação | **7,9 × 10⁻⁸** (precisão de float32) |
+| Recompensa | **0** |
+
+**O MDP é o mesmo.** As diferenças de código são de andaime — API, semeadura, validações, ponto de inserção de ruído —, não de formulação.
+
+### 4.2 Uma "correção" nossa que quebrava a equivalência, e foi revertida
+
+O `DroneProtocol` de referência inicializa `current_position = (0,0,0)`, o que é tecnicamente errado enquanto a primeira telemetria não chega — o spawn é sorteado em `[-2, 2]²`. Na primeira versão desta spec nós "corrigimos" isso para a posição real de spawn, e registramos como micro-correção benigna.
+
+**Não era benigna.** Medido: com a correção, `max|Δobs|` contra a referência salta de **7,9 × 10⁻⁸ para 8,5 × 10⁻¹** em 60 passos. A causa não é magnitude, é **caos**: a posição errada entra no cálculo da escala do waypoint, altera levemente o rumo da primeira ação, e as trajetórias divergem completamente.
+
+Revertido. O PRD §0 manda reproduzir, não melhorar — e este é o exemplo concreto de por que a regra existe. O teste diferencial agora trava isso.
 
 **Confirmado por execução, não por leitura** (os três fatos mais caros da §4.1 da spec):
 

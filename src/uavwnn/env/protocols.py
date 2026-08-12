@@ -69,14 +69,21 @@ class DroneProtocol(IProtocol):
     _ctx: "EpisodeContext"
 
     def initialize(self) -> None:
-        # O código de referência inicializa em (0,0,0), o que está errado
-        # enquanto a primeira telemetria não chega. Como o spawn é sorteado em
-        # [-2, 2]^2, o erro é de no máximo ~2.8 m e afeta apenas o cálculo da
-        # escala do waypoint na primeira decisão. Corrigido aqui e registrado
-        # na lista de desvios do relatório.
-        idx = self._ctx.agent_node_ids.index(self.provider.get_id())
-        pos = self._ctx.state.scenario.agent_positions[idx]
-        self.current_position = (float(pos[0]), float(pos[1]), 0.0)
+        # (0,0,0) e não a posição de spawn — verbatim do original.
+        #
+        # É tecnicamente incorreto: enquanto a primeira telemetria não chega, o
+        # protocolo acredita estar na origem, e o spawn é sorteado em [-2,2]^2.
+        # O efeito é pequeno e dura uma decisão: entra apenas no cálculo da
+        # ESCALA do waypoint, e o waypoint é recomputado a cada época.
+        #
+        # Ainda assim, "corrigir" isto QUEBRA a equivalência com a referência.
+        # Medido: com a correção, `max|Δobs|` contra a implementação de
+        # referência vai de 7,9e-08 (precisão de float32) para 8,5e-01 em 60
+        # passos. A causa é caos, não magnitude: a diferença de escala altera
+        # levemente o rumo da primeira ação e as trajetórias divergem.
+        #
+        # PRD §0 manda reproduzir, não melhorar. Ver tests/test_referencia.py.
+        self.current_position = (0.0, 0.0, 0.0)
         self._broadcast()
 
     def handle_timer(self, timer: str) -> None:
