@@ -70,7 +70,7 @@ Cada etapa tem um **portão** (`G1`, `G2`, `G3`): critério objetivo a ser ating
 | **H3** | 2a | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
 | **H4** | 2b | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
 | **H5** | 3 | Fundir estimativas entre UAVs por **interseção de covariância** supera o KF local isolado e não diverge, ao contrário do KF ingênuo | Erro de estimativa e NEES/NIS. H5 cai se CI não bater o KF local, ou se o KF ingênuo não divergir |
-| **H6** | 3 | A coordenação emerge também com aproximador sem peso: o enxame supera a heurística gulosa, como em Lamenza | Tempo de conclusão vs heurística gulosa. H6 cai se a política não bater o guloso |
+| **H6** | 3 | A coordenação emerge também com aproximador sem peso | **Barra revista.** Superar a `greedy` é barra baixa: medimos que ela não coordena — separação média entre UAVs de **0,1 m** contra alcance de 20 m, quatro drones em formação. A barra honesta é a **`smart`** do próprio `heuristics.py`, que coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. H6 divide-se: **H6a** supera `greedy` (provável), **H6b** supera `smart` (incerto). Ver `reports/spec00-parametros.md` §9 |
 
 ---
 

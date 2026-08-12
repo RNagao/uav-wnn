@@ -21,6 +21,7 @@ si só, uma divergência do baseline.
 
 from .loader import (
     REFERENCE_COMMIT,
+    SPAWN_HALF_WIDTH,
     ReferenceNotAvailable,
     load_environment,
     load_heuristics,
@@ -40,6 +41,7 @@ __all__ = [
     "EpisodeSummary",
     "LAMENZA_003",
     "REFERENCE_COMMIT",
+    "SPAWN_HALF_WIDTH",
     "ReferenceNotAvailable",
     "load_environment",
     "load_heuristics",

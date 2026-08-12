@@ -21,6 +21,15 @@ um estado posterior. Nos arquivos que usamos os dois coincidem hoje, mas
 depender disso seria depender de um acidente.
 """
 
+SPAWN_HALF_WIDTH = 2.0
+"""Semi-lado da área de largada dos UAVs, em metros.
+
+Fato do ambiente de referência, não parâmetro nosso: o `reset()` sorteia as
+posições iniciais com `random.uniform(-2, 2)` em x e y — um QUADRADO de lado
+4 m centrado na origem, não um disco. Exposto aqui só para instrumentação e
+gráficos; nada no ambiente lê esta constante.
+"""
+
 SCENARIO = "scenario/003-collaboration"
 """O cenário que corresponde ao §7.2 da dissertação."""
 

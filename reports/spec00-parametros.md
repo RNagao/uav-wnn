@@ -146,3 +146,35 @@ Configuração espelhada de `visualize_performance.py`: `algorithm_iteration_int
 Os valores publicados foram lidos das figuras (`statistics/completion_times/*.png`), com precisão de leitura de ~0,3 s; o script de referência não semeia o gerador. O acordo dentro de ~2 % é o esperado para uma reprodução correta.
 
 Reprodução: `uv run python scripts/spec00_validar_guloso.py`. Três células (a diagonal) estão travadas em `tests/test_refenv.py::test_guloso_reproduz_a_figura_7_3`.
+
+---
+
+## 9. Achado: o baseline da fig. 7.3 não coordena, e há um que coordena no mesmo repositório
+
+O `heuristics.py` de referência traz **três** políticas: `greedy`, `random` e `smart`. A fig. 7.3 compara o MADDPG apenas contra a `greedy`.
+
+**A `greedy` não coordena — nem um pouco.** Medido na célula 4×24, semente 1: a **separação média entre pares de UAVs ao longo do episódio é de 0,1 m**, contra um alcance de comunicação de 20 m. Os quatro drones voam em formação, colados, cobrindo o mesmo disco. Não é uma heurística de coordenação fraca; é ausência de coordenação. Reproduz exatamente o que Lamenza observa no §7.1 (fig. 7.1): as trajetórias se sobrepõem porque todos partem do mesmo ponto e escolhem o mesmo sensor mais próximo.
+
+A `smart` atribui sensores entre os agentes por um laço guloso de troca, **lendo apenas o vetor de observação** — nenhuma informação privilegiada. É exatamente o "baseline 3: guloso + reivindicação entre agentes" que o PRD §6.1 listava como indispensável, e ele já existe.
+
+**Comparação no mesmo intervalo de decisão (0,5 s), `Ns = 24`, 60 sementes:**
+
+| Na | MADDPG publicado | `smart` medido | `greedy` medido | separação entre UAVs (greedy) |
+|---|---|---|---|---|
+| 2 | 29,6 | **25,18 ± 0,91** | 40,79 ± 2,07 | ~0 m |
+| 4 | 13,8 | 16,12 ± 0,73 | 43,04 ± 2,21 | ~0 m |
+| 8 | 9,7 | 10,21 ± 0,40 | 39,33 ± 2,51 | ~0 m |
+
+**Uma heurística sem nenhum treino fica a 5–17 % do MADDPG, e o supera com 2 agentes** — contra 32 dias de GPU. E o baseline efetivamente usado na figura é 2,4 a 4,3× pior que ela.
+
+*(Valores do MADDPG lidos das barras das figuras publicadas, precisão ~0,3 s. A comparação é sobre o mesmo ambiente e o mesmo intervalo de decisão.)*
+
+### Consequência para o trabalho
+
+**A barra da H6 muda.** "A coordenação emerge: o enxame supera a heurística gulosa" é afirmação fraca quando a gulosa são quatro drones em formação. A barra honesta é a **`smart`**, e ela é dura: bater a `smart` significa bater algo que já empata com o MADDPG.
+
+Isto não enfraquece o projeto — ao contrário, é o tipo de resultado que a disciplina de baselines do PRD existe para produzir: *"sem eles, 'a rede sem peso completou a coleta' não significa nada"*. Mas exige três coisas:
+
+1. Reportar `greedy`, `smart` e a política aprendida **sempre juntas**, nunca só contra a `greedy`.
+2. Declarar que a comparação publicada usa o baseline que não coordena.
+3. Reformular a H6 em torno da `smart`, ou dividi-la: superar a `greedy` (barra baixa, provável) e superar a `smart` (barra alta, incerta).
