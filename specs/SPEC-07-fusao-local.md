@@ -5,6 +5,48 @@
 
 ---
 
+## 0. Revisão após a SPEC-00 — o ponto de inserção mudou
+
+Esta spec foi escrita supondo que o ambiente seria nosso e que o ruído entraria por uma interface `StateView`. **O ambiente passou a ser o de Lamenza, verbatim, e não é editável.** O ponto de inserção agora é **subclasse do `GrADySEnvironment`, sobrescrevendo apenas `observe_simulation_relative_positions()`**. Ver `specs/ARQUITETURA.md` §3.
+
+Três consequências, todas favoráveis:
+
+**(a) A física fica intocável por construção.** Movimento, alcance de comunicação, coleta, recompensa e terminação vivem no `Simulator`, fora do alcance do método sobrescrito. RF-04 ("a verdade não vaza para a política") deixa de precisar de *taint tracking* — a subclasse só pode corromper o que devolve.
+
+**(b) O erro de GPS próprio é um deslocamento COMUM, e isso simplifica tudo.** Verificado numericamente. Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`. Se a estimativa própria erra por `e`:
+
+```
+(p̂_k − p_i + S)/(2S) = (p_k − p_i + S)/(2S) + e/(2S)
+```
+
+O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos — e o padding `-1` não é tocado. Logo:
+
+- corromper = somar duas linhas de código, não reconstruir a observação;
+- **aplicar o filtro = somar `(p̃_k − p̂_k)/(2S)`**, pela mesma razão;
+- a escala do erro em unidades de observação é `σ/(2S)`. Com `S = 100 m`, `σ = 5 m` desloca **0,025** — comparável direto à largura do bin do termômetro. É a regra *bin ≈ σ* em unidades da entrada real.
+
+**(c) Guardas fortes e baratas.** Com `σ = 0` a subclasse devolve observação **bit-idêntica** ao pai (verificado). E o tempo de conclusão com `σ = 0` tem de continuar reproduzindo a fig. 7.3, que a SPEC-00 já travou em 9/9 células.
+
+### Correções de modelagem que saem daí
+
+| # | A spec dizia | Correção |
+|---|---|---|
+| 1 | Ruído dos sensores como canal a ser fundido no episódio | O erro do levantamento é **constante no episódio**, não branco por passo — o sensor não se move. Sortear por passo tornaria o problema artificialmente fácil, porque a média temporal cancelaria o erro |
+| 2 | Ganho do filtro ≈ o 18,8× do achado A3 | A observação é **relativa**: `σ_rel = √(σ_own² + σ_sensor²)`. Com `σ_sensor = 5 m`, filtrar `σ_own` de 10 m para 0,7 m leva `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**. O ganho é limitado pelo pior canal (pendência **T2**) |
+| 3 | `dt` de decisão a definir | É **0,5 s**, fixado pelo `benchmark.py`. E a posição lida numa decisão está **um tique de mobilidade atrasada** (quirk Q3): o KF precisa modelar isso, ou o resíduo terá viés sistemático |
+| 4 | Mobilidade com inércia como ablação fácil | A mobilidade é configurada **dentro do `reset()`** de referência. Trocá-la exigiria sobrescrever `reset()`, bem mais invasivo que a observação. Com mobilidade sem massa o modelo de processo é quase exato e `Q` degenera — o degrau 4 fica mais fácil do que seria com dinâmica realista, e isso precisa ser **declarado como limitação** |
+
+### Uma decisão que esta spec precisa tomar
+
+Com posição própria ruidosa, o agente real ordenaria os sensores pela distância **percebida**; o ambiente ordena pela **verdadeira** e entrega só os `N*_s` mais próximos. Duas leituras:
+
+- **(i)** herdar seleção e ordenação verdadeiras, só deslocar coordenadas — erro de segunda ordem, só importa quando dois sensores distam menos que `σ`;
+- **(ii)** recomputar seleção e ordenação a partir das posições estimadas — mais fiel, acessível na subclasse por leitura do `Simulator`.
+
+**Recomendação: (ii)**, com (i) como ablação para quantificar a idealização. Em `Ns = 36` num quadrado de 200 m a distância típica entre vizinhos é ~30 m, comparável a `σ = 10 m` — não é desprezível.
+
+---
+
 ## 1. Objetivo
 
 Entregar, **validado fora do laço de RL**, o estimador de estado que substitui o canal global de Lamenza: (i) uma camada de corrupção parametrizada e reprodutível, (ii) um filtro de Kalman linear de 2 estados que usa a **velocidade comandada pela política** como entrada de controle, (iii) um filtro de informação para o canal estático dos sensores, (iv) o aparato de consistência NEES/NIS que autoriza qualquer número a jusante, e (v) o teste automatizado do invariante de vazamento (RF-04).

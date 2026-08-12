@@ -4,13 +4,17 @@
 **Disciplina:** Fusão de Dados — PESC/COPPE-UFRJ
 **Autor:** Raphael Nagao Ferreira · rnagao@cos.ufrj.br
 **Data:** 09/08/2026 · **Prazo:** 4 semanas (entrega em ~06/09/2026)
-**Status:** rascunho para aprovação · **Versão:** 2.1 — *problema de Lamenza preservado; tamanho de modelo e tempo de inferência como figuras de mérito de primeira classe (§5.5)*
+**Status:** em execução · **Versão:** 3.0 — *o ambiente passa a ser o de Lamenza verbatim (submodule); features entram por costuras externas (ver `specs/ARQUITETURA.md`)*
 
 ---
 
 ## 0. Princípio que rege este documento
 
-> **O problema formulado por Lamenza (2025) não é modificado.** Cenário, observação, ação, recompensa, métricas e parâmetros são reproduzidos como estão na dissertação. A única coisa que trocamos é o **aproximador de função**: rede n-tuple sem peso no lugar das redes profundas.
+> **O problema formulado por Lamenza (2025) não é modificado.** Cenário, observação, ação, recompensa, métricas e parâmetros são reproduzidos como estão. A única coisa que trocamos é o **aproximador de função**: rede n-tuple sem peso no lugar das redes profundas.
+
+**Isto deixou de ser promessa e virou construção.** O ambiente **é** o `GrADySEnvironment` de Lamenza, carregado verbatim de um submodule fixado na tag `dissertation`. Não há reimplementação do MDP. Como as features do trabalho se encaixam sem tocar naquele código está em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
+
+A decisão veio de uma medição: a reimplementação anterior era provadamente equivalente (`max|Δobs| = 7,9×10⁻⁸`), mas uma "correção" de **uma linha** — inicializar a posição do drone no spawn em vez de `(0,0,0)`, que é o que o original faz — levava a divergência a `8,5×10⁻¹` por efeito caótico. Ver `reports/spec00-parametros.md`.
 
 Só depois de a rede sem peso ser avaliada sobre o problema original é que a **extensão de Fusão de Dados** entra: medição ruidosa e filtro de Kalman. A extensão é declarada como extensão, em capítulo próprio, e nunca se mistura com a reprodução.
 
@@ -147,6 +151,8 @@ Sem *reward shaping*, sem penalidade de borda, sem termo de coordenação. A rec
 
 **Sem sinalização entre agentes.** Em Lamenza a coordenação emerge só de cada agente conhecer a posição dos demais — não há mensagem de reivindicação nem canal aprendido. Mantido.
 
+> **Correções que o código de referência impôs a esta seção.** O texto da eq. 5-1 descreve coordenadas relativas cruas; a implementação que gerou os resultados **normaliza** por `(p_k − p_i + S)/(2S)` e usa padding **`-1`**, não `(0,0)`. A faixa real dos valores é `[-0,5; 1,5]`, e não `[0,1]` — o `observation_space` de referência declara `Box(-1,1)`, o que também não bate. O índice do agente entra como `k/Na`. Nada disso é escolha nossa: é o que o ambiente entrega, e a SPEC-01 precisa binarizar a faixa **medida**. Ver `reports/spec00-parametros.md` §6.
+
 ### 5.3 O que trocamos: o aproximador
 
 **Algoritmo: n-tuple Actor-Critic** (Katopodis §4.3.4), com política gaussiana cuja média vem de uma rede n-tuple e crítico n-tuple para `V`. É a variante do trabalho de referência que suporta **ação contínua** e que, no benchmark Hopper, superou o Actor-Critic com MLP.
@@ -176,7 +182,7 @@ Esta tabela é o contrato da §0. Ela tem hoje **uma linha**, e qualquer acrésc
 |---|---|---|---|
 | **1** | **Binarização da observação** por termômetro (Katopodis §3.2.3) | Redes n-tuple endereçam RAMs com bits; não há como alimentá-las com reais | O **vetor de observação é idêntico** ao de Lamenza; o codificador é parte do aproximador, não do MDP. A resolução `T` é varrida e reportada, como Katopodis faz |
 
-**Detalhe de codificação — `zero-padding`.** Slots vazios de `P^s` valem `(0,0)`, que sob termômetro é indistinguível de "sensor exatamente sobre o UAV". A MLP de Lamenza pode aprender a desambiguar pelo contexto; o endereçamento por RAM não. Solução: **um bit de validade por slot**, anexado ao padrão binário. É acréscimo ao codificador, não à observação.
+**Detalhe de codificação — `padding`. RESOLVIDO, e o desvio caiu.** A spec projetava um bit de validade porque supunha padding em `(0,0)`, indistinguível de "sensor exatamente sobre o UAV". O código de referência usa **`-1`**, que está **fora da faixa dos valores válidos** — logo slot vazio e sensor sobre o UAV (que normaliza para 0,5) são distinguíveis **por construção**. O bit de validade é **desnecessário** e não entra nesta tabela.
 
 ---
 
@@ -279,7 +285,9 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 **Varreduras:** resolução do termômetro `T ∈ {8, 32, 128}` × tamanho da tupla `n ∈ {8, 10, 12}` × número de RAMs `N ∈ {16, 48, 128}` × esquema de codificação (simples vs circular) × fator de esquecimento. Medição preliminar indica retorno decrescente em `N` (8× mais memória para 13 % menos erro): a varredura documenta o joelho da curva, não maximiza.
 
-**Orçamento de simulação.** Medido: `update_rate = 0,1` dá 0,11 s por episódio de 120 s simulados com 4 UAVs / 12 sensores, idêntico ao default de 0,01. Extrapolando para episódios de até 500 s e 50 M passos (o orçamento de Lamenza), estima-se **8–30 h num único núcleo**, contra 7 dias de GPU. **Estimativa, não medição** — confirmar na semana 1 (P2). Se confirmada, é um resultado a reportar por si só.
+**Orçamento de simulação — MEDIDO (P2 fechada).** No ambiente de referência, guloso, grade completa: **1,8 a 5,2 h por núcleo** para os 50 M passos de Lamenza, contra 7 dias de GPU. A estimativa anterior de 8–30 h se sustenta com folga. Tabela por célula em `reports/spec00-orcamento.md`.
+
+**Correção que sai da medição:** a célula cara em horas de treino é `Na = 1`, não `Na = 8` — o contador de passos é `passos × Na`, então menos agentes significam menos passos por segundo simulado. **A Etapa 1 é a mais cara do projeto**, o oposto do que a linha de corte da §8 supunha.
 
 > **Portão G1** — 1a atinge taxa de sucesso comparável aos 100 % publicados; 1b supera a caminhada aleatória decisivamente e fica dentro do IC da heurística gulosa; tabela pareada WNN vs MLP fechada com tempo, memória ocupada e latência.
 > *Se G1 não for atingido:* é a refutação de H1 e o principal resultado da etapa. Registrar o veredito, diagnosticar (resolução? tamanho de tupla? variância da gaussiana?) e prosseguir — H2 a H4 medem degradação **relativa** ao próprio desempenho sem ruído e permanecem válidas mesmo com política medíocre.
