@@ -11,38 +11,44 @@ Duas features:
 
 ## 1. O mapa
 
+```mermaid
+flowchart LR
+    subgraph ENV["Ambiente · GrADySEnvironment · submodule, verbatim"]
+        T["p_i sensores<br/>p_k drone<br/>física intocada"]
+    end
+
+    CS["Relatório do sensor<br/>z = p_i + b_i + v_t<br/>R(d) cresce com a distância"]
+    CG["GPS do drone<br/>ẑ = p_k + e_k<br/>σ fixo, fora da varredura"]
+    FI["Filtro de informação<br/>Ω ← Ω + R(d)⁻¹<br/>alvo estático, sem controle"]
+    KF["Kalman + entrada de controle<br/>p̃⁻ = p̃ + u·dt<br/>alvo móvel, comando conhecido"]
+    OBS["Ranking sobre as estimativas<br/>montagem relativa e normalizada<br/>termômetro → bits"]
+    POL["Rede n-tuple Actor-Critic<br/>u = rumo, velocidade"]
+    MET["Métricas<br/>só avaliação"]
+
+    T -->|verdade| CS
+    T -->|verdade| CG
+    T -.->|nunca chega à política| MET
+    CS --> FI
+    CG --> KF
+    FI --> OBS
+    KF --> OBS
+    OBS --> POL
+    POL -->|"env.step(u) move o drone"| ENV
+    POL -->|"a mesma ação vira comando"| KF
+
+    classDef truth stroke:#808A96,stroke-width:1.5px
+    classDef noise stroke:#C08A34,stroke-width:1.5px
+    classDef est stroke:#3E9A90,stroke-width:1.5px
+    classDef ctrl stroke:#B0637C,stroke-width:1.5px
+    class T,MET truth
+    class CS,CG noise
+    class FI,KF est
+    class POL ctrl
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  vendor/gradys-data-collection  (submodule, tag dissertation) │
-│  GrADySEnvironment  —  PettingZoo ParallelEnv                 │
-│  reset() -> obs ;  step(actions) -> obs, rewards, term, info  │
-│  VERBATIM. Física, coleta, recompensa e terminação são dele.  │
-└───────────────┬──────────────────────────────────────────────┘
-                │  obs[agent] : (2·N*_a + 2·N*_s + 1,) em [0,1], padding -1
-                │
-      ┌─────────▼──────────┐   COSTURA A — só nas Etapas 2 e 3
-      │ NoisyGrADysEnv     │   subclasse; sobrescreve APENAS
-      │ (sobrescreve       │   observe_simulation_relative_positions()
-      │  a observação)     │   Guarda: com sigma=0, saída bit-idêntica ao pai
-      └─────────┬──────────┘
-                │  obs corrompida + medição z_k da posição própria
-                │
-      ┌─────────▼──────────┐   COSTURA B — Etapas 2 e 3
-      │ Estimador (KF)     │   entrada de controle = ação anterior
-      │  p̂ -> p̃           │   corrige por deslocamento comum
-      └─────────┬──────────┘
-                │  obs filtrada
-                │
-      ┌─────────▼──────────┐   COSTURA C — todas as etapas
-      │ Codificador        │   termômetro: reais -> bits  (SPEC-01)
-      └─────────┬──────────┘
-                │  vetor binário
-      ┌─────────▼──────────┐   COSTURA D — Etapa 1 em diante
-      │ Aproximador        │   n-tuple Actor-Critic  |  MLP AC (pareado)
-      └─────────┬──────────┘
-                │  u ∈ [0,1]²  =  (direção, velocidade)
-                └──────────────► env.step()
-```
+
+A verdade sai do ambiente por dois caminhos e **nunca por um terceiro**: corrompida nos dois canais de medição, e — tracejada — direto para as métricas. Não existe seta da caixa do ambiente para a política, e é isso que torna RF-04 uma propriedade da **estrutura** em vez de uma promessa.
+
+O laço de realimentação fecha **duas vezes**: a ação move o drone no simulador *e* entra na predição do Kalman como comando conhecido. É o que faz o filtro acompanhar as viradas bruscas de rumo — e o que o KF de velocidade constante não tem.
 
 Nenhuma costura está **dentro** do ambiente. A física — movimento, alcance de comunicação, coleta, recompensa, terminação — permanece exatamente a de Lamenza em todas as etapas.
 
@@ -131,6 +137,10 @@ Três decisões registradas, cada uma com consequência:
 
 **O drone conserva ruído de GPS próprio, com σ fixo.** Ver §3.5.
 
+![Incerteza da estimativa de um sensor contra o número de medições: a curva medida de perto converge muito mais rápido que a medida de longe, mas ambas param no mesmo piso dado pelo viés fixo](img/incerteza-vs-medicoes.svg)
+
+*Como a precisão do relatório piora com a distância, medições feitas de perto pesam mais no filtro de informação: aproximar-se de um sensor **compra informação**. É esse mecanismo físico que dá sentido à H4 — com `R` constante, só o tempo reduziria a incerteza e a hipótese ficaria sem causa. As duas curvas param no mesmo lugar: o viés fixo não é filtrável.*
+
 ### 3.3 O filtro certo é de informação, não KF de movimento
 
 O sensor é **estático**: `F = I`, `Q = 0`, sem entrada de controle. O KF degenera no filtro de informação — média ponderada recursiva pela precisão:
@@ -184,6 +194,10 @@ A observação é relativa, então o erro do que a política vê é `e_k − e_i
 ```
 
 Filtrar um canal só melhora a percepção até o piso do outro. Com `σ_sensor = 5 m` irredutível, levar `σ_own` de 10 m a 0,7 m move `σ_rel` de 11,2 m para 5,05 m — fator **2,2×**, não 15×. **O achado A3 é sobre a posição própria, não sobre o que a política enxerga**, e essa distinção precisa aparecer no relatório (pendência T2).
+
+![Dois triângulos retângulos na mesma escala mostrando que reduzir o cateto do GPS de 10 para 0,7 metro move a hipotenusa apenas de 11,2 para 5,05 metros, porque o cateto do sensor continua em 5 metros](img/composicao-erro.svg)
+
+*Os dois erros entram na mesma diferença relativa, então compõem em quadratura. Reduzir o GPS catorze vezes move o que a política enxerga apenas duas. **O resultado medido no GPS não é o resultado percebido pela política** — são grandezas diferentes, e o relatório precisa dizer qual está reportando.*
 
 Contrapartida favorável: os dois canais têm naturezas de estimação **opostas** — estático sem controle contra móvel com controle —, e tê-los lado a lado é o contraste de livro-texto que a disciplina pede.
 
