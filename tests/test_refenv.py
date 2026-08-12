@@ -196,3 +196,45 @@ def test_sem_vazamento_de_handlers_de_logging():
     for s in range(1, 16):
         run_episode(cfg, g, seed=s)
     assert len(logging.getLogger().handlers) == antes
+
+
+# --- validação contra os resultados publicados -----------------------------
+
+PUBLICADO_FIG_7_3 = {
+    (2, 12): 29.6, (2, 24): 38.2, (2, 36): 43.2,
+    (4, 12): 28.2, (4, 24): 35.4, (4, 36): 39.7,
+    (8, 12): 27.6, (8, 24): 33.2, (8, 36): 36.7,
+}
+"""Barras "Heuristic" da fig. 7.3, lidas dos PNGs em
+`vendor/.../statistics/completion_times/`. Precisão de leitura ~0,3 s."""
+
+
+@pytest.mark.parametrize("cell", [(2, 12), (4, 24), (8, 36)])
+def test_guloso_reproduz_a_figura_7_3(cell):
+    """Prova de que a montagem está correta.
+
+    Se o guloso do próprio trabalho de referência, rodando no ambiente de
+    referência, reproduz os tempos publicados, então submodule, versão do
+    simulador, configuração e laço de avaliação estão todos certos -- sem
+    precisar de nenhuma política aprendida.
+
+    Três células aqui (a diagonal) para manter o teste rápido. A grade completa
+    está em `scripts/spec00_validar_guloso.py`: 9/9 células dentro de 10 %,
+    erro mediano 1,7 %, viés médio +0,5 %.
+    """
+    n_a, n_s = cell
+    publicado = PUBLICADO_FIG_7_3[cell]
+
+    # dt = 0,1 s: é assim que `visualize_performance.py` avalia a heurística.
+    cfg = LAMENZA_003(n_a, n_s, phase="eval_heuristic")
+    greedy = greedy_for(cfg)
+
+    n_ep = 60
+    ct = np.array([run_episode(cfg, greedy, seed=i).completion_time for i in range(n_ep)])
+    media = float(ct.mean())
+    erro = (media - publicado) / publicado
+
+    assert abs(erro) <= 0.12, (
+        f"Na={n_a} Ns={n_s}: medido {media:.2f} s vs publicado {publicado:.1f} s "
+        f"({erro:+.1%})"
+    )

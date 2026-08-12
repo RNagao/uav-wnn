@@ -120,3 +120,29 @@ Estas mudam o desenho do codificador binário e foram descobertas ao ler o códi
 | **P7** | `max_episode_length` "permissivo" do §7.1 | Cenário exploratório é outro (`001-prototype`/`002-scaling`) |
 | **P9** | `σ_sensor` | Parâmetro nosso, da Etapa 2 |
 | **V-1** | Invariante KS contra o gerador analítico | Depende da SPEC-01. Agora compara contra o ambiente de referência diretamente |
+
+---
+
+## 8. Validação contra os resultados publicados
+
+A prova de que a montagem está correta: a heurística gulosa **do próprio trabalho de referência**, rodando no ambiente de referência, reproduz os tempos da fig. 7.3. Nenhuma política aprendida é necessária — se o guloso bate, então submodule, versão do simulador, configuração e laço de avaliação estão todos certos.
+
+Configuração espelhada de `visualize_performance.py`: `algorithm_iteration_interval = 0,1` para a heurística, `end_when_all_collected` no default `True`, quebra na primeira `info` não vazia. 200 episódios por célula.
+
+| Na | Ns | medido (s) | IC95 | publicado (s) | erro |
+|---|---|---|---|---|---|
+| 2 | 12 | 29,89 | [29,10; 30,67] | 29,6 | +1,0 % |
+| 2 | 24 | 37,51 | [36,46; 38,56] | 38,2 | −1,8 % |
+| 2 | 36 | 43,30 | [41,99; 44,61] | 43,2 | +0,2 % |
+| 4 | 12 | 29,12 | [28,25; 29,99] | 28,2 | +3,3 % |
+| 4 | 24 | 35,73 | [34,53; 36,93] | 35,4 | +0,9 % |
+| 4 | 36 | 38,62 | [37,01; 40,24] | 39,7 | −2,7 % |
+| 8 | 12 | 28,41 | [27,49; 29,33] | 27,6 | +2,9 % |
+| 8 | 24 | 33,77 | [32,47; 35,06] | 33,2 | +1,7 % |
+| 8 | 36 | 36,34 | [34,74; 37,94] | 36,7 | −1,0 % |
+
+**9/9 células dentro de 10 %.** Erro relativo mediano **1,7 %**, máximo 3,3 %, viés médio **+0,5 %** — sem tendência sistemática. Taxa de sucesso 1,000 em todas.
+
+Os valores publicados foram lidos das figuras (`statistics/completion_times/*.png`), com precisão de leitura de ~0,3 s; o script de referência não semeia o gerador. O acordo dentro de ~2 % é o esperado para uma reprodução correta.
+
+Reprodução: `uv run python scripts/spec00_validar_guloso.py`. Três células (a diagonal) estão travadas em `tests/test_refenv.py::test_guloso_reproduz_a_figura_7_3`.
