@@ -35,38 +35,38 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 
 | Spec | Estado |
 |---|---|
-| SPEC-00 — Ambiente fiel a Lamenza | **implementada**; 40 testes; P1 e P2 fechadas. Falta o invariante V-1, que depende da SPEC-01 |
+| SPEC-00 — Ambiente de referência | **pronta**; o ambiente é o de Lamenza verbatim (submodule), 15 testes, P1 e P2 fechadas |
 | SPEC-01 — Estudo de binarização | especificada; próxima |
 | SPEC-02 a SPEC-10 | especificadas, em revisão |
 
 ## Instalação e uso
 
-Requer [uv](https://docs.astral.sh/uv/).
+Requer [uv](https://docs.astral.sh/uv/). O ambiente vem de um **submodule**:
 
 ```bash
+git submodule update --init --recursive
 uv sync
-uv run pytest -q                          # 40 testes
-uv run python scripts/spec00_budget.py    # custo e fidelidade do integrador
+uv run pytest -q                          # 15 testes
+uv run python scripts/spec00_budget.py    # custo por célula da grade
 ```
 
-Um episódio com a heurística gulosa:
+Um episódio com a heurística gulosa **do próprio trabalho de referência**:
 
 ```python
-from uavwnn.env import EpisodeRunner, GreedyPolicy, ScenarioConfig
+from uavwnn.refenv import LAMENZA_003, load_heuristics, run_episode
 
-cfg = ScenarioConfig(n_agents=4, n_sensors=24)
-runner = EpisodeRunner(cfg, root_seed=0)
-result = runner.run(GreedyPolicy(cfg.effective_n_star_a), episode_index=0)
-print(result.as_row())
+cfg = LAMENZA_003(num_drones=4, num_sensors=24)
+greedy = load_heuristics().create_greedy_heuristics(3, 12)
+print(run_episode(cfg, greedy, seed=1).as_row())
 ```
 
-## Parâmetros e proveniência
+## O ambiente é o de Lamenza, verbatim
 
-Os valores do cenário vieram do **código de referência** (`Project-GrADyS/gradys-data-collection@dissertation`, cenário `003-collaboration`), não do texto da dissertação, sempre que os dois divergem. Proveniência linha a linha em [`reports/spec00-parametros.md`](reports/spec00-parametros.md). Três divergências relevantes:
+Não há reimplementação do MDP. O ambiente vem do submodule `vendor/gradys-data-collection`, fixado na tag `dissertation`, cenário `003-collaboration`. Nosso `src/uavwnn/refenv/` apenas **carrega, configura e semeia** aquele código — nada altera observação, ação, recompensa, coleta ou terminação.
 
-- a observação é **normalizada** e o padding é **`-1`**, não `(0,0)` — o que torna desnecessário o bit de validade que havíamos projetado;
-- `algorithm_iteration_interval` é **0,5 s** no código contra 2 s na tab. 7.1 — e 2 s é fisicamente inconsistente com `communication_range = 20 m`;
-- o `update_rate` do código de referência (`interval/2`) introduz **viés sistemático de +7,9 %** no tempo de conclusão; ver [`reports/spec00-orcamento.md`](reports/spec00-orcamento.md).
+O simulador está fixado em **`gradysim==0.6.11`**: o `environment.py` de referência importa `VisualizationController`, que existe até essa versão e sumiu na série 0.7. Rodar código intacto contra outro simulador seria, por si só, uma divergência do baseline.
+
+Proveniência de cada parâmetro e as ressalvas sobre os números publicados estão em [`reports/spec00-parametros.md`](reports/spec00-parametros.md) — incluindo que a fig. 7.3 compara o MADDPG a 0,5 s por decisão com o guloso a 0,1 s, uma variável não controlada que vale ~10 % no tempo de conclusão.
 
 ## Referências
 

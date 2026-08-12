@@ -1,0 +1,3 @@
+[submodule "vendor/gradys-data-collection"]
+	path = vendor/gradys-data-collection
+	url = https://github.com/Project-GrADyS/gradys-data-collection.git
