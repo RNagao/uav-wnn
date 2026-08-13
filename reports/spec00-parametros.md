@@ -157,6 +157,8 @@ O `heuristics.py` de referência traz **três** políticas: `greedy`, `random` e
 
 ![O mesmo painel com 8 UAVs e 36 sensores: greedy leva 55,0 s com os oito drones colados, smart leva 11,5 s com oito territórios distintos](img/greedy-vs-smart-8a36s.png)
 
+As trajetórias no estilo exato do `plot_paths.py` de referência — incluindo a faixa semitransparente de **40 m em unidades de dados**, que é o diâmetro do alcance de comunicação varrido — estão em [`img/paths/`](img/paths/), com o mesmo esquema de nomes da pasta `statistics/paths/` do repositório de referência. Gerar com `--estilo lamenza`.
+
 *Mesma semente, mesmo cenário, mesma observação. As trajetórias da `greedy` são desenhadas com largura decrescente por UAV justamente para que as de baixo apareçam — sem esse cuidado o gráfico mostraria só o último drone e esconderia o achado. Gerados por `uv run python scripts/spec00_demo.py --compare ARQUIVO.png`.*
 
 **A `greedy` não coordena — nem um pouco.** Medido na célula 4×24, semente 1: a **separação média entre pares de UAVs ao longo do episódio é de 0,1 m**, contra um alcance de comunicação de 20 m. Os quatro drones voam em formação, colados, cobrindo o mesmo disco. Não é uma heurística de coordenação fraca; é ausência de coordenação. Reproduz exatamente o que Lamenza observa no §7.1 (fig. 7.1): as trajetórias se sobrepõem porque todos partem do mesmo ponto e escolhem o mesmo sensor mais próximo.

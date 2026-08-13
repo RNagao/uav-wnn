@@ -23,6 +23,7 @@ build-backend = "uv_build"
 dev = [
     "matplotlib>=3.11.1",
     "pytest>=9.1.1",
+    "seaborn>=0.13.2",
 ]
 
 [tool.pytest.ini_options]

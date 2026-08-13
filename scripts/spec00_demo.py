@@ -35,6 +35,8 @@ def main() -> int:
     ap.add_argument("--every", type=int, default=10, help="imprime uma linha a cada N passos")
     ap.add_argument("--compare", metavar="ARQUIVO.png",
                     help="painel greedy | smart no mesmo cenário e semente")
+    ap.add_argument("--estilo", choices=["compacto", "lamenza"], default="compacto",
+                    help="'lamenza' reproduz o estilo do plot_paths.py de referência")
     args = ap.parse_args()
 
     if args.compare:
@@ -113,12 +115,79 @@ def main() -> int:
           f"(soma dos {cfg.num_drones} UAVs)")
 
     if args.plot:
-        salvar_grafico(args.plot, trilhas, sensores, env, cfg, args)
+        if args.estilo == "lamenza":
+            salvar_grafico_lamenza(args.plot, trilhas, sensores, cfg, args)
+        else:
+            salvar_grafico(args.plot, trilhas, sensores, env, cfg, args)
     else:
         print("\n(use --plot trajetorias.png para ver os caminhos)")
 
     env.close()
     return 0
+
+
+def _largura_em_dados(ax, fig, metros: float) -> float:
+    """Converte uma largura em METROS para pontos de linha do matplotlib.
+
+    É o miolo da classe `data_linewidth_plot` do `plot_paths.py` de referência:
+    sem isso a faixa semitransparente não representa o alcance de comunicação,
+    representa só uma linha grossa qualquer. Como salvamos PNG estático, basta
+    calcular uma vez depois do layout.
+    """
+    fig.canvas.draw()
+    ppd = 72.0 / fig.dpi
+    t = ax.transData.transform
+    return float(((t((0, metros)) - t((0, 0))) * ppd)[1])
+
+
+def salvar_grafico_lamenza(arquivo, trilhas, sensores, cfg, args) -> None:
+    """Reproduz o estilo do `plot_paths.py` de referência.
+
+    Diferenças em relação ao original, todas por necessidade: eles plotam a
+    trajetória de um MADDPG treinado, e nós de uma heurística; e usamos os
+    marcadores por época de decisão do mesmo jeito, porque é o que mostra onde
+    o UAV realmente decidiu.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import seaborn as sns
+    except ImportError:
+        print("\nfaltam dependências. Rode: uv add --dev matplotlib seaborn pandas")
+        return
+
+    sns.set_theme()
+    sns.set_context("talk")
+    sns.set_style("whitegrid")
+    fig, ax = plt.subplots(figsize=(14, 12))
+    S = cfg.scenario_size
+    ax.set_xlim(-S, S)
+    ax.set_ylim(-S, S)
+
+    sensor_df = pd.DataFrame({"x": sensores[:, 0], "y": sensores[:, 1]})
+    sns.scatterplot(data=sensor_df, x="x", y="y", ax=ax, marker="x", color="black",
+                    label="Sensors Positions", s=100, linewidth=2)
+
+    # Diâmetro do alcance, em metros — é o que a faixa representa.
+    diametro = 2 * cfg.communication_range
+    lw = _largura_em_dados(ax, fig, diametro)
+
+    for k, t in enumerate(trilhas):
+        t = np.array(t)
+        linha, = ax.plot(t[:, 0], t[:, 1], marker="o", linestyle="-", ms=5,
+                         label=f"Agent {k}")
+        ax.plot(t[:, 0], t[:, 1], linestyle="-", linewidth=lw,
+                color=linha.get_color(), alpha=0.1, solid_capstyle="round")
+
+    ax.legend()
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    fig.tight_layout()
+    fig.savefig(arquivo, dpi=100)
+    print(f"\ngráfico salvo: {arquivo}  (estilo plot_paths.py)")
+    print(f"compare com: vendor/gradys-data-collection/scenario/003-collaboration/"
+          f"statistics/paths/path-a{cfg.num_drones}s{cfg.num_sensors}.png")
 
 
 def rodar_silencioso(tipo, args):

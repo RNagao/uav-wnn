@@ -56,7 +56,7 @@ uv run pytest -q                                # 18 testes
 
 | Script | O que faz |
 |---|---|
-| `spec00_demo.py` | roda um episódio imprimindo o traço; `--plot` salva as trajetórias |
+| `spec00_demo.py` | roda um episódio imprimindo o traço; `--plot` salva as trajetórias, `--compare` gera o painel greedy vs smart |
 | `spec00_visualizar.py` | **visualização 3D ao vivo** no navegador, em tempo real |
 | `spec00_validar_guloso.py` | reproduz a fig. 7.3 nas 9 células da grade |
 | `spec00_budget.py` | custo de simulação por célula |
