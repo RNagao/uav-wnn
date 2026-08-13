@@ -66,9 +66,25 @@ uv run python scripts/spec00_demo.py --policy smart --plot traj.png
 uv run python scripts/spec00_visualizar.py --policy greedy
 ```
 
-A visualização sobe um servidor WebSocket em `localhost:5678`; abra
-<https://project-gradys.github.io/gradys-sim-nextgen-visualization/> e o
-visualizador conecta sozinho.
+### Visualização 3D ao vivo
+
+O simulador sobe um servidor **WebSocket** em `localhost:5678`. Ele fala apenas WebSocket e **não serve página** — abrir `localhost:5678` no navegador dá o erro *"You cannot access a WebSocket server directly with a browser"*.
+
+Quem serve a página é o visualizador hospedado, e é ele que conecta no seu servidor:
+
+```
+https://project-gradys.github.io/gradys-sim-nextgen-visualization/
+```
+
+Use **Chrome ou Edge**: a página é HTTPS e precisa abrir um WebSocket inseguro em `localhost`. O Chrome permite, porque trata `localhost` como origem confiável; o Firefox costuma bloquear.
+
+Se a página não conectar, isole o problema sem depender do navegador:
+
+```bash
+uv run python scripts/spec00_visualizar.py --diagnostico
+```
+
+Ele conecta como cliente WebSocket em Python e imprime os quadros recebidos. Se passar, o servidor está bom e o problema é do navegador.
 
 Um episódio com a heurística gulosa **do próprio trabalho de referência**:
 

@@ -24,6 +24,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import sys
 import time
@@ -38,6 +39,77 @@ AZUL = (60, 130, 246)
 VERMELHO = (200, 60, 72)
 
 
+def instrucoes(cfg, args) -> None:
+    largura = len(VISUALIZADOR) + 4
+    print()
+    print("  ┌─ ABRA ESTA PÁGINA NO NAVEGADOR " + "─" * max(0, largura - 32) + "┐")
+    print(f"  │  {VISUALIZADOR}  │")
+    print("  └" + "─" * largura + "┘")
+    print()
+    print("  NÃO abra localhost:5678 no navegador. Aquilo fala apenas WebSocket,")
+    print("  não serve página — é a página acima que se conecta nele.")
+    print()
+    print("  Use Chrome ou Edge: a página é HTTPS e precisa abrir um WebSocket")
+    print("  inseguro em localhost. Chrome permite; Firefox costuma bloquear.")
+    print()
+    print(f"  {args.agents} UAVs (azul) · {args.sensors} sensores (vermelho → verde ao coletar)")
+    print(f"  política '{args.policy}' · semente {args.seed} · roda em tempo real")
+    print()
+
+
+def diagnostico(cfg, args) -> int:
+    """Prova o lado servidor sem depender de navegador.
+
+    Separa dois problemas que se confundem: servidor quebrado versus navegador
+    que não conecta. Se isto passa e a página não mostra nada, o problema é do
+    navegador — conteúdo misto, extensão ou firewall —, não do simulador.
+    """
+    import asyncio
+    import json
+    import threading
+
+    import websockets
+
+    env_mod = load_environment()
+    h = load_heuristics()
+    pol = h.create_greedy_heuristics(args.agents - 1, cfg.state_num_closest_sensors)
+    env = env_mod.GrADySEnvironment(render_mode="visual", **cfg.kwargs())
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    obs, _ = env.reset()
+
+    def girar():
+        o = obs
+        for _ in range(40):
+            o, *_ = env.step({a: pol(o[a]) for a in env.agents})
+
+    threading.Thread(target=girar, daemon=True).start()
+
+    async def cliente():
+        await asyncio.sleep(1.0)
+        async with websockets.connect("ws://localhost:5678") as ws:
+            print("  CONECTADO a ws://localhost:5678\n")
+            for n in range(3):
+                msg = json.loads(await ws.recv())
+                if isinstance(msg, dict):
+                    print(f"  quadro {n + 1}: {sorted(msg.keys())}")
+            print("\n  O SERVIDOR ESTÁ BOM.")
+            print("  Se a página não mostra nada, o problema é do navegador:")
+            print("  tente Chrome/Edge, e confira se alguma extensão bloqueia WebSocket.")
+
+    try:
+        asyncio.run(cliente())
+    except Exception as e:
+        print(f"\n  FALHOU ao conectar: {e}")
+        print("  O servidor não subiu. Verifique se a porta 5678 está livre.")
+        return 1
+    finally:
+        # O SyncManager do multiprocessing cospe um KeyError de teardown no
+        # stderr ao encerrar. É ruído inofensivo do gradysim.
+        sys.stderr = open(os.devnull, "w")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--agents", type=int, default=4)
@@ -46,9 +118,14 @@ def main() -> int:
     ap.add_argument("--policy", choices=["greedy", "smart", "random"], default="greedy")
     ap.add_argument("--espera", type=float, default=12.0,
                     help="segundos para você abrir o navegador antes de começar")
+    ap.add_argument("--diagnostico", action="store_true",
+                    help="testa o servidor WebSocket sem navegador e sai")
     args = ap.parse_args()
 
     cfg = LAMENZA_003(args.agents, args.sensors)
+    if args.diagnostico:
+        return diagnostico(cfg, args)
+
     env_mod = load_environment()
     h = load_heuristics()
     policy = {
@@ -75,10 +152,7 @@ def main() -> int:
     except Exception as e:  # o controlador é best-effort
         print(f"(não foi possível estilizar os nós: {e})")
 
-    print(f"\n  servidor WebSocket em localhost:5678")
-    print(f"  abra:  {VISUALIZADOR}\n")
-    print(f"  {args.agents} UAVs (azul) · {args.sensors} sensores (vermelho → verde ao coletar)")
-    print(f"  política '{args.policy}' · semente {args.seed} · roda em tempo real\n")
+    instrucoes(cfg, args)
     for restante in range(int(args.espera), 0, -1):
         print(f"\r  começando em {restante:2d}s ...", end="", flush=True)
         time.sleep(1)
