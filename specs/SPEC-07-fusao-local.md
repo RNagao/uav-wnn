@@ -5,6 +5,66 @@
 
 ---
 
+## 0. Revisão após a SPEC-00 — o ponto de inserção mudou
+
+Esta spec foi escrita supondo que o ambiente seria nosso e que o ruído entraria por uma interface `StateView`. **O ambiente passou a ser o de Lamenza, verbatim, e não é editável.** O ponto de inserção agora é **subclasse do `GrADySEnvironment`, sobrescrevendo apenas `observe_simulation_relative_positions()`**. Ver `specs/ARQUITETURA.md` §3.
+
+Três consequências, todas favoráveis:
+
+**(a) A física fica intocável por construção.** Movimento, alcance de comunicação, coleta, recompensa e terminação vivem no `Simulator`, fora do alcance do método sobrescrito. RF-04 ("a verdade não vaza para a política") deixa de precisar de *taint tracking* — a subclasse só pode corromper o que devolve.
+
+**(b) O erro de GPS próprio é um deslocamento COMUM, e isso simplifica tudo.** Verificado numericamente. Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`. Se a estimativa própria erra por `e`:
+
+```
+(p̂_k − p_i + S)/(2S) = (p_k − p_i + S)/(2S) + e/(2S)
+```
+
+O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos — e o padding `-1` não é tocado. Logo:
+
+- corromper = somar duas linhas de código, não reconstruir a observação;
+- **aplicar o filtro = somar `(p̃_k − p̂_k)/(2S)`**, pela mesma razão;
+- a escala do erro em unidades de observação é `σ/(2S)`. Com `S = 100 m`, `σ = 5 m` desloca **0,025** — comparável direto à largura do bin do termômetro. É a regra *bin ≈ σ* em unidades da entrada real.
+
+**(c) Guardas fortes e baratas.** Com `σ = 0` a subclasse devolve observação **bit-idêntica** ao pai (verificado). E o tempo de conclusão com `σ = 0` tem de continuar reproduzindo a fig. 7.3, que a SPEC-00 já travou em 9/9 células.
+
+### O modelo de ruído mudou: o canal primário é o SENSOR
+
+Esta spec supunha o GPS do drone como canal principal. **Inverteu-se.** O desenho agora é: o drone recebe, a cada época, um relatório corrompido da posição de cada sensor e o refina recursivamente; **tudo que ele deriva daí, inclusive o ranking, é computado sobre a estimativa filtrada.** Detalhe completo em `specs/ARQUITETURA.md` §3.
+
+```
+z_{i,t} = p_i + b_i + v_{i,t}      b_i ~ N(0, σ_b²)  viés FIXO por sensor
+                                   v_{i,t} ~ N(0, R(d))  BRANCO por relatório
+R(d) = (σ_0 + κ·d)² I              precisão PIORA com a distância
+```
+
+| # | A spec dizia | Correção |
+|---|---|---|
+| 1 | O erro dos sensores é **constante no episódio**; sortear por passo seria modelar errado | **Invertido.** A componente branca é o que dá sentido à filtragem — sem ela não há o que filtrar. O que existe é branco **mais** um viés fixo, e o viés é o piso irredutível |
+| 2 | O canal dos sensores é degenerado na Etapa 2 porque ouvir = coletar (achado C5) | **Resolvido.** O relatório não vem por rádio: vem do **canal global reinterpretado**. Nenhuma mudança de protocolo, e o canal deixa de ser degenerado — há medições repetidas a fundir |
+| 3 | O filtro dos sensores é um KF | É **filtro de informação**: estado estático, `F=I`, `Q=0`, sem entrada de controle. Mais barato e mais estável para constante |
+| 4 | Ganho ≈ o 18,8× do achado A3 | A3 é sobre a posição **própria**. Com `σ_rel = √(σ_own² + σ_sensor²)`, o ganho no que a política enxerga é limitado pelo pior canal (pendência **T2**) |
+| 5 | `dt` a definir | É **0,5 s**, do `benchmark.py`. E a posição lida está **um tique atrasada** (quirk Q3): o KF do canal próprio precisa modelar isso |
+| 6 | Mobilidade com inércia como ablação fácil | Está **dentro do `reset()`** de referência; trocá-la é mais invasivo que sobrescrever a observação. Sem inércia o modelo de processo é quase exato e `Q` degenera — declarar como limitação |
+
+### O experimento que esta spec ganha de presente
+
+Se o filtro de informação **ignorar o viés `b_i`**, ele converge para `p_i + b_i` com `P → 0`: fica arbitrariamente confiante num valor errado, e o **NEES estoura**. É predição falsificável, e é o melhor material da Etapa 2 para a disciplina — o filtro ingênuo passa em qualquer inspeção visual e **só a validação de consistência o denuncia**. A correção é limitar `P` inferiormente por `σ_b²`; a diferença entre as duas versões é resultado a reportar.
+
+### O canal do GPS próprio permanece
+
+`σ_own` **fixo**, com KF de entrada de controle, **fora da varredura** (que é toda do canal do sensor). A grade continua `σ_sensor × T` = 12 configurações. Duas razões: o achado A3 só existe neste canal, e sem incerteza na posição própria a **interseção de covariância da Etapa 3 perde o objeto** — drones transmitiriam posições exatas e não haveria erro correlacionado a fundir.
+
+### Uma decisão que esta spec precisa tomar
+
+Com posição própria ruidosa, o agente real ordenaria os sensores pela distância **percebida**; o ambiente ordena pela **verdadeira** e entrega só os `N*_s` mais próximos. Duas leituras:
+
+- **(i)** herdar seleção e ordenação verdadeiras, só deslocar coordenadas — erro de segunda ordem, só importa quando dois sensores distam menos que `σ`;
+- **(ii)** recomputar seleção e ordenação a partir das posições estimadas — mais fiel, acessível na subclasse por leitura do `Simulator`.
+
+**Recomendação: (ii)**, com (i) como ablação para quantificar a idealização. Em `Ns = 36` num quadrado de 200 m a distância típica entre vizinhos é ~30 m, comparável a `σ = 10 m` — não é desprezível.
+
+---
+
 ## 1. Objetivo
 
 Entregar, **validado fora do laço de RL**, o estimador de estado que substitui o canal global de Lamenza: (i) uma camada de corrupção parametrizada e reprodutível, (ii) um filtro de Kalman linear de 2 estados que usa a **velocidade comandada pela política** como entrada de controle, (iii) um filtro de informação para o canal estático dos sensores, (iv) o aparato de consistência NEES/NIS que autoriza qualquer número a jusante, e (v) o teste automatizado do invariante de vazamento (RF-04).

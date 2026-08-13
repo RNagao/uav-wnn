@@ -1,7 +1,25 @@
 # SPEC-01 — Estudo de binarização
 
-**Etapa:** pré-Etapa 1 · **Depende de:** nada · **Estimativa:** 3–4 dias
+**Etapa:** pré-Etapa 1 · **Depende de:** SPEC-00 (ambiente carregado) · **Estimativa:** 3 dias
+**Revisada** após a SPEC-00: o gerador analítico foi **descartado** e três premissas caíram — ver §0.
 **Portão de saída:** `G0` · **Referência:** PRD §5.2 (observação), §5.4 (desvios), §5.5 (custo)
+
+---
+
+## 0. O que mudou depois da SPEC-00
+
+A SPEC-00 leu o código de referência e mediu o ambiente. Quatro premissas desta spec caíram:
+
+| # | A spec supunha | O ambiente entrega |
+|---|---|---|
+| 1 | Entrada em metros crus, faixa `[-200, 200]` | **Já normalizada**: `(p_k − p_i + S)/(2S)`. Faixa **real medida `[-0,5; 1,5]`** — nem `[0,1]`, nem o `Box(-1,1)` declarado |
+| 2 | Padding `(0,0)`, ambíguo com "sensor sobre o UAV" — daí o **bit de validade** | Padding **`-1`**, fora da faixa dos válidos. Ambiguidade não existe; **o bit de validade foi removido do escopo** |
+| 3 | Corpus vindo de um **gerador analítico** sem simulador, validado por KS (invariante V-1) | **Desnecessário.** O ambiente de referência roda a 0,02–0,15 s por episódio: gera-se o corpus direto dele. V-1 **deixa de existir**, e com ele o maior risco desta spec |
+| 4 | `T` e `N` varridos independentemente | **Não são independentes** (achado C4): com `N·n = 576` contra `B ≈ 3200` em `T=128`, a rede lê ~18 % da entrada. Aumentar `T` sem aumentar `N` reduz a fração observada |
+
+O índice do agente entra como `k/Na`, já em `[0,1)` — é categórica disfarçada de escalar, e o tratamento continua sendo pergunta desta spec.
+
+**Consequência prática:** a spec fica mais curta e menos arriscada. Some o gerador analítico, some o teste KS, some o bit de validade; entra a cobertura de bits como métrica de primeira classe.
 
 ---
 
@@ -23,26 +41,20 @@ O argumento prático é mais direto: **um codificador ruim é indistinguível de
 
 ---
 
-## 4. Gerador analítico de cenários
+## 4. Corpus — direto do ambiente de referência
 
-Não depende do `gradysim`. A observação (PRD §5.2, Lamenza eq. 5-1) é função pura das posições e da máscara de visitados.
+O gerador analítico foi descartado (§0). O corpus vem do **ambiente de referência**, o que elimina de uma vez o maior risco desta spec: otimizar o codificador para a distribuição errada. O invariante V-1 e o teste KS deixam de existir.
 
-**Amostragem estática:** `Ns` sensores uniformes em `[-100, 100]²`; UAVs em área pequena no centro; máscara de visitados sorteada com fração `ρ ∈ [0, 1]` para cobrir todo o ciclo do episódio.
+Custo medido (SPEC-00): 0,02 a 0,15 s por episódio, ~60 a 100 passos de decisão por episódio, com 1 a 8 agentes. Um corpus de 10⁶ observações sai em minutos.
 
-**Rollout analítico do guloso:** `dt = 2 s`, `v = 15 m/s`, direção para o sensor não visitado mais próximo; sensor marcado como visitado quando `d ≤ communication_range`. Reproduz a dinâmica suficiente para gerar a distribuição **on-policy** das observações.
+| Conjunto | Origem | Papel |
+|---|---|---|
+| `on-policy` | rollouts do **guloso de referência** (`heuristics.py`) | é a distribuição que a política vai encontrar |
+| `exploratorio` | rollouts da política **aleatória** de referência | cobertura; evita ajustar o codificador ao guloso |
 
-> **Invariante V-1 (fidelidade do corpus).** Quando a SPEC-00 entregar o ambiente real, comparar os histogramas de cada componente da observação entre o gerador analítico e o `gradysim` por teste de Kolmogorov–Smirnov. **Divergência significativa invalida este estudo e obriga a refazê-lo.** Sem esse teste, corre-se o risco de otimizar o codificador para a distribuição errada.
+Células: `Na ∈ {1, 2, 4}` × `Ns ∈ {12, 24, 36}`. Sementes fixas via `run_episode(..., seed=i)`; corpus regenerável por script, não versionado.
 
-> **Dependência de P1.** `communication_range` ainda não foi confirmado (PRD §10). O rollout guloso depende dele através da dinâmica da máscara de visitados. Rodar com 2–3 valores candidatos e **reportar a sensibilidade**; se as conclusões mudarem entre eles, o estudo fica bloqueado em P1.
-
-### Corpus
-
-| Conjunto | Tamanho | Origem | Papel |
-|---|---|---|---|
-| `on-policy` | ~10⁶ observações | rollouts gulosos | é a distribuição que a política vai encontrar |
-| `uniforme` | ~10⁵ observações | amostragem estática com `ρ` uniforme | cobertura; evita ajustar o codificador ao guloso |
-
-Células: `Na ∈ {1, 2, 4}` × `Ns ∈ {12, 24, 36}`. Seeds fixas, corpus versionado e regenerável.
+**Estratificação obrigatória.** A fração de sensores restantes varia muito ao longo do episódio, e com ela a distribuição da observação — no fim do episódio a maioria dos slots é padding. Todas as métricas abaixo são reportadas **estratificadas por fração restante**, não só agregadas.
 
 ---
 
@@ -60,16 +72,16 @@ Métrica: entropia da distribuição quantizada, por slot, sob binning global un
 
 | id | Esquema | Observação |
 |---|---|---|
-| **E0** | termômetro linear global | bins uniformes em `[-200, 200]`, iguais para todos os slots — a linha de base ingênua |
+| **E0** | termômetro linear global | bins uniformes na faixa medida `[-0,5; 1,5]`, iguais para todos os slots — a linha de base ingênua |
 | **E1** | termômetro linear **por slot** | limites do suporte empírico de cada slot |
 | **E2** | termômetro **distributivo** (quantis) por slot | bins equiprováveis segundo o corpus |
 | **E3** | E2 + **polar** `(distância, ângulo)`, ângulo com codificador **circular** | ver ressalva abaixo |
 
-Varredura: `T ∈ {4, 8, 16, 32, 64}` bits por escalar × `{com, sem}` bit de validade.
+Varredura: `T ∈ {4, 8, 16, 32, 64}` bits por escalar **× `N ∈ {16, 48, 128}`** — os dois eixos **juntos**, nunca separados, pela razão de cobertura de bits (§0, item 4 e T-01.4).
+
+**Tratamento do padding `-1`.** Ele fica fora da faixa dos válidos, então o termômetro o mapeia naturalmente para "tudo zero" (ou "tudo um", conforme o sentido). Isso é o comportamento desejado e é o que dispensa o bit de validade — mas precisa ser **verificado**, não presumido: teste de que o padrão binário de um slot de padding é constante e distinto do padrão de qualquer valor válido.
 
 > **Ressalva sobre E3.** Converter `(dx, dy)` para `(d, θ)` é bijeção — a informação disponível ao agente é idêntica, e a conversão acontece **dentro do codificador**. Ainda assim, muda o vetor que a rede recebe e portanto **exige uma linha nova na tabela de desvios do PRD §5.4 se for adotado**. Há razão para testá-lo: o codificador circular de Katopodis existe exatamente para grandezas angulares, e sob distância de tupla a representação cartesiana degrada mal sob rotação. Há razão para desconfiar: Lamenza testou "ângulos e distâncias em vez de coordenadas" e mediu **pior** — para MLP. É uma pergunta empírica aberta e o mérito do estudo é respondê-la barato.
-
-O **bit de validade por slot** (PRD §5.4) é obrigatório na configuração final; a ablação existe só para quantificar quanto ele vale.
 
 ### T-01.3 — Geometria: preservação de similaridade
 

@@ -6,6 +6,27 @@
 
 ---
 
+## 0. Revisão após a SPEC-00 — os baselines já existem
+
+Esta spec foi escrita para **implementar** os baselines. O repositório de referência já os traz, e eles são os que geraram a fig. 7.3:
+
+| Baseline | Onde | Situação |
+|---|---|---|
+| Guloso (sensor não visitado mais próximo) | `heuristics.py::create_greedy_heuristics` | **usar verbatim** — reimplementar reintroduz o risco que a SPEC-00 eliminou |
+| Aleatório | `heuristics.py::create_random_heuristics` | usar verbatim |
+| `smart` (atribuição gulosa entre agentes) | `heuristics.py::create_smart_heuristics` | **brinde**: é coordenação sem aprendizado, exatamente o baseline 3 que esta spec projetava construir |
+| k-means + TSP | não existe | **continua sendo nosso** — é o teto quase-ótimo |
+
+Perguntas fechadas pelo código: o guloso usa velocidade máxima (`1` normalizado) e **recomputa o alvo a cada passo** (Q3 e Q4 desta spec).
+
+**Validação já feita.** O guloso de referência reproduz a fig. 7.3 em **9/9 células**, erro mediano 1,7 %, viés médio +0,5 %. Ver `reports/spec00-parametros.md` §8 e `tests/test_refenv.py`.
+
+**Ressalva que esta spec precisa carregar.** Em `visualize_performance.py` o MADDPG é avaliado a `interval = 0,5 s` e o guloso a `0,1 s`. Medido: o guloso a 0,1 s completa em 39,1 s contra 43,5 s a 0,5 s — **~10 %**. Ao comparar nossa política com o guloso, ambos devem rodar no **mesmo** `interval`; ao citar os números publicados, a assimetria deve ser declarada.
+
+O escopo desta spec encolhe para: **k-means+TSP**, o harness de avaliação com IC pareado, e a decisão sobre agregação de episódios sem sucesso.
+
+---
+
 ## 1. Objetivo
 
 Entregar (a) os três baselines não aprendidos do PRD §6.1 como políticas executáveis dentro do mesmo ambiente, (b) a interface `Policy` que baselines e políticas aprendidas implementam sem que o avaliador saiba qual é qual, e (c) o harness que roda 500 episódios de avaliação **pareados por semente** e produz números com intervalo de confiança, incluindo o **IC da diferença pareada**, que é a estatística sobre a qual H6 e o portão G1 são decididos.

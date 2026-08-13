@@ -218,7 +218,7 @@ p = 1 − (1 − Na/B)^n
 
 Para `Na = 4`, `T = 32` sobre 31 escalares (`B ≈ 1000`), `n = 12`: `p ≈ 4,7 %` — cerca de **2 de 48 RAMs** enxergam a identidade do agente. O canal de individualidade que Lamenza obtém de graça numa MLP densa (toda unidade da primeira camada vê o índice) é, na rede n-tuple, praticamente inexistente.
 
-**Mitigações a testar em T-05.5:** (i) replicar o one-hot `R` vezes no padrão binário, elevando `p` a `1 − (1 − R·Na/B)^n`; (ii) reservar um grupo de RAMs cujo mapeamento **inclui obrigatoriamente** os bits de índice; (iii) não fazer nada e medir — se a individualidade não tiver efeito no tempo de conclusão, é resultado a reportar, e um resultado interessante (a coordenação de Lamenza emerge de posições relativas, não de identidade). Isto é um acréscimo ao **codificador**, portanto não entra na tabela de desvios §5.4, pela mesma lógica do bit de validade.
+**Mitigações a testar em T-05.5:** (i) replicar o one-hot `R` vezes no padrão binário, elevando `p` a `1 − (1 − R·Na/B)^n`; (ii) reservar um grupo de RAMs cujo mapeamento **inclui obrigatoriamente** os bits de índice; (iii) não fazer nada e medir — se a individualidade não tiver efeito no tempo de conclusão, é resultado a reportar, e um resultado interessante (a coordenação de Lamenza emerge de posições relativas, não de identidade). Isto é um acréscimo ao **codificador**, portanto não entra na tabela de desvios §5.4 — a mesma lógica pela qual a binarização em si é a única linha de lá.
 
 ### 4.8 Baseline MLP AC pareado
 
@@ -297,7 +297,7 @@ Isto é o que garante o pareamento: se o laço estivesse duplicado nos dois agen
 
 Hiperparâmetros do apêndice A.3/A.6 dele, verbatim. O alvo do AC com MLP no Mountain Car (≈ 0, ótimo local de não mover o carro) é um **controle negativo** tão informativo quanto o positivo: se a nossa MLP resolver o Mountain Car, ela não é a MLP dele e a comparação de H1 não é a comparação dele.
 
-**(b) Validação da ação circular** — nenhum benchmark clássico tem ação **angular**, então usamos um brinquedo próprio, no gerador analítico que a SPEC-01 já entrega (`env/analytic.py`): 1 UAV, 1 sensor, área 200 × 200, `dt = 2 s`, ação `⟨θ, s⟩`, recompensa `+10` na visita e `−1/passo`. Sem simulador, sem rede, episódios de milissegundos.
+**(b) Validação da ação circular** — nenhum benchmark clássico tem ação **angular**, então usamos um brinquedo próprio, um brinquedo próprio em `src/uavwnn/toy/nav.py`: 1 UAV, 1 sensor, área 200 × 200, `dt = 0,5 s`, ação `⟨θ, s⟩`, recompensa `+10` na visita e `−1/passo`. **Não** usa o gerador analítico da SPEC-01, que foi descartado — é um brinquedo independente, sem simulador e sem rede, com episódios de milissegundos.
 
 É aqui que C0, C1 e C2 são comparados com custo desprezível — e é o único ponto do projeto em que a decisão da §4.3 é falsificável de forma barata. Métrica: passos até a visita, e erro angular mediano entre `atan2(f₂,f₁)` e o rumo ótimo.
 
@@ -366,7 +366,7 @@ Não implementar o harness (é a SPEC-03), mas **expor e testar** o que ele cons
 | **O ator WNN sai maior que a MLP pareada** (§4.8: ≈ 14,8 KB vs 8,6 KB, e piora no "realizado") | Já previsto pelo PRD §5.5. Discriminador vetorial em vez de escalares; medir e reportar honestamente; migrar o argumento para T3 (zero MAC em ponto flutuante), que é onde a diferença é estrutural. Reportar contra **ambas** as referências (D12) |
 | **C2 não resolve a circularidade** e a política não aprende rumo | C1 e C0 implementadas como ablação barata em T-05.2; o brinquedo de T-05.4(b) responde em minutos. Se as três falharem, o diagnóstico é do codificador (volta para a SPEC-01), não do algoritmo |
 | **`‖f‖` colapsa (exploração some cedo) ou explode** | Esquecimento no ator (`λ`) como encolhimento; projeção `r_max` como *fallback*; histograma de `‖f‖` como diagnóstico obrigatório — é o instrumento que separa "não aprendeu" de "convergiu cedo demais" |
-| **`max_seconds_stalled = 30 s` impede o arranque.** Com a memória zerada o rumo é uniforme e a velocidade média é 7,5 m/s; se o agente não visita nenhum sensor em 15 decisões, o episódio é podado, o crítico só vê prefixos e a janela de `m = 250` nunca amadurece | Medir a taxa de visitação sob a política inicial **antes** de treinar (é uma conta de Monte Carlo no gerador analítico, custo desprezível). Se for baixa demais, as opções são relaxar `max_seconds_stalled` **só durante um aquecimento de treino** — decisão a registrar na §10 do PRD — ou aceitar e reportar. Não improvisar durante a SPEC-06 |
+| **`max_seconds_stalled = 30 s` impede o arranque.** Com a memória zerada o rumo é uniforme e a velocidade média é 7,5 m/s; se o agente não visita nenhum sensor em 15 decisões, o episódio é podado, o crítico só vê prefixos e a janela de `m = 250` nunca amadurece | Medir a taxa de visitação sob a política inicial **antes** de treinar (é uma conta de Monte Carlo no brinquedo de navegação, ou direto no ambiente de referência a 0,017 s por episódio — custo desprezível nos dois casos). Se for baixa demais, as opções são relaxar `max_seconds_stalled` **só durante um aquecimento de treino** — decisão a registrar na §10 do PRD — ou aceitar e reportar. Não improvisar durante a SPEC-06 |
 | **Vantagem de variância explosiva por crítico frio** | Aquecimento `K_warmup`; normalização/recorte de `δ`; monitorar a fração de leituras em entradas com `c < c_min` |
 | **`σ⁻²` confunde a varredura de `η`** | Varrer `η′ = η/σ_s²` e reportar `η′`, explicitamente |
 | **Convenção soma/média trocada** entre o protótipo e as taxas de Katopodis, com fator `N` de erro | Decisão registrada (§4.2), conversão do protótipo, e um teste que verifica `f(x) = (1/N)Σ v[i](x)` |
@@ -385,7 +385,7 @@ Não implementar o harness (é a SPEC-03), mas **expor e testar** o que ele cons
 - `src/uavwnn/agents/ntuple_ac.py` — ator funcional com posições vetoriais `d = 3`; crítico NTRN com esquecimento (+ variante funcional)
 - `src/uavwnn/agents/mlp_ac.py` — NumPy puro, ator e crítico, Adam, sem PyTorch
 - `src/uavwnn/agents/interface.py` — `Policy` (§4.6), com tipos e formas documentados
-- `src/uavwnn/env/toy_nav.py` — brinquedo de navegação `⟨θ, s⟩` sobre `env/analytic.py`
+- `src/uavwnn/toy/nav.py` — brinquedo de navegação `⟨θ, s⟩`, independente do ambiente de referência
 - `configs/spec05/` — hiperparâmetros de reprodução de Katopodis e faixas iniciais para a SPEC-06
 - `reports/spec05-actor-critic.md` + figuras (curvas de validação, C0/C1/C2, histograma de `‖f‖`, tabela T3)
 - `tests/test_ac_core.py`, `tests/test_policies.py`, `tests/test_mlp_grad.py`, `tests/test_pareamento.py`, `tests/test_determinismo.py`

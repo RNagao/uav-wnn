@@ -1,0 +1,33 @@
+[project]
+name = "uavwnn"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Rnagao", email = "nagao1234@poli.ufrj.br" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "gradysim==0.6.11",
+    "gymnasium>=1.3.0",
+    "numpy>=2.5.2",
+    "pettingzoo>=1.26.1",
+    "scipy>=1.18.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.8,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.11.1",
+    "pytest>=9.1.1",
+    "seaborn>=0.13.2",
+]
+
+[tool.pytest.ini_options]
+# `vendor/` é código de terceiros carregado como submodule: não coletar os
+# testes dele nem tratá-lo como pacote nosso.
+testpaths = ["tests"]
+norecursedirs = ["vendor", ".venv", ".git"]

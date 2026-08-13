@@ -4,13 +4,17 @@
 **Disciplina:** Fusão de Dados — PESC/COPPE-UFRJ
 **Autor:** Raphael Nagao Ferreira · rnagao@cos.ufrj.br
 **Data:** 09/08/2026 · **Prazo:** 4 semanas (entrega em ~06/09/2026)
-**Status:** rascunho para aprovação · **Versão:** 2.1 — *problema de Lamenza preservado; tamanho de modelo e tempo de inferência como figuras de mérito de primeira classe (§5.5)*
+**Status:** em execução · **Versão:** 3.0 — *o ambiente passa a ser o de Lamenza verbatim (submodule); features entram por costuras externas (ver `specs/ARQUITETURA.md`)*
 
 ---
 
 ## 0. Princípio que rege este documento
 
-> **O problema formulado por Lamenza (2025) não é modificado.** Cenário, observação, ação, recompensa, métricas e parâmetros são reproduzidos como estão na dissertação. A única coisa que trocamos é o **aproximador de função**: rede n-tuple sem peso no lugar das redes profundas.
+> **O problema formulado por Lamenza (2025) não é modificado.** Cenário, observação, ação, recompensa, métricas e parâmetros são reproduzidos como estão. A única coisa que trocamos é o **aproximador de função**: rede n-tuple sem peso no lugar das redes profundas.
+
+**Isto deixou de ser promessa e virou construção.** O ambiente **é** o `GrADySEnvironment` de Lamenza, carregado verbatim de um submodule fixado na tag `dissertation`. Não há reimplementação do MDP. Como as features do trabalho se encaixam sem tocar naquele código está em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
+
+A decisão veio de uma medição: a reimplementação anterior era provadamente equivalente (`max|Δobs| = 7,9×10⁻⁸`), mas uma "correção" de **uma linha** — inicializar a posição do drone no spawn em vez de `(0,0,0)`, que é o que o original faz — levava a divergência a `8,5×10⁻¹` por efeito caótico. Ver `reports/spec00-parametros.md`.
 
 Só depois de a rede sem peso ser avaliada sobre o problema original é que a **extensão de Fusão de Dados** entra: medição ruidosa e filtro de Kalman. A extensão é declarada como extensão, em capítulo próprio, e nunca se mistura com a reprodução.
 
@@ -47,7 +51,8 @@ E uma regra de projeto que amarra as duas metades do trabalho:
 | Etapa | Configuração | O que muda em relação a Lamenza | Responde |
 |---|---|---|---|
 | **1** | 1 UAV, sem ruído | só o aproximador | H1 — a rede sem peso aprende o problema? |
-| **2** | 1 UAV, com ruído | + medição ruidosa e KF | H2, H3, H4 |
+| **2a** | 1 UAV, ruído no **GPS do drone** | + medição ruidosa e KF com entrada de controle | H2, H3 |
+| **2b** | 1 UAV, + ruído no **canal do sensor** | + filtro de informação e ranking sobre estimativas | H4 |
 | **3** | `Na` UAVs, com ruído | + coordenação e estimativas correlacionadas | H5, H6 |
 
 A Etapa 1 é a **reprodução**. As Etapas 2 e 3 são a **extensão de Fusão de Dados**.
@@ -61,11 +66,11 @@ Cada etapa tem um **portão** (`G1`, `G2`, `G3`): critério objetivo a ser ating
 | ID | Etapa | Hipótese | Como é falsificada |
 |---|---|---|---|
 | **H1** | 1 | Sobre o problema **inalterado**, a política n-tuple atinge desempenho comparável ao de uma rede densa, a custo de **modelo** e **inferência** materialmente menor | Comparação pareada: mesmo ambiente, mesma observação, mesma recompensa, **mesmo algoritmo**, trocando só o aproximador. Critério detalhado em **§5.5** — H1 cai se o tempo de conclusão da WNN for pior além do IC, ou se o ator não couber em poucas dezenas de KB **realizados**, ou se a contagem de operações não mostrar o aproximador livre de **multiplicações em ponto flutuante**. **Atenção:** três specs independentes (03, 04, 05) estimam que o ator WNN realizado fica entre ~12 e ~15 KB contra ~8,6 KB da MLP pareada — isto é, provavelmente **maior**. Ver §5.5 e a nota de revisão |
-| **H2** | 2 | A binarização por termômetro **não** torna a WNN mais frágil a ruído de medição que uma rede densa | Curvas de degradação WNN vs MLP sobre σ crescente. H2 cai se os ICs separarem |
-| **H3** | 2 | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
-| **H4** | 2 | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
+| **H2** | 2a | A binarização por termômetro **não** torna a WNN mais frágil a ruído de medição que uma rede densa | Curvas de degradação WNN vs MLP sobre σ crescente. H2 cai se os ICs separarem |
+| **H3** | 2a | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
+| **H4** | 2b | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
 | **H5** | 3 | Fundir estimativas entre UAVs por **interseção de covariância** supera o KF local isolado e não diverge, ao contrário do KF ingênuo | Erro de estimativa e NEES/NIS. H5 cai se CI não bater o KF local, ou se o KF ingênuo não divergir |
-| **H6** | 3 | A coordenação emerge também com aproximador sem peso: o enxame supera a heurística gulosa, como em Lamenza | Tempo de conclusão vs heurística gulosa. H6 cai se a política não bater o guloso |
+| **H6** | 3 | A coordenação emerge também com aproximador sem peso | **Barra revista.** Superar a `greedy` é barra baixa: medimos que ela não coordena — separação média entre UAVs de **0,1 m** contra alcance de 20 m, quatro drones em formação. A barra honesta é a **`smart`** do próprio `heuristics.py`, que coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. H6 divide-se: **H6a** supera `greedy` (provável), **H6b** supera `smart` (incerto). Ver `reports/spec00-parametros.md` §9 |
 
 ---
 
@@ -147,6 +152,8 @@ Sem *reward shaping*, sem penalidade de borda, sem termo de coordenação. A rec
 
 **Sem sinalização entre agentes.** Em Lamenza a coordenação emerge só de cada agente conhecer a posição dos demais — não há mensagem de reivindicação nem canal aprendido. Mantido.
 
+> **Correções que o código de referência impôs a esta seção.** O texto da eq. 5-1 descreve coordenadas relativas cruas; a implementação que gerou os resultados **normaliza** por `(p_k − p_i + S)/(2S)` e usa padding **`-1`**, não `(0,0)`. A faixa real dos valores é `[-0,5; 1,5]`, e não `[0,1]` — o `observation_space` de referência declara `Box(-1,1)`, o que também não bate. O índice do agente entra como `k/Na`. Nada disso é escolha nossa: é o que o ambiente entrega, e a SPEC-01 precisa binarizar a faixa **medida**. Ver `reports/spec00-parametros.md` §6.
+
 ### 5.3 O que trocamos: o aproximador
 
 **Algoritmo: n-tuple Actor-Critic** (Katopodis §4.3.4), com política gaussiana cuja média vem de uma rede n-tuple e crítico n-tuple para `V`. É a variante do trabalho de referência que suporta **ação contínua** e que, no benchmark Hopper, superou o Actor-Critic com MLP.
@@ -176,7 +183,7 @@ Esta tabela é o contrato da §0. Ela tem hoje **uma linha**, e qualquer acrésc
 |---|---|---|---|
 | **1** | **Binarização da observação** por termômetro (Katopodis §3.2.3) | Redes n-tuple endereçam RAMs com bits; não há como alimentá-las com reais | O **vetor de observação é idêntico** ao de Lamenza; o codificador é parte do aproximador, não do MDP. A resolução `T` é varrida e reportada, como Katopodis faz |
 
-**Detalhe de codificação — `zero-padding`.** Slots vazios de `P^s` valem `(0,0)`, que sob termômetro é indistinguível de "sensor exatamente sobre o UAV". A MLP de Lamenza pode aprender a desambiguar pelo contexto; o endereçamento por RAM não. Solução: **um bit de validade por slot**, anexado ao padrão binário. É acréscimo ao codificador, não à observação.
+**Detalhe de codificação — `padding`. RESOLVIDO, e o desvio caiu.** A spec projetava um bit de validade porque supunha padding em `(0,0)`, indistinguível de "sensor exatamente sobre o UAV". O código de referência usa **`-1`**, que está **fora da faixa dos valores válidos** — logo slot vazio e sensor sobre o UAV (que normaliza para 0,5) são distinguíveis **por construção**. O bit de validade é **desnecessário** e não entra nesta tabela.
 
 ---
 
@@ -279,7 +286,9 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 **Varreduras:** resolução do termômetro `T ∈ {8, 32, 128}` × tamanho da tupla `n ∈ {8, 10, 12}` × número de RAMs `N ∈ {16, 48, 128}` × esquema de codificação (simples vs circular) × fator de esquecimento. Medição preliminar indica retorno decrescente em `N` (8× mais memória para 13 % menos erro): a varredura documenta o joelho da curva, não maximiza.
 
-**Orçamento de simulação.** Medido: `update_rate = 0,1` dá 0,11 s por episódio de 120 s simulados com 4 UAVs / 12 sensores, idêntico ao default de 0,01. Extrapolando para episódios de até 500 s e 50 M passos (o orçamento de Lamenza), estima-se **8–30 h num único núcleo**, contra 7 dias de GPU. **Estimativa, não medição** — confirmar na semana 1 (P2). Se confirmada, é um resultado a reportar por si só.
+**Orçamento de simulação — MEDIDO (P2 fechada).** No ambiente de referência, guloso, grade completa: **1,8 a 5,2 h por núcleo** para os 50 M passos de Lamenza, contra 7 dias de GPU. A estimativa anterior de 8–30 h se sustenta com folga. Tabela por célula em `reports/spec00-orcamento.md`.
+
+**Correção que sai da medição:** a célula cara em horas de treino é `Na = 1`, não `Na = 8` — o contador de passos é `passos × Na`, então menos agentes significam menos passos por segundo simulado. **A Etapa 1 é a mais cara do projeto**, o oposto do que a linha de corte da §8 supunha.
 
 > **Portão G1** — 1a atinge taxa de sucesso comparável aos 100 % publicados; 1b supera a caminhada aleatória decisivamente e fica dentro do IC da heurística gulosa; tabela pareada WNN vs MLP fechada com tempo, memória ocupada e latência.
 > *Se G1 não for atingido:* é a refutação de H1 e o principal resultado da etapa. Registrar o veredito, diagnosticar (resolução? tamanho de tupla? variância da gaussiana?) e prosseguir — H2 a H4 medem degradação **relativa** ao próprio desempenho sem ruído e permanecem válidas mesmo com política medíocre.
@@ -288,12 +297,26 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado e a extensão é declarada.
 
-**Onde o ruído entra.** Em Lamenza o "canal global" entrega o estado verdadeiro. Substituímos por medição corrompida em dois canais:
+**Dois blocos, um canal por vez.** A Etapa 2 introduz dois canais de ruído com estruturas **opostas** — o do drone é deslocamento comum a todas as entradas da observação, o do sensor é por slot. Ligá-los juntos torna qualquer degradação inatribuível. Um portão só (G2), um capítulo só, mas ordenação interna que isola os canais:
 
-| Canal | Modelo | Natureza | Filtro |
-|---|---|---|---|
-| Posição própria | GPS, σ ≈ 1–10 m | ruído branco, **entrada de controle conhecida** | KF linear 2 estados `[x, y]`, predição `x̂ + u·dt` |
-| Posição dos sensores | descoberta por enlace local | estática; linear se o sensor transmite sua posição estimada | **filtro de informação** (média ponderada recursiva pela precisão) |
+| Bloco | Ruído | Filtro | Hipóteses | Varredura |
+|---|---|---|---|---|
+| **2a** | só GPS do drone | KF + **entrada de controle** | H2, H3 | `σ_own ∈ {1,3,5,10}` × `T ∈ {8,32,128}` |
+| **2b** | + canal do sensor | filtro de informação | H4 | `σ_sensor × T`, com `σ_own` **fixado pelo resultado de 2a** |
+
+Custo medido de dobrar a grade: **~5 h de um núcleo** a 2 M passos por corrida, com as configurações paralelizando trivialmente. Não é o gargalo; o gargalo seria calendário, e por isso os blocos ficam dentro de uma etapa em vez de virarem uma quarta.
+
+Três razões para a separação, além da atribuição:
+
+1. **2a não depende da física do canal do sensor** (ver T3), que segue em discussão. Pode começar imediatamente.
+2. **2a mede `σ_own`** em vez de o fixarmos por decreto — resolve a pendência P10.
+3. **Linha de corte honesta:** se o tempo apertar, 2b é a metade cortável, e 2a sozinha ainda entrega H2, H3 e a réplica do achado A3.
+
+**Bloco 2a — GPS do drone.** `p̂_k = p_k + e_k`. O erro é **comum** a todas as entradas válidas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)`. Estado móvel, comando conhecido: é onde vive o achado A3 e onde o KF com entrada de controle faz sentido. Modelo fechado, nada pendente.
+
+**Bloco 2b — canal do sensor.** O drone obtém a posição do sensor pelo **canal global reinterpretado**, não por rádio: no mecanismo de referência ouvir o drone é ser coletado, então um relatório por rádio já teria tirado o sensor do problema antes de haver medições a acumular. **Todo dado derivado — inclusive o ranking dos sensores — é computado sobre a estimativa filtrada**, nunca sobre a verdade. Desenho em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
+
+> **T3 — pendente.** A física deste canal ainda não foi decidida, e ela determina se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância, e é dominado por **viés fixo** — o canal vira piso irredutível, não objeto de fusão, e a H4 perde a causa física. Se o drone **localiza o sensor por rádio**, o erro é branco e **cresce com a distância**, a filtragem tem função e aproximar-se compra informação — ao custo de declarar na §5.4 um alcance de detecção maior que o de coleta. O bloco 2b não roda antes dessa decisão; o 2a roda.
 
 **Escada de ablação:**
 
@@ -306,11 +329,13 @@ Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado
 | 4 | **KF + entrada de controle** | a proposta |
 | 5 | 4 + covariância na observação | política consciente da incerteza |
 
+A escada roda **em cada bloco**: em 2a sobre o canal do drone, em 2b sobre o do sensor. Os degraus 2 e 3 mudam de sentido entre eles — para alvo estático não existe "KF de velocidade constante", e o degrau 3 vira "média simples sem ponderar pela precisão".
+
 O degrau 5 acrescenta canais à observação e portanto **entra na tabela de desvios (§5.4) quando executado** — é ablação explícita, com resultado reportado com e sem.
 
 Cruzado com o regime de treino: **treino limpo → avaliação ruidosa** vs **treino ruidoso → avaliação ruidosa**. Se o degrau 4 tornar os dois equivalentes, é o argumento mais forte possível a favor do filtro.
 
-**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ_GPS ∈ {1, 3, 5, 10} m` × `T ∈ {8, 32, 128}`. É o experimento mais caro do projeto e roda muito mais barato com 1 UAV — razão de ele vir antes do multiagente.
+**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ × T` dentro de cada bloco, **12 configurações por bloco**. Medido: ~5 h de um núcleo por bloco a 2 M passos com 3 sementes. Roda muito mais barato com 1 UAV — razão de a Etapa 2 vir antes do multiagente.
 
 **RF-04 (invariante de vazamento).** A verdade **nunca** chega à política. `handle_telemetry` do gradysim entrega posição exata; a corrupção acontece na entrada do protocolo e a verdade fica guardada só para métricas. Teste automatizado obrigatório.
 
@@ -417,20 +442,24 @@ A alternativa (estado compartilhado + inversão de controle, dando API PettingZo
 
 ## 8. Cronograma — 4 semanas
 
-A execução é decomposta em specs pequenas, com escopo fechado e critério de saída medido: ver **[`specs/README.md`](specs/README.md)**. A primeira é o **[estudo de binarização (SPEC-01)](specs/SPEC-01-binarizacao.md)**, que roda sem simulador e sem laço de RL, e portanto em paralelo com a montagem do ambiente.
+A execução é decomposta em specs pequenas, com escopo fechado e critério de saída medido: ver **[`specs/README.md`](specs/README.md)**.
 
-| Semana | Etapa | Entrega | Portão / critério de pronto |
+| Semana | Bloco | Entrega | Portão / critério de pronto |
 |---|---|---|---|
-| **1** | 1 (infra) | **SPEC-01** (binarização, portão G0) em paralelo com **SPEC-00** (cenário, protocolos, ponte, `rewards.py` verbatim, baselines, harness de custo) | **G0**: codificador escolhido com evidência; P1 e P2 resolvidas; asserção `η = c/N` ativa; orçamento de simulação medido |
-| **2** | 1 (aprendizado) | n-tuple Actor-Critic em 1b, `Na = 1 → 2 → 4`; ablação MLP pareada; varreduras `T × n × N`; tabela de memória e latência | **G1** |
-| **3** | 2 | Ruído (GPS + enlace local); KF com entrada de controle; filtro de informação; NEES/NIS; degraus 0–5; varredura σ × T | **G2** |
-| **4** | 3 + fechamento | Multiagente 3a e 3b; degraus 6a/6b/6c; interseção de covariância; relatório e slides | **G3**; `make repro` verde; E2 e E3 |
+| ~~**1**~~ | ~~SPEC-00~~ | **Concluída.** Ambiente de referência via submodule, `gradysim==0.6.11`, 18 testes, P1 e P2 fechadas, guloso reproduzindo a fig. 7.3 em 9/9 células | ✔ |
+| **1** | SPEC-01, 02, 03, 07 | Binarização (**G0**) · baselines e harness · harness de custo · ruído e KF. As quatro são independentes e rodam em paralelo | **G0**: codificador escolhido com evidência, `(T, N)` varridos juntos |
+| **2** | SPEC-04, 05, 06 | Núcleo n-tuple · Actor-Critic e MLP pareado · Etapa 1 (réplicas 1a/1b, varreduras, tabela de custo da §5.5) | **G1** e veredito de H1 |
+| **3** | SPEC-08, bloco **2a** | Ruído no GPS do drone; KF com entrada de controle; NEES/NIS; escada 0–5; varredura `σ_own × T` | H2 e H3 |
+| **4** | SPEC-08 bloco **2b** + SPEC-09 + fechamento | Canal do sensor *(se T3 resolver)*; multiagente 3a/3b; degraus 6a/6b/6c; relatório e slides | **G2**, **G3**; `make repro` verde; E2 e E3 |
+
+**A SPEC-00 saiu antes do prazo e mais barata que o previsto** — o ambiente veio pronto do repositório de referência em vez de ser escrito. Isso liberou a semana 1 para quatro specs em paralelo.
 
 A redação **não** espera a semana 4: cada tabela entra no relatório assim que sai.
 
 ### Linha de corte (o que cai primeiro se atrasar)
 
-1. Varreduras de `n × N` → fixar `n = 12`, `N = 48` (já testados no protótipo) e varrer só `T`
+1. Bloco **2b** inteiro (canal do sensor). É a metade cortável da Etapa 2: 2a sozinha ainda entrega H2, H3 e a réplica de A3
+2. Varreduras de `n × N` → fixar `n = 12`, `N = 48` (já testados no protótipo) e varrer só `T` — com a ressalva de que `T` e `N` não são independentes (achado C4)
 2. Células `Ns ∈ {24, 36}` e `Na = 8` na Etapa 1
 3. Esquema de codificação circular (manter só o termômetro simples)
 4. Varredura σ × T → reduzir a `σ ∈ {1, 10}` × `T ∈ {8, 128}`

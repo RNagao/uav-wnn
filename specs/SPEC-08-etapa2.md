@@ -5,6 +5,49 @@
 
 ---
 
+## 0. Revisão — a Etapa 2 roda em dois blocos
+
+Os dois canais de ruído têm estruturas **opostas**: o do drone é **deslocamento comum** a todas as entradas da observação; o do sensor é **por slot**. Ligá-los juntos torna qualquer degradação inatribuível. Um portão só (`G2`), um capítulo só, ordenação interna que isola os canais:
+
+| Bloco | Ruído | Filtro | Hipóteses | Varredura | Bloqueado? |
+|---|---|---|---|---|---|
+| **2a** | só GPS do drone | KF + entrada de controle | H2, H3 | `σ_own × T` = 12 configs | **não — pode começar** |
+| **2b** | + canal do sensor | filtro de informação | H4 | `σ_sensor × T` = 12 configs | **sim — depende de T3** |
+
+**Custo medido de dobrar a grade:** ~5 h de um núcleo por bloco, a 2 M passos por corrida com 3 sementes, na célula base `Na=1, Ns=12` (0,0174 s/ep, 68,5 passos/ep → ~3 900 passos/s). As configurações são independentes e paralelizam trivialmente. Compute não é o gargalo — calendário é, e por isso os blocos ficam **dentro** de uma etapa em vez de virar uma quarta com portão e capítulo próprios.
+
+Três ganhos além da atribuição:
+
+1. **2a não depende de T3.** O modelo do canal próprio está fechado — ruído branco, estado móvel, comando conhecido — e o achado A3 já foi medido. Antes desta separação, a Etapa 2 inteira estava travada na pergunta sobre a física do sensor.
+2. **2a mede `σ_own`** em vez de o fixarmos por decreto. Fecha a pendência P10, e o valor medido alimenta 2b.
+3. **Linha de corte honesta.** Se o tempo apertar, 2b é a metade cortável; 2a sozinha ainda entrega H2, H3 e a réplica de A3 — que é a metade com resultado pré-existente medido.
+
+### A escada muda de sentido entre os blocos
+
+A escada de ablação roda nos dois, mas os degraus intermediários não são os mesmos:
+
+| # | Bloco 2a (alvo móvel) | Bloco 2b (alvo estático) |
+|---|---|---|
+| 0 | sem ruído — política da Etapa 1 | idem |
+| 1 | ruído bruto | ruído bruto |
+| 2 | média móvel / passa-baixa | média simples, sem ponderar pela precisão |
+| 3 | **KF de velocidade constante** — o "óbvio" que já sabemos que falha | *não existe*: alvo estático não tem modelo de velocidade |
+| 4 | **KF + entrada de controle** | **filtro de informação com `R` correto** |
+| 5 | 4 + covariância na observação | idem |
+
+Para o alvo estático o espantalho não é o KF de velocidade constante — é o **filtro que ignora o viés**, que converge para `p_i + b_i` com `P → 0` e só é denunciado pelo NEES.
+
+### T3 — pendência que bloqueia 2b
+
+A física do canal do sensor decide se a **H4 tem mecanismo**:
+
+- **sensor transmite o próprio GPS** → erro é dele, **não depende da distância**, dominado por **viés fixo**. O canal vira piso irredutível, não objeto de fusão, e a H4 perde a causa física;
+- **drone localiza o sensor por rádio** → erro **branco** e **crescente com a distância**, filtragem tem função, aproximar-se compra informação — ao custo de declarar na §5.4 do PRD um alcance de detecção maior que o de coleta.
+
+Enquanto T3 estiver aberta, 2b não roda. **2a roda.**
+
+---
+
 ## 1. Objetivo
 
 Produzir os **números e os vereditos** de H2, H3 e H4 na célula `Na = 1, Ns = 12`, executando a escada de ablação 0–5 nos dois regimes de treino e a varredura **conjunta** `σ_GPS × T`, e fechar o portão `G2`.

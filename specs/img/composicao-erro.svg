@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 320" width="700" role="img" aria-labelledby="t2 d2">
+  <title id="t2">Composição em quadratura dos dois canais de erro</title>
+  <desc id="d2">Dois triângulos retângulos na mesma escala. Antes da filtragem os catetos valem 5 e 10 metros e a hipotenusa 11,2 metros. Depois de filtrar o GPS para 0,7 metro a hipotenusa cai apenas para 5,05 metros, porque o cateto do sensor continua em 5 metros.</desc>
+  <defs>
+    <marker id="ax2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#808A96"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="60" text-anchor="middle" font-family="ui-monospace, monospace" font-size="15" fill="#8B95A1">σ_rel = √( σ_own² + σ_sensor² )</text>
+  <text x="360" y="86" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#808A96">o cateto que não encolhe governa a hipotenusa</text>
+
+  <g font-family="ui-monospace, monospace" font-size="11.5">
+    <polygon points="110,250 170,250 170,130" fill="#C08A3422" stroke="#C08A34" stroke-width="1.6"/>
+    <line x1="110" y1="250" x2="170" y2="130" stroke="#C08A34" stroke-width="2.6"/>
+    <text x="140" y="272" text-anchor="middle" fill="#808A96">σ_sensor = 5</text>
+    <text x="180" y="194" fill="#808A96">σ_own = 10</text>
+    <text x="104" y="184" text-anchor="end" fill="#C08A34">σ_rel</text>
+    <text x="104" y="200" text-anchor="end" font-size="13" fill="#C08A34">11,2 m</text>
+    <text x="140" y="296" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="620" fill="#8B95A1">antes do filtro</text>
+
+    <polygon points="420,250 480,250 480,241.6" fill="#3E9A9022" stroke="#3E9A90" stroke-width="1.6"/>
+    <line x1="420" y1="250" x2="480" y2="241.6" stroke="#3E9A90" stroke-width="2.6"/>
+    <text x="450" y="272" text-anchor="middle" fill="#808A96">σ_sensor = 5</text>
+    <text x="490" y="248" fill="#808A96">σ_own = 0,7</text>
+    <text x="414" y="228" text-anchor="end" fill="#3E9A90">σ_rel</text>
+    <text x="414" y="244" text-anchor="end" font-size="13" fill="#3E9A90">5,05 m</text>
+    <text x="450" y="296" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="620" fill="#8B95A1">depois do filtro</text>
+  </g>
+
+  <path d="M540,200 L600,200" fill="none" stroke="#808A96" stroke-width="1.2" marker-end="url(#ax2)"/>
+  <text x="628" y="196" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="640" fill="#8B95A1">14×</text>
+  <text x="628" y="212" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#808A96">no GPS</text>
+  <text x="628" y="234" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="640" fill="#8B95A1">2,2×</text>
+  <text x="628" y="250" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#808A96">na percepção</text>
+</svg>

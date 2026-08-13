@@ -205,7 +205,7 @@ Justificativa: "permissivo" tem um significado funcional único no texto de Lame
 1. `Ns = 4` e horizonte enorme — o problema ficou trivial e ainda assim não aprende? Então o defeito é do laço de treino ou do crítico, não do cenário.
 2. Variância `σ²` da gaussiana em `{0,1; 0,2; 0,5}` (Katopodis usa 0,2 em Hopper, 0,5 em Mountain Car).
 3. Crítico: substituir `V` n-tuple por retorno Monte Carlo tabular por episódio. Se resolver, o problema é do **crítico**, e a SPEC-01 T-01.6 (regressão de valor) previu errado.
-4. Ator: reexecutar o proxy de clonagem do guloso (SPEC-01 T-01.5) na **configuração de treino real**. Se a clonagem falhar aqui e tiver passado lá, o invariante V-1 (fidelidade do corpus) está violado e a SPEC-01 precisa ser refeita.
+4. Ator: reexecutar o proxy de clonagem do guloso (SPEC-01 T-01.5) na **configuração de treino real**. Se a clonagem falhar aqui e tiver passado lá, o corpus da SPEC-01 não representa a distribuição de treino e a spec precisa ser refeita. *(O invariante V-1 e o teste KS que o guardavam deixaram de existir: o corpus passou a sair do próprio ambiente de referência.)*
 5. Trocar o codificador pela **segunda melhor** opção registrada em G0.
 
 #### Evidência qualitativa: a fig. 7.1
@@ -240,7 +240,7 @@ Predição pré-registrada: `Ω` **alto** em 1a e **baixo** em 1b (T-06.2), com 
 - Os tempos de conclusão do §7.2 estão em **figura** (fig. 7.3), não em tabela. A única tabela numérica de tempo é a **tab. 7.3**, que pertence ao §7.4.2 e ao modelo de **sensores variáveis** — outra campanha, outro `α`. Usá-la como alvo do §7.2 seria comparar coisas diferentes.
 - Portanto: **a comparação rigorosa é a razão `CT_cens(método)/CT_cens(guloso)` por célula**, não o valor absoluto em segundos. A razão cancela simulador, implementação e `communication_range`; o valor absoluto não cancela nada. Os valores absolutos vão na tabela como referência, com a ressalva escrita.
 
-> **Cruzamento com P1.** A diagonal da tab. 7.3 dá `22,71 s` (2 agentes), `13,47 s` (4) e `13,26 s` (8). A `15 m/s` e `2 s` por decisão, `22,71 s` são ~11 passos, ~340 m de trajeto por UAV, para cobrir 12+ sensores em `200 × 200 m`. Isso só fecha com um `communication_range` **grande** — da ordem de dezenas de metros. É uma restrição numérica independente sobre P1 e deve ser usada como **verificação de sanidade** assim que a SPEC-00 fixar o valor: se o guloso reimplementado, com o `communication_range` adotado, produzir tempos de conclusão de ordem muito diferente da de Lamenza, o parâmetro está errado e **toda comparação numérica desta spec está deslocada**.
+> **P1 fechada, e a verificação de sanidade foi executada.** `communication_range = 20 m` (`environment.py:157`), e `algorithm_iteration_interval = 0,5 s`, não os 2 s da tab. 7.1. A verificação que esta spec propunha foi feita de forma mais forte: o **guloso de referência reproduz a fig. 7.3 em 9/9 células**, erro mediano 1,7 % e viés médio +0,5 %. Ver `../reports/spec00-parametros.md` §8. A comparação rigorosa continua sendo por **razão contra o guloso**, não por segundos absolutos — porque o `visualize_performance.py` avalia o MADDPG a 0,5 s por decisão e o guloso a 0,1 s, uma assimetria que vale ~10 %.
 
 ---
 
@@ -365,7 +365,7 @@ Cada item **medido**, não implementado.
 | **Corrida única não distingue método ruim de semente ruim** (Lamenza §7.3: falha catastrófica na curva de 4 agentes) | `R ≥ 3`, `R = 5` no caminho crítico; nenhuma corrida descartada; `falhas/R` como métrica de primeira classe; regra de concordância de dois níveis (D-06.2) |
 | **`B_max` insuficiente** — a vazão medida fica muito abaixo dos 460–1 700 passos/s implicados pela estimativa do PRD | T-06.0 é a primeira tarefa e bloqueia as demais; se apertar, acionar a linha de corte do PRD §8 **na ordem publicada**, e **nunca** reduzir `R` |
 | **"Permissivo" é grau de liberdade que Lamenza não publicou** | definição operacional (`3 × CT_p99` do guloso, piso 500 s), verificação (`SR` do guloso ≥ 99 %) e sensibilidade obrigatória nos três horizontes |
-| **`communication_range` (P1) errado desloca toda a comparação numérica** | verificação de sanidade contra a diagonal da tab. 7.3 de Lamenza (13–23 s ⇒ raio grande); comparar por **razão contra o guloso**, não por segundos absolutos |
+| ~~`communication_range` (P1) errado desloca toda a comparação~~ | **fechada**: 20 m, e o guloso de referência reproduz a fig. 7.3 em 9/9 células. Segue valendo comparar por **razão contra o guloso**, pela assimetria de `interval` na avaliação publicada |
 | **Comparação com a MLP mede aproximador + binarização juntos** | declarar a unidade como "aproximador e sua codificação"; coluna MLP-bin como separação, primeira da linha de corte interna de T-06.3 |
 | **Pareamento injusto de esforço de sintonia** | mesmo número de pontos e mesmo `B_max` dos dois lados, com o orçamento gasto reportado na tabela |
 | **Seleção de checkpoint contamina a métrica final** | bancos `val` e `test` disjuntos, disjunção testada; seleção só por `val` |
