@@ -22,8 +22,8 @@ O simulador está fixado em **`gradysim==0.6.11`**: o `environment.py` de refer�
 | Spec | Estado |
 |---|---|
 | SPEC-00 — Ambiente de referência | **concluída**: 18 testes, P1 e P2 fechadas, validação contra a fig. 7.3 |
-| SPEC-01 — Estudo de binarização | revisada; **próxima** |
-| SPEC-02, 03, 07 | revisadas; rodam em paralelo com a 01 |
+| SPEC-01 — Estudo de binarização | **concluída**: portão G0 fechado, codificador escolhido com evidência |
+| SPEC-02, 03, 07 | revisadas; **próximas**, rodam em paralelo |
 | SPEC-04 a 06, 08 a 10 | revisadas |
 
 **Bloqueio único:** a pendência **T3** — a física do ruído no sensor — decide se a H4 tem mecanismo. Ela trava o bloco 2b e nada mais.
@@ -39,6 +39,12 @@ Isso vale mais que qualquer teste unitário: se submodule, versão do simulador,
 ### Custo: 1,8 a 5,2 h por núcleo
 
 Para o orçamento de 50 M passos de Lamenza, contra 7 dias de GPU por célula no original. O PRD estimava 8–30 h; o real é menor, com folga. E a célula cara em horas de treino é **`Na = 1`**, não `Na = 8` — o contador de passos é `passos × Na`. Ou seja, a Etapa 1 é a mais cara do projeto. Ver [`reports/spec00-orcamento.md`](reports/spec00-orcamento.md).
+
+### O codificador binário: quantis por slot
+
+A distribuição da observação depende fortemente do **índice do slot** — o sensor mais próximo concentra, o 12º espalha, com razão de amplitude **3,1×**. Binning global desperdiça bits justamente no slot 1, que é o que dirige a ação: usa 2,40 dos 4,00 bits disponíveis.
+
+Medido pela clonagem do guloso (erro angular mediano): **quantil por slot 4,3°** contra 6,7° do linear por slot e 7,6° do global. Configuração escolhida: **E2, T=8, N=48** — 5,8° com 200 bits, melhor que o *melhor* resultado do global, que precisa de 400 bits e 128 RAMs. Ver [`reports/spec01-binarizacao.md`](reports/spec01-binarizacao.md).
 
 ### O baseline da figura publicada não coordena
 
