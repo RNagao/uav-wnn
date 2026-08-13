@@ -50,6 +50,33 @@ A primeira é a recomendada: chega a 5,8° com **200 bits e 48 RAMs**, melhor qu
 
 ---
 
+## 2b. Por que o quantil vence: erro de reconstrução
+
+A entropia diz que o global desperdiça bits, mas não diz *o que isso custa*. A medida direta é o **erro de reconstrução**: dado o padrão de bits do slot 1, qual a dispersão das posições verdadeiras que caem nele? É a incerteza que a rede **não consegue resolver por mais que treine** — não é falta de capacidade, a informação não está no código.
+
+Slot 1, `T = 8`, por faixa de distância ao sensor:
+
+| | 0–25 m | 25–60 m | > 60 m |
+|---|---|---|---|
+| **E0 global** — incerteza no ângulo | **103,7°** | 62,7° | 32,0° |
+| **E2 quantil** — incerteza no ângulo | **23,1°** | 16,6° | 16,6° |
+| E0 — incerteza na distância | 2,6 m | 6,5 m | 10,0 m |
+| E2 — incerteza na distância | 1,8 m | 5,1 m | 26,2 m |
+
+Com o termômetro global, quando o sensor está **perto** — a situação que decide a ação — o código deixa o rumo indeterminado em **±104°**. Isso explica sozinho os 7,6° de erro de clonagem: metade dele é ruído de quantização irremovível.
+
+A causa é dimensional: a régua global cobre a faixa de *todos* os slots, então seus bins medem **55 m** — quase três vezes o `communication_range` de 20 m. Ela é uniforme no espaço e grosseira demais onde a decisão acontece. Os bins do quantil no slot 1 medem **12 m**.
+
+### A inversão em `> 60 m` é o comportamento desejado
+
+Repare que ali o E2 é **pior**: 26,2 m contra 10,0 m de incerteza na distância. Não é defeito.
+
+Errar 26 m sobre um sensor a 150 m **não muda a ação** — voa-se naquela direção de qualquer forma. Errar 10 m sobre um sensor a 15 m decide se ele é coletado ou não. O quantil troca precisão longe por precisão perto, e neste problema essa é a troca certa.
+
+**Régua uniforme no espaço não é o mesmo que precisão uniforme na decisão.** A régua deve seguir a distribuição da variável, e a distribuição foi deformada pela ordenação que a própria eq. 5-1 impõe.
+
+---
+
 ## 3. `T` e `N` não são independentes (T-01.4, achado C4)
 
 A cobertura de bits — a fração da entrada que alguma RAM lê — cai de 100 % a **22 %** ao longo da grade. E a consequência aparece direto no erro:
