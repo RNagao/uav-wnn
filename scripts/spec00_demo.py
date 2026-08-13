@@ -33,7 +33,12 @@ def main() -> int:
     ap.add_argument("--plot", metavar="ARQUIVO.png", help="salva o gráfico das trajetórias")
     ap.add_argument("--show-obs", action="store_true", help="imprime o vetor de observação do drone 0")
     ap.add_argument("--every", type=int, default=10, help="imprime uma linha a cada N passos")
+    ap.add_argument("--compare", metavar="ARQUIVO.png",
+                    help="painel greedy | smart no mesmo cenário e semente")
     args = ap.parse_args()
+
+    if args.compare:
+        return comparar(args)
 
     cfg = LAMENZA_003(args.agents, args.sensors, phase=args.phase)
     h = load_heuristics()
@@ -116,6 +121,100 @@ def main() -> int:
     return 0
 
 
+def rodar_silencioso(tipo, args):
+    """Roda um episódio sem imprimir nada e devolve o que o gráfico precisa."""
+    cfg = LAMENZA_003(args.agents, args.sensors, phase=args.phase)
+    h = load_heuristics()
+    pol = {
+        "greedy": h.create_greedy_heuristics,
+        "smart": h.create_smart_heuristics,
+        "random": h.create_random_heuristics,
+    }[tipo](args.agents - 1, cfg.state_num_closest_sensors)
+
+    env = make_env(cfg)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    obs, _ = env.reset()
+    sensores = np.array([env.simulator.get_node(i).position[:2] for i in env.sensor_node_ids])
+    trilhas = [[] for _ in range(cfg.num_drones)]
+
+    while True:
+        for k, i in enumerate(env.agent_node_ids):
+            trilhas[k].append(np.array(env.simulator.get_node(i).position[:2]))
+        obs, r, term, trunc, infos = env.step({a: pol(obs[a]) for a in env.agents})
+        if infos and "avg_reward" in next(iter(infos.values())):
+            info = next(iter(infos.values()))
+            break
+        if any(term.values()) or any(trunc.values()):
+            info = {}
+            break
+
+    coletado = np.array([
+        env.simulator.get_node(i).protocol_encapsulator.protocol.has_collected
+        for i in env.sensor_node_ids
+    ])
+    T = np.array([np.array(t) for t in trilhas])
+    pares = [np.linalg.norm(T[i] - T[j], axis=1).mean()
+             for i in range(len(T)) for j in range(i + 1, len(T))]
+    sep = float(np.mean(pares)) if pares else float("nan")
+    env.close()
+    return trilhas, sensores, coletado, info, sep, cfg
+
+
+def comparar(args) -> int:
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+    except ImportError:
+        print("matplotlib não instalado. Rode: uv add --dev matplotlib")
+        return 1
+
+    fig, eixos = plt.subplots(1, 2, figsize=(11.4, 5.9))
+    cores = plt.cm.tab10.colors
+
+    for ax, tipo in zip(eixos, ("greedy", "smart")):
+        trilhas, sensores, coletado, info, sep, cfg = rodar_silencioso(tipo, args)
+        S = cfg.scenario_size
+        n = len(trilhas)
+
+        ax.scatter(sensores[~coletado, 0], sensores[~coletado, 1], s=40, facecolors="none",
+                   edgecolors="#B03A48", linewidths=1.4, zorder=3)
+        ax.scatter(sensores[coletado, 0], sensores[coletado, 1], s=24, c="#2B2F36",
+                   marker="x", linewidths=1.2, zorder=3)
+
+        for k, t in enumerate(trilhas):
+            t = np.array(t)
+            cor = cores[k % 10]
+            ax.plot(t[:, 0], t[:, 1], color=cor,
+                    lw=2 * cfg.communication_range * 72 / (2.2 * S * 5.7),
+                    alpha=0.10, solid_capstyle="round", zorder=1)
+            ax.plot(t[:, 0], t[:, 1], color=cor, lw=3.2 - 2.1 * k / max(1, n - 1),
+                    zorder=2 + k, solid_capstyle="round", label=f"UAV {k}")
+            ax.plot(t[0, 0], t[0, 1], "o", color=cor, ms=5, mec="white", mew=1, zorder=20)
+
+        ax.add_patch(Rectangle((-SPAWN_HALF_WIDTH, -SPAWN_HALF_WIDTH),
+                               2 * SPAWN_HALF_WIDTH, 2 * SPAWN_HALF_WIDTH,
+                               fill=False, ec="#8A929C", ls=":", lw=1.1, zorder=19))
+        ax.set_xlim(-S * 1.02, S * 1.02); ax.set_ylim(-S * 1.02, S * 1.02)
+        ax.set_aspect("equal"); ax.set_xlabel("x (m)")
+        ax.grid(alpha=0.16, lw=0.6)
+        ct = info.get("completion_time", float("nan"))
+        ax.set_title(f"{tipo}  ·  conclusão {ct:.1f} s\n"
+                     f"separação média entre UAVs: {sep:.1f} m",
+                     fontsize=10.5)
+        ax.legend(fontsize=7, loc="upper right", framealpha=0.92, ncol=2)
+
+    eixos[0].set_ylabel("y (m)")
+    fig.suptitle(f"{args.agents} UAVs · {args.sensors} sensores · semente {args.seed}"
+                 f"  ·  alcance de comunicação {20:.0f} m", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(args.compare, dpi=160)
+    print(f"gráfico salvo: {args.compare}")
+    return 0
+
+
 def salvar_grafico(arquivo, trilhas, sensores, env, cfg, args) -> None:
     try:
         import matplotlib
@@ -140,15 +239,21 @@ def salvar_grafico(arquivo, trilhas, sensores, env, cfg, args) -> None:
                marker="x", linewidths=1.3, label="sensor coletado", zorder=3)
 
     cores = plt.cm.tab10.colors
+    n = len(trilhas)
     for k, t in enumerate(trilhas):
         t = np.array(t)
         cor = cores[k % 10]
         # A faixa larga é o alcance de comunicação varrido — mesma leitura da
         # fig. 7.4 de Lamenza, cujas áreas semitransparentes são esse raio.
         ax.plot(t[:, 0], t[:, 1], color=cor, lw=2 * cfg.communication_range * 72 / (2.2 * S * 6.4),
-                alpha=0.13, solid_capstyle="round", zorder=1)
-        ax.plot(t[:, 0], t[:, 1], color=cor, lw=1.3, label=f"UAV {k}", zorder=2)
-        ax.plot(t[0, 0], t[0, 1], "o", color=cor, ms=5, mec="white", mew=1, zorder=4)
+                alpha=0.10, solid_capstyle="round", zorder=1)
+        # Largura DECRESCENTE por UAV: quando as trajetórias coincidem — o que
+        # acontece na heurística gulosa, em que os drones voam colados — as de
+        # baixo continuam visíveis como bandas concêntricas. Sem isso o gráfico
+        # mostra só o último UAV desenhado e esconde justamente o achado.
+        ax.plot(t[:, 0], t[:, 1], color=cor, lw=3.2 - 2.1 * k / max(1, n - 1),
+                label=f"UAV {k}", zorder=2 + k, solid_capstyle="round")
+        ax.plot(t[0, 0], t[0, 1], "o", color=cor, ms=5, mec="white", mew=1, zorder=20)
 
     # Área de largada: quadrado de lado 2*SPAWN_HALF_WIDTH (o original usa
     # random.uniform(-2, 2), não um disco).

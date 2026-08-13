@@ -153,6 +153,12 @@ Reprodução: `uv run python scripts/spec00_validar_guloso.py`. Três células (
 
 O `heuristics.py` de referência traz **três** políticas: `greedy`, `random` e `smart`. A fig. 7.3 compara o MADDPG apenas contra a `greedy`.
 
+![Painel comparando as trajetórias das heurísticas greedy e smart com 4 UAVs e 24 sensores: na greedy as quatro trajetórias se sobrepõem inteiramente e o episódio leva 59,5 s; na smart cada UAV cobre um território distinto e o episódio leva 22,5 s](img/greedy-vs-smart-4a24s.png)
+
+![O mesmo painel com 8 UAVs e 36 sensores: greedy leva 55,0 s com os oito drones colados, smart leva 11,5 s com oito territórios distintos](img/greedy-vs-smart-8a36s.png)
+
+*Mesma semente, mesmo cenário, mesma observação. As trajetórias da `greedy` são desenhadas com largura decrescente por UAV justamente para que as de baixo apareçam — sem esse cuidado o gráfico mostraria só o último drone e esconderia o achado. Gerados por `uv run python scripts/spec00_demo.py --compare ARQUIVO.png`.*
+
 **A `greedy` não coordena — nem um pouco.** Medido na célula 4×24, semente 1: a **separação média entre pares de UAVs ao longo do episódio é de 0,1 m**, contra um alcance de comunicação de 20 m. Os quatro drones voam em formação, colados, cobrindo o mesmo disco. Não é uma heurística de coordenação fraca; é ausência de coordenação. Reproduz exatamente o que Lamenza observa no §7.1 (fig. 7.1): as trajetórias se sobrepõem porque todos partem do mesmo ponto e escolhem o mesmo sensor mais próximo.
 
 A `smart` atribui sensores entre os agentes por um laço guloso de troca, **lendo apenas o vetor de observação** — nenhuma informação privilegiada. É exatamente o "baseline 3: guloso + reivindicação entre agentes" que o PRD §6.1 listava como indispensável, e ele já existe.
@@ -163,6 +169,7 @@ A `smart` atribui sensores entre os agentes por um laço guloso de troca, **lend
 |---|---|---|---|---|
 | 2 | 29,6 | **25,18 ± 0,91** | 40,79 ± 2,07 | ~0 m |
 | 4 | 13,8 | 16,12 ± 0,73 | 43,04 ± 2,21 | ~0 m |
+| — | — | 11,5 (8×36, semente 2) | 55,0 (8×36, semente 2) | ~0 m |
 | 8 | 9,7 | 10,21 ± 0,40 | 39,33 ± 2,51 | ~0 m |
 
 **Uma heurística sem nenhum treino fica a 5–17 % do MADDPG, e o supera com 2 agentes** — contra 32 dias de GPU. E o baseline efetivamente usado na figura é 2,4 a 4,3× pior que ela.
