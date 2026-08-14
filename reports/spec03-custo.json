@@ -1,0 +1,106 @@
+{
+  "config": {
+    "T": 8,
+    "N": 48,
+    "n": 12,
+    "D": 25,
+    "encoding": "E2 quantil",
+    "Na": 1,
+    "Ns": 24,
+    "n_obs": 11526
+  },
+  "t1": {
+    "ocupadas": 13555,
+    "curva_ocupacao": [
+      [
+        200,
+        3908,
+        null
+      ],
+      [
+        500,
+        6030,
+        0.4733446071984559
+      ],
+      [
+        1000,
+        7938,
+        0.3966175602123848
+      ],
+      [
+        2000,
+        9859,
+        0.3126657588897004
+      ],
+      [
+        4000,
+        11675,
+        0.24390932359485407
+      ],
+      [
+        8644,
+        13555,
+        0.19375977602905992
+      ]
+    ],
+    "saturou": false,
+    "erro_clonagem_graus": {
+      "wnn": 5.55387950112882,
+      "mlp": 1.1300621471959864
+    },
+    "persistente_bytes": {
+      "wnn_ordenado": 137126,
+      "wnn_hash": 280216,
+      "wnn_denso": 1574248,
+      "mlp_pareada": 7816,
+      "ator_maddpg_estimado": 291848
+    },
+    "detalhe_wnn_ordenado": {
+      "luts": 135742,
+      "mapeamento_tuplas": 576,
+      "limiares_codificador": 800,
+      "params_distribuicao": 8,
+      "buffer_bits": 25,
+      "buffer_enderecos": 192,
+      "buffer_acumuladores": 16
+    }
+  },
+  "t3": {
+    "wnn": {
+      "mult_fp": 4,
+      "soma_fp": 98,
+      "div_fp": 2,
+      "transcendental_fp": 5,
+      "comparacoes": 200,
+      "lookups": 96,
+      "soma_int": 576,
+      "op_bits": 1152,
+      "total": 2133
+    },
+    "mlp": {
+      "mult_fp": 1892,
+      "soma_fp": 1956,
+      "div_fp": 0,
+      "transcendental_fp": 5,
+      "comparacoes": 64,
+      "lookups": 0,
+      "soma_int": 0,
+      "op_bits": 0,
+      "total": 3917
+    },
+    "ciclos_por_alvo": {
+      "x86-64 (com FPU e SIMD)": [
+        2642,
+        4112
+      ],
+      "Cortex-M4F (com FPU)": [
+        2954,
+        12108
+      ],
+      "Cortex-M0 (SEM FPU)": [
+        12290,
+        244084
+      ]
+    }
+  }
+}

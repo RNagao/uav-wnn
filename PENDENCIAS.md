@@ -2,6 +2,8 @@
 
 Consolidação das ~90 perguntas em aberto espalhadas pelo PRD e pelas 11 specs. Este arquivo é a **fonte única de verdade** sobre o que está pendente; as seções "Perguntas em aberto" das specs são o detalhe, este é o índice com impacto.
 
+> **Atualização (SPEC-03).** **T1 fechada por medição, com resposta negativa** — a alegação de "modelo menor" cai e o argumento migra para a aritmética. Ver `reports/spec03-custo.md`.
+>
 > **Atualização.** Após a SPEC-00 e a revisão do modelo de ruído: **P1, P5, P6, P8, L1 e P2 fechadas** (código de referência e medição); **C5 resolvida** pelo novo modelo; **C4, T1, C1, C2, C3 seguem abertas**. Entram **P9** (parâmetros do canal do sensor) e **P10** (`σ_own`).
 
 **Leitura rápida:** das ~90, **16 têm impacto real no projeto**. Destas, **5 estão no caminho crítico** e precisam de resposta na semana 1. O resto é local, já tem recomendação embutida na spec e pode seguir com o padrão proposto.
@@ -38,7 +40,7 @@ Todas dependem do repositório público `Project-GrADyS/gradys-data-collection`,
 
 | ID | Pendência | Impacto |
 |---|---|---|
-| **T1** | **Reformular H1: "modelo menor" → "aproximador sem multiplicação"?** | Três specs independentes (03, 04, 05) estimam o ator WNN entre ~12 e ~15 KB realizados contra ~8,6 KB da MLP pareada. **A WNN provavelmente sai maior.** Decidir agora custa uma reescrita de parágrafo; decidir na semana 3 custa reescrever a conclusão e refazer a apresentação |
+| ~~**T1**~~ | ~~"modelo menor" → "aproximador sem multiplicação"?~~ | **FECHADA POR MEDIÇÃO, com resposta negativa.** Não são os ~12–15 KB estimados: medido, a WNN é **133,9 KB** (chaves ordenadas) contra **7,6 KB** da MLP pareada — **17,5×** — e ainda 5× menos precisa na clonagem (5,6° contra 1,1°). A estimativa errou uma ordem de grandeza porque partia de um protótipo de **2 variáveis de entrada**; a observação real tem 25. A alegação de tamanho **cai**. Sobra, medido: **zero multiplicações em ponto flutuante no aproximador**, e vantagem de ciclos **condicional ao alvo** — 1,6× em x86, 4,1× em Cortex-M4F, **19,9× em Cortex-M0 sem FPU**. Ver `reports/spec03-custo.md` |
 | **T4** | **A barra da H6 mudou.** O baseline da fig. 7.3 (`greedy`) **não coordena** — separação média entre UAVs de 0,1 m contra alcance de 20 m. A `smart` do mesmo `heuristics.py` coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. Uma heurística sem treino empata com 32 dias de GPU. Decidir: reformular a H6 em torno da `smart`, ou dividir em H6a (bater `greedy`) e H6b (bater `smart`)? Ver `reports/spec00-parametros.md` §9 |
 | **T3** | **Qual é a física do ruído no sensor?** Decide se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância e é dominado por **viés fixo** — o canal vira piso irredutível e a busca ativa perde a causa. Se o drone **localiza o sensor por rádio**, o erro é branco e cresce com a distância, a filtragem tem função e aproximar-se compra informação — ao custo de um alcance de detecção maior que o de coleta, declarado na §5.4. **Bloqueia o bloco 2b; não bloqueia 2a** |
 | **T2** | **Recalibrar o que a fusão pode prometer** | A observação é **relativa**, então `σ_rel = √(σ_a² + σ_s²)`. Se o levantamento dos sensores tiver ~5 m irredutíveis, o 18,8× medido no GPS vira **~2,2×** no que a política enxerga. O achado A3 é sobre a posição própria, não sobre a entrada da política |

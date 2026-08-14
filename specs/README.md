@@ -15,7 +15,7 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 | **00** | [Ambiente de referência](SPEC-00-ambiente.md) | infra | 1 | — | 3 d | **concluída** |
 | **01** | [Estudo de binarização](SPEC-01-binarizacao.md) | estudo | pré-1 | 00 | 3 d | **concluída** — G0 fechado |
 | **02** | [Baselines e harness de avaliação](SPEC-02-baselines.md) | infra | 1 | 00 | 1 d | revisada (escopo encolheu) |
-| **03** | [Harness de custo — T1/T2/T3](SPEC-03-custo.md) | infra | todas | — | 2 d | escrita, em revisão |
+| **03** | [Harness de custo — T1/T2/T3](SPEC-03-custo.md) | infra | todas | — | 2 d | **T1 e T3 concluídos**; T2 pendente da SPEC-04 |
 | **04** | [Núcleo n-tuple esparso](SPEC-04-ntuple.md) | modelo | 1 | 01 | 2 d | escrita, em revisão |
 | **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | revisada (brinquedo próprio no lugar do gerador analítico) |
 | **06** | [Etapa 1 — réplicas 1a/1b e varreduras → **G1**](SPEC-06-etapa1.md) | experimento | 1 | 00, 02, 03, 05 | 4 d | revisada (P1 fechada; guloso validado) |
