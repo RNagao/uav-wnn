@@ -5,6 +5,35 @@
 
 ---
 
+## 0. Revisão — o código do Katopodis resolve a C2, e ela estava mal formulada
+
+A implementação de referência é do **próprio autor**: `rkatopodis/RLWorktable.jl` (agentes) e `rkatopodis/Ramnet.jl` (núcleo). Atenção: os `AltDiscriminators` estão na branch **`faster_hashing`**, não na `master`. Ambos MIT.
+
+**A pendência C2 partia de uma premissa errada.** O PRD pedia "gradiente funcional **com** fator de esquecimento" — combinação que **não existe** no código dele. São **dois modelos distintos, para papéis distintos**:
+
+| papel | modelo | `predict` | `train!` | guarda |
+|---|---|---|---|---|
+| **ator** | `FunctionalDiscriminator` | `Σ vᵢ / N` — média simples | `v -= grad` | só **valor** |
+| **crítico** | `RegressionDiscriminator` | `Σ vᵢ / Σ (1−γ^cᵢ)/(1−γ)` | acumula valor e contador | **valor + contador** |
+
+O denominador do crítico é a soma da série geométrica dos pesos de esquecimento — é a eq. 4.10 da dissertação, implementada literalmente.
+
+### Três consequências para esta spec
+
+**1. Implementar dois modelos, não um.** O escopo muda de "um núcleo com esquecimento opcional" para dois tipos com interfaces próximas mas semânticas diferentes. O `NTupleRegressor` que a SPEC-01 já escreveu (média sobre RAMs, `v -= η(f−y)`, sem contador) **já é o `FunctionalDiscriminator`** — o ator está pronto em forma mínima.
+
+**2. O crítico custa o dobro por entrada.** Valor **e** contador por posição endereçada. A medição de T1 da SPEC-03 mediu só o ator; a coluna *ator + crítico* precisa desse fator, e o medidor já lê `bytes_por_entrada` do modelo em vez de assumir.
+
+**3. O esquecimento não é ajuste do ator.** Ele existe porque o crítico faz **regressão para o retorno `G`**, cujo alvo se desloca conforme a política melhora. No ator não há distribuição-alvo se movendo dessa forma, e por isso não há γ.
+
+### Ainda em aberto
+
+**C3 — estrutura de armazenamento.** A SPEC-03 já mediu, na configuração da SPEC-01: chaves ordenadas **133,9 KB** contra hash aberto **273,6 KB**. A ordenada ganha por 2× em memória; falta medir a cauda de latência (T2) para decidir, já que o argumento a favor do hash era previsibilidade.
+
+**A ocupação não satura** (elasticidade 0,194 contra o critério de 0,05 do RNF-08). A poda por esquecimento deixa de ser refinamento e vira requisito: medir `occ_ε` — entradas com `|v| > ε` — junto com `occ`.
+
+---
+
 ## 1. Objetivo
 
 Entregar a biblioteca do aproximador — a rede n-tuple com gradiente funcional, esquecimento, armazenamento esparso e múltiplas cabeças de saída — **validada fora do laço de RL**, com contratos de API, layout de memória e instrumentação de custo já no formato que a SPEC-03 consome.

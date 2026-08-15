@@ -6,6 +6,54 @@
 
 ---
 
+## 0. Revisão — o algoritmo está no código do autor, e pode ser copiado
+
+`rkatopodis/RLWorktable.jl`, arquivo `src/Agents/WNN/PG/ContinousFunctionalAC.jl`. MIT. Deixa de ser reconstrução a partir do texto e passa a ser adaptação de código existente.
+
+### O algoritmo, verbatim
+
+**Actor-critic de `m` passos com retorno Monte Carlo dentro do buffer.** Não é TD(0):
+
+```
+se episódio terminou:            G = 0
+senão, com buffer cheio:         G = V(s_atual)          # bootstrap
+para cada transição, de trás para frente:
+    G  = r + γ·G
+    δ  = G − V(s)                                        # vantagem
+    atualiza ator  com δ
+    treina crítico por REGRESSÃO para G                  # não para o erro TD
+```
+
+O crítico é treinado por **regressão para o retorno `G`**, não para o erro TD. É isso que justifica o esquecimento nele: o alvo se desloca conforme a política melhora.
+
+### A política contínua, e o que ela não resolve
+
+`ContinousActionPolicy` emite um vetor em `R^AS` e amostra:
+
+```
+a = cov·randn(AS) + predict(f, obs)          # gaussiana isotrópica
+grad = inv(cov)·(pred − a)                   # gradiente da perda
+train!(f, obs, lr · grad · δ)                # escalado pela vantagem
+```
+
+**Katopodis não trata ação circular.** Para o Hopper — torques numa caixa — a gaussiana isotrópica basta. Para o nosso `θ ∈ [0, 2π)` não: a média linear de ângulos continua inválida.
+
+**A recomendação de normal projetada (C1) se mantém, e encaixa nativamente.** O `FunctionalDiscriminator{AS}` já é multi-saída: basta `AS = 3` — `u₁, u₂` para o rumo, `μ_s` para a velocidade —, aplicar `θ = atan2(z₂, z₁)` sobre a amostra, e o resto do laço fica idêntico. É o `d = 3` que esta spec já previa.
+
+### Detalhes de treino a copiar
+
+| Detalhe | Como no original |
+|---|---|
+| **Covariância da política** | **Recozida**, não aprendida: `(1−α)·start_cov + α·end_cov`, `α = update_count / cov_decay`. **Elimina o hiperparâmetro** que esta spec listava como risco da normal projetada |
+| **Taxa de aprendizado** | Recozida pela mesma forma linear |
+| **Escala do gradiente do ator** | Pela **vantagem `δ`**, não pelo retorno `G` |
+| **Particionamento das tuplas** | `:uniform_random` é o default |
+| **Crítico** | `RegressionDiscriminator` com γ; **ator** `FunctionalDiscriminator` sem γ (ver SPEC-04 §0) |
+
+> **Ressalva de leitura.** O default `end_learning_rate = 1e5` no construtor de `ContinousActionPolicy` é quase certamente um erro de digitação por `1e-5` — uma taxa final maior que a inicial contraria o propósito do recozimento. Não copiar sem verificar contra os experimentos da dissertação.
+
+---
+
 ## 1. Objetivo
 
 Entregar **duas políticas treináveis e intercambiáveis** sobre a mesma interface, com o mesmo algoritmo, a mesma observação e a mesma recompensa:

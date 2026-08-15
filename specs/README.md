@@ -16,8 +16,8 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 | **01** | [Estudo de binarização](SPEC-01-binarizacao.md) | estudo | pré-1 | 00 | 3 d | **concluída** — G0 fechado |
 | **02** | [Baselines e harness de avaliação](SPEC-02-baselines.md) | infra | 1 | 00 | 1 d | revisada (escopo encolheu) |
 | **03** | [Harness de custo — T1/T2/T3](SPEC-03-custo.md) | infra | todas | — | 2 d | **T1 e T3 concluídos**; T2 pendente da SPEC-04 |
-| **04** | [Núcleo n-tuple esparso](SPEC-04-ntuple.md) | modelo | 1 | 01 | 2 d | escrita, em revisão |
-| **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | revisada (brinquedo próprio no lugar do gerador analítico) |
+| **04** | [Núcleo n-tuple esparso](SPEC-04-ntuple.md) | modelo | 1 | 01 | 2 d | revisada; **C2 fechada**, restam dois modelos a implementar |
+| **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | revisada; algoritmo disponível em código MIT do autor |
 | **06** | [Etapa 1 — réplicas 1a/1b e varreduras → **G1**](SPEC-06-etapa1.md) | experimento | 1 | 00, 02, 03, 05 | 4 d | revisada (P1 fechada; guloso validado) |
 | **07** | [Ruído, KF com entrada de controle, NEES/NIS](SPEC-07-fusao-local.md) | fusão | 2a | 00 | 3 d | revisada (canal do sensor virou primário) |
 | **08** | [Etapa 2 — blocos 2a e 2b → **G2**](SPEC-08-etapa2.md) | experimento | 2a, 2b | 06, 07 | 3 d | revisada (dois blocos; 2b bloqueado por T3) |
@@ -25,6 +25,8 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 | **10** | [Reprodutibilidade, relatório e slides](SPEC-10-entrega.md) | entrega | — | contínua | contínua | escrita, em revisão |
 
 Todas as specs foram escritas e passaram por uma revisão cruzada; os achados que exigem decisão humana estão em [`REVISAO.md`](REVISAO.md).
+
+**Fonte primária do aproximador.** A implementação de referência da rede n-tuple é o código do **próprio Katopodis**, MIT: [`rkatopodis/RLWorktable.jl`](https://github.com/rkatopodis/RLWorktable.jl) (agentes) e [`rkatopodis/Ramnet.jl`](https://github.com/rkatopodis/Ramnet.jl) — este último com o núcleo na branch **`faster_hashing`**, não na `master`. A leitura dele **fechou a C2** e confirmou a C1 como problema novo nosso; ver SPEC-04 §0 e SPEC-05 §0.
 
 **[`ARQUITETURA.md`](ARQUITETURA.md)** define como as duas features do trabalho — trocar o MADDPG pela rede sem peso, e acrescentar ruído gaussiano na posição dos drones — se encaixam **sem tocar** no código do cenário, que vive num submodule. Leitura obrigatória antes da SPEC-04.
 

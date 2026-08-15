@@ -162,6 +162,12 @@ Os valores do cenário vieram do **código de referência** (`Project-GrADyS/gra
 - a observação é **normalizada** e o padding é **`-1`**, não `(0,0)` — o que torna desnecessário o bit de validade que o projeto havia previsto;
 - na fig. 7.3 o MADDPG é avaliado a 0,5 s por decisão e o guloso a **0,1 s**, uma variável não controlada que vale ~10 % no tempo de conclusão.
 
+## Implementação de referência do aproximador
+
+Além do ambiente, o **aproximador** também tem fonte primária em código: [`rkatopodis/RLWorktable.jl`](https://github.com/rkatopodis/RLWorktable.jl) e [`rkatopodis/Ramnet.jl`](https://github.com/rkatopodis/Ramnet.jl), do próprio Katopodis, MIT. O núcleo está na branch **`faster_hashing`** do segundo, não na `master`.
+
+A leitura dele mostrou que **ator e crítico são modelos diferentes** — `FunctionalDiscriminator` (média simples, sem esquecimento) e `RegressionDiscriminator` (auto-normalizado, com esquecimento e contador) —, o que fechou uma pendência que estava mal formulada, e que **ele não trata ação circular**, o que confirma o `θ` do nosso problema como questão nova.
+
 ## Referências
 
 - LAMENZA, T. S. *A Deep Reinforcement Learning Approach for Sensor Data Collection by a Swarm of UAVs*. Dissertação de mestrado, PUC-Rio, 2025.
