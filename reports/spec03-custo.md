@@ -108,10 +108,69 @@ Isso é o que o PRD §5.5 já prescrevia como recuo, e agora está medido.
 
 ---
 
-## 5. O que não foi feito nesta passagem
+## 5. Validação: os números acima são medidos, não calculados
+
+Os dois resultados centrais deste relatório vinham de código que só era testado
+contra si mesmo. Os testes de `test_custo.py` re-derivavam a mesma fórmula que
+verificavam, e a alegação de "zero multiplicações fp" afirmava que **o nosso
+contador** devolve zero — verdadeiro por construção. Duas validações fecharam
+isso.
+
+### 5.1 A fórmula de memória bate com a estrutura materializada
+
+`src/uavwnn/custo/realizado.py` constrói as três variantes de verdade — chaves,
+valores, bitmaps, cabeçalhos — serializa num blob plano sem `pickle`, e mede
+`len(blob)`:
+
+| variante | fórmula | **medido** | erro | pred. vs denso |
+|---|---|---|---|---|
+| ordenado | 604 376 B | **604 376 B** | 0,00 % | 5,9e-08 |
+| hash | 996 904 B | **996 904 B** | 0,00 % | 5,9e-08 |
+| denso | 1 574 248 B | **1 574 248 B** | 0,00 % | 5,9e-08 |
+| MLP pareada | 7 816 B | **7 816 B** | 0,00 % | — |
+
+O que dá peso à medição não é a igualdade — fórmula e medição partem das mesmas
+premissas de codificação — e sim que **as estruturas respondem consultas**. O
+hash com sondagem linear insere e recupera toda a ocupação dentro de
+`2^⌈log₂(occ/α)⌉`, a busca binária acerta, e as três reproduzem o denso a menos
+do arredondamento `float32`, o que de quebra valida a premissa `bytes_valor=4`.
+Uma LUT que ocupasse poucos bytes por ter perdido entradas seria pega aqui.
+
+**O veredito de T1 se mantém.**
+
+### 5.2 O núcleo n-tuple é equivalente ao do Katopodis
+
+Teste diferencial contra `Ramnet.jl@faster_hashing`, com Julia 1.10.5: mesmo
+mapeamento de tuplas, mesmos bits, mesmos alvos, mesma ordem de visita.
+
+| configuração | \|Δ\| máx | \|Δ\| médio | escala |
+|---|---|---|---|
+| B=64, n=8, N=8, d=2 | 5,6e-17 | 1,2e-17 | 0,368 |
+| B=96, n=12, N=8, d=2 | **0** | **0** | 0,176 |
+| B=128, n=8, N=16, d=3 | 5,6e-17 | 1,1e-17 | 0,287 |
+
+Desvio no nível do epsilon de `float64`: os dois lados computam a mesma coisa.
+O mapeamento é imposto ao lado Julia sobrescrevendo `segments`/`offsets` após a
+construção, com `RawBitsEncoder{UInt16}` — exige `B = N·n` para o partitioner
+render exatamente `N` nós.
+
+Isto promove o `NTupleRegressor` de "passa nos testes que eu escolhi" para
+"concorda com a implementação do autor". As predições Julia estão congeladas em
+`tests/fixtures/diferencial/`, então a suíte não exige Julia instalado.
+
+---
+
+## 6. O que não foi feito nesta passagem
 
 - **T2 (latência)** — o harness de medição com regimes de cache, 5 blocos em processos separados e separação de cauda de hash *versus* cauda de escalonador. É trabalho considerável e depende de decidir a variante de armazenamento; a SPEC-04 é quem implementa o esparso de verdade.
 - **T-03.4 (quantização como ablação)** — exige política treinada para reavaliar tempo de conclusão, o que só existe depois da SPEC-06.
 - **T-03.6 (paridade de arcabouço)** — a MLP já está em NumPy puro aqui; falta a coluna PyTorch e o teste de equivalência.
+- **T3 continua sendo modelo, não medição.** A §5.1 validou a contabilidade de
+  *memória*; a de *operações* segue sem contrapartida empírica — nada conta
+  instruções executadas, e a tabela de ciclos por classe de alvo vem de manuais
+  de arquitetura. A alegação "zero multiplicações fp" é verdadeira sobre o
+  algoritmo, e é assim que o relatório final precisa enunciá-la.
+- **Teste A/A (SPEC-02)** — todos os ICs deste repositório pressupõem um
+  procedimento de intervalo cuja calibração nunca foi verificada.
 
 Nenhum deles muda o veredito de T1, que é o que esta passagem existia para resolver.

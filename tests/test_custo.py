@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from uavwnn.custo import custo_mlp, custo_ntuple, ocupacao_por_ram
+from uavwnn.custo.realizado import LUTHash, medir_mlp, medir_realizado
 from uavwnn.custo.operacoes import (
     CICLOS,
     ciclos,
@@ -138,3 +139,56 @@ def test_vantagem_cresce_sem_fpu():
     sem_fpu = razoes["Cortex-M0 (SEM FPU)"]
     assert 1.0 < com_fpu < 3.0
     assert sem_fpu > 10 * com_fpu
+
+
+# --- T1: validação cruzada, fórmula contra medição -------------------------
+
+
+@pytest.mark.parametrize("variante", ["ordenado", "hash", "denso"])
+def test_formula_bate_com_a_estrutura_materializada(rede_treinada, variante):
+    """A validação cruzada que faltava: `memoria.py` calcula, `realizado.py` mede.
+
+    O veredito de T1 — WNN 17x maior que a MLP pareada — descansava numa
+    fórmula que ninguém tinha conferido contra a realidade. Aqui as chaves,
+    valores, bitmaps e cabeçalhos viram bytes de verdade e o tamanho é
+    `len(blob)`.
+    """
+    f = custo_ntuple(rede_treinada.pesos, 200, 12, 48, variante=variante,
+                     limiares_por_dim=8, n_dims=25)
+    m = medir_realizado(rede_treinada, variante, limiares_por_dim=8, n_dims=25)
+    assert m.persistente == f.persistente
+    assert m.residente == f.residente
+
+
+@pytest.mark.parametrize("variante", ["ordenado", "hash", "denso"])
+def test_estrutura_esparsa_responde_como_a_densa(rede_treinada, variante):
+    """O que dá valor à medição: a estrutura FUNCIONA.
+
+    Uma LUT que ocupasse poucos bytes por ter perdido entradas mediria bonito e
+    estaria errada. `medir_realizado` levanta se a predição divergir do denso
+    além do arredondamento `float32` — este teste garante que essa verificação
+    é de fato exercida, com bits reais.
+    """
+    rng = np.random.default_rng(11)
+    bits = rng.random((120, 200)) > 0.5
+    m = medir_realizado(rede_treinada, variante, bits_verificacao=bits)
+    assert m.erro_max_vs_denso < 1e-6
+
+
+def test_hash_acomoda_toda_a_ocupacao(rede_treinada):
+    """`cap = 2^ceil(log2(occ/alpha))` com `alpha < 1` precisa caber sempre.
+
+    Se a capacidade ficasse abaixo da ocupação, a sondagem linear entraria em
+    laço infinito na inserção — o risco real da variante V-a, e a razão de a
+    SPEC-03 exigir a mitigação do RNF-10.
+    """
+    lut = LUTHash(rede_treinada.pesos)
+    occ = ocupacao_por_ram(rede_treinada.pesos)
+    for i, (cap, oc) in enumerate(zip(lut.caps, occ)):
+        assert cap >= oc, f"RAM {i}: capacidade {cap} < ocupação {oc}"
+        assert cap == 0 or cap & (cap - 1) == 0, "capacidade não é potência de 2"
+
+
+def test_mlp_medida_em_float32_como_a_wnn(rede_treinada):
+    """A comparação só é honesta com a mesma régua nos dois lados."""
+    assert medir_mlp([25, 32, 32, 2]).persistente == custo_mlp([25, 32, 32, 2]).persistente
