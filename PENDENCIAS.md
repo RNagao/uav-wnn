@@ -274,3 +274,55 @@ já estava em uso (`σ_own`, fechada por construção). Corrigido:
   original. **Não é bloqueio** — o codificador de produção é o quantil, por
   outras razões —, mas se o relatório citar §5.2.2 como fundamento, a ressalva
   precisa vir junto. Ver `reports/replica-katopodis-52.md`.
+
+---
+
+## Adendo — 2026-08-20: P4 fechada por medição, e a D7 se estreita
+
+**O submodule já tinha o que faltava.** `vendor/gradys-data-collection` traz, além
+do cenário, o **código de treino do MADDPG** (`main.py`, base CleanRL), **9
+checkpoints treinados** (`Na ∈ {2,4,8} × Ns ∈ {12,24,36}`, 45 MB) e o **harness
+de avaliação** (`test.py`). Nada disso precisava ser treinado.
+
+### ~~P4~~ — arquitetura do ator do MADDPG. **FECHADA POR MEDIÇÃO.**
+
+| `Na` | obs | params | ator fp32 |
+|---|---|---|---|
+| 2 | 27 | 73 474 | 287,0 KB |
+| 4 | 31 | 74 498 | 291,0 KB |
+| 8 | 39 | 76 546 | 299,0 KB |
+
+`obs → 256 → 256 → 2`, ReLU, `tanh` na saída — **exatamente o default do CleanRL
+que a estimativa supunha**. A estimativa registrada era "≈74 000 params, ≈298 KB";
+o palpite estava certo. A razão da §5.5 (`0,46×` o ator do MADDPG) deixa de sair
+marcada como estimativa.
+
+Duas validações cruzadas de graça: a fórmula `D = 2(Na−1) + 25` do PRD §5.2
+confere com as formas de `fc1.weight`, e `obs_dim` não muda com `Ns`, confirmando
+`N*_s = 12` fixo com zero-padding.
+
+### D7 estreitada, não derrubada
+
+A justificativa original — *"reproduzi-lo exigiria replicar exatamente simulador,
+observação e recompensa; qualquer divergência invalidaria a comparação
+silenciosamente"* — **não se aplica a carregar os pesos dele**. Não há nada a
+replicar: são os pesos dele, no ambiente dele, que é o nosso submodule.
+
+O que continua valendo: **não retreinamos**. Isso custaria ~7 dias de GPU por
+célula, pelo número da própria dissertação.
+
+### Sobe de prioridade: T-03.6 (paridade de arcabouço)
+
+A latência do ator do MADDPG agora é mensurável (**35 a 36 µs** de mediana, 1
+thread, batch 1, fp32). Mas é PyTorch em CPU, e a nossa WNN é NumPy — medir tempo
+de parede favorece quem tem a biblioteca mais otimizada, não o modelo mais barato.
+**A comparação independente de arcabouço é a contagem de operações (T3)**, e o
+contraste que se sustenta é estrutural: ~73 000 multiplicações em ponto flutuante
+por decisão contra **zero** no nosso aproximador.
+
+### Nova, e é limitação de escopo, não pendência de decisão
+
+- **Não há checkpoint para `Na = 1`.** As células publicadas começam em 2 agentes,
+  e a Etapa 1 começa em `Na = 1`. Ali **não existe baseline MADDPG** — as
+  referências são a heurística e a MLP pareada. Precisa aparecer no relatório;
+  não há o que decidir.

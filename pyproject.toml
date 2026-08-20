@@ -25,6 +25,13 @@ dev = [
     "pytest>=9.1.1",
     "seaborn>=0.13.2",
 ]
+# Grupo opcional: só para LER os checkpoints do MADDPG que Lamenza publicou no
+# submodule (`.cleanrl_model` é um arquivo do `torch.save`). Não treinamos nada
+# com torch, e ele não entra na instalação padrão porque são ~200 MB para uma
+# medição de baseline. Ver `scripts/spec02_baseline_maddpg.py`.
+baseline = [
+    "torch>=2.0",
+]
 
 [tool.pytest.ini_options]
 # `vendor/` é código de terceiros carregado como submodule: não coletar os

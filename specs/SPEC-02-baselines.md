@@ -5,6 +5,47 @@
 **Referência:** PRD §5.1, §5.2, §6.1, §6.4, RNF-06 · Lamenza §3, §5.1–5.3, §7.1–7.2, tab. 3.1 e 7.1
 
 
+## 0-ter. O baseline MADDPG entrou no escopo desta spec (2026-08-20)
+
+**Descoberta:** o submodule já traz os **pesos treinados** do MADDPG — 9
+checkpoints (`Na ∈ {2,4,8} × Ns ∈ {12,24,36}`, 45 MB), o código de treino
+(`main.py`) e o harness de avaliação (`test.py`). Não é preciso treinar nada.
+
+Isso **estreita a D7** do PRD: não retreinamos (custaria ~7 dias de GPU por
+célula), mas avaliamos os pesos liberados. A justificativa original da D7 — risco
+de divergência ao replicar simulador, observação e recompensa — não se aplica,
+porque são os pesos dele no ambiente dele.
+
+| figura de mérito | estado |
+|---|---|
+| **tamanho do modelo** | **MEDIDO** — 287 a 299 KB conforme `Na`; fecha a **P4** |
+| **tempo de inferência** | **MEDIDO** — 35 a 36 µs de mediana, 1 thread, batch 1 |
+| **tempo de conclusão** | **falta**, e é tarefa desta spec (T-02.C abaixo) |
+
+Feito: `scripts/spec02_baseline_maddpg.py`, `reports/spec02-baseline-maddpg.md`,
+`tests/test_baseline_maddpg.py` (10 testes). `torch` entra como grupo **opcional**
+`baseline`, porque são ~200 MB só para ler `.cleanrl_model`.
+
+### Tarefas que isto acrescenta
+
+- **T-02.C — tempo de conclusão do MADDPG nas 9 células.** Rodar a política
+  treinada via o `test.py` do submodule, coletando `completion_time`,
+  `avg_collection_time` e `all_collected`. É a comparação mais forte possível: a
+  política dele e a nossa, no mesmo simulador e no mesmo harness. **Substitui a
+  digitalização da fig. 7.3** como linha de referência, e vale confrontar os dois
+  para detectar divergência de configuração.
+- **T-02.D — paridade de arcabouço com a T-03.6.** A latência medida é PyTorch em
+  CPU; a nossa é NumPy. Tempo de parede favorece a biblioteca mais otimizada, não
+  o modelo mais barato. Reportar sempre ao lado da contagem de operações.
+
+### Limitação que precisa ir para o relatório
+
+**Não há checkpoint para `Na = 1`.** As células publicadas começam em 2 agentes, e
+a Etapa 1 começa em `Na = 1`. Ali as referências continuam sendo a heurística e a
+MLP pareada — não há baseline MADDPG, e não há o que decidir a respeito.
+
+---
+
 ## 0-bis. Esta spec passou a ser o único bloqueio estatístico (2026-08-15)
 
 Com a auditoria do artigo concluída (`specs/PLANO-TESTES.md`), o **teste A/A** é
