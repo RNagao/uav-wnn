@@ -133,3 +133,97 @@ separação, que usa o episódio inteiro.
 200 não completa a coleta. O tempo de conclusão desses episódios entra na média
 como o instante em que o episódio terminou, não como censura explícita — o mesmo
 tratamento que a L1 da SPEC-00 documenta.
+
+---
+
+## 6. Campanha de 900 runs — os números definitivos
+
+`scripts/spec02_maddpg_campanha.py`, **100 runs × 200 episódios × 9 células**.
+Cada run é uma réplica da campanha de avaliação de Lamenza (`total_runs = 200`
+no `test.py`), então o desvio abaixo é **entre runs**: mede quanto o número
+publicado variaria numa nova campanha.
+
+| célula | conclusão (s) | sucesso | separação (m) | latência (µs) |
+|---|---|---|---|---|
+| `a_2-s_12` | 18,44 ± 0,71 | 0,9995 ± 0,0015 | 92,8 ± 13,2 | 34,8 ± 0,4 |
+| `a_2-s_24` | 30,32 ± 2,37 | 0,9944 ± 0,0050 | 100,8 ± 15,4 | 35,0 ± 1,4 |
+| `a_2-s_36` | 35,36 ± 2,19 | 0,9964 ± 0,0046 | 116,6 ± 19,2 | 34,7 ± 0,4 |
+| `a_4-s_12` | 10,07 ± 0,13 | 1,0000 ± 0,0000 | 80,1 ± 9,2 | 34,6 ± 0,5 |
+| `a_4-s_24` | 13,73 ± 0,15 | 1,0000 ± 0,0000 | 94,2 ± 6,6 | 34,5 ± 0,4 |
+| `a_4-s_36` | 16,13 ± 0,14 | 1,0000 ± 0,0000 | 95,1 ± 6,7 | 34,6 ± 0,9 |
+| `a_8-s_12` | **15,11 ± 0,47** | 0,9999 ± 0,0009 | 76,6 ± 9,6 | 34,6 ± 0,4 |
+| `a_8-s_24` | 9,65 ± 0,08 | 1,0000 ± 0,0000 | 73,7 ± 6,2 | 34,6 ± 0,4 |
+| `a_8-s_36` | 12,87 ± 0,16 | 1,0000 ± 0,0000 | 88,2 ± 5,3 | 34,7 ± 0,5 |
+
+**Esta tabela substitui a da §2**, que vinha de uma campanha só.
+
+### Validação: 3/3 dentro de um desvio
+
+| célula | medido | publicado | erro | |
+|---|---|---|---|---|
+| `a_2-s_24` | 30,32 ± 2,37 | 29,6 | +2,4 % | dentro de 1 desvio |
+| `a_4-s_24` | 13,73 ± 0,15 | 13,8 | −0,5 % | dentro de 1 desvio |
+| `a_8-s_24` | 9,65 ± 0,08 | 9,7 | −0,5 % | dentro de 1 desvio |
+
+Afirmação mais forte que o "±2 %" da §2: com 100 runs sabemos **quanto o número
+deveria variar**, e a diferença contra o publicado cabe nessa variação. Não é
+concordância dentro de uma tolerância arbitrária — é concordância dentro do ruído
+próprio da medição.
+
+### Achado: a linha `Na = 2` é uma ordem de grandeza menos estável
+
+| linha | desvio entre runs |
+|---|---|
+| `Na = 2` | **0,71 a 2,37 s** |
+| `Na = 4` | 0,13 a 0,15 s |
+| `Na = 8` | 0,08 a 0,47 s |
+
+**Até 15× de diferença.** Com dois drones a política é frágil; com quatro ou mais
+é notavelmente estável. E as falhas de coleta se concentram na mesma linha: a
+taxa de sucesso é exatamente 1,0000 em todas as células de `Na = 4` e cai a
+0,9944 em `a_2-s_24`.
+
+Isto tem consequência para o nosso plano: **a Etapa 1 percorre `Na = 1 → 2 → 4 →
+8`, e a célula de 2 drones é a mais ruidosa do baseline.** Comparar a nossa
+política ali exige mais sementes do que nas outras, ou o ruído do baseline
+domina a diferença.
+
+### A anomalia de `a_8-s_12` confirma-se — e corrige o meu número anterior
+
+**15,11 ± 0,47 s**, contra 9,65 de `a_8-s_24` e 12,87 de `a_8-s_36`. Mais
+sensores, menos tempo: não é monotônico, e agora está medido sobre 100 runs em
+vez de uma campanha.
+
+A campanha também **corrige** a estimativa da §2, que dava 17,3 s com IC
+[14,5; 22,4] — largo o suficiente para conter 15,11. O valor de uma campanha só
+estava alto.
+
+A explicação segue a da §2: aquela pasta tem carimbo de **set/2024** contra
+ago/2024 das outras oito, e foi retreinada depois de um treino interrompido.
+
+### O desvio entre runs se comporta como deveria
+
+Verificação de sanidade: se os episódios fossem independentes, o desvio entre
+runs seria o desvio entre episódios dividido por `√200 ≈ 14,1`.
+
+| célula | entre runs | entre episódios | razão |
+|---|---|---|---|
+| `a_4-s_24` | 0,15 s | 2,17 s | **14,2×** |
+| `a_2-s_24` | 2,37 s | 29,76 s | 12,5× |
+
+`a_4-s_24` bate na mosca. `a_2-s_24` fica um pouco abaixo, o que é o esperado de
+uma distribuição de cauda mais pesada — consistente com ser a linha instável.
+
+Isto valida a estrutura da campanha: o número que reportamos é a variabilidade da
+**campanha**, não a do episódio, e as duas se relacionam como a teoria manda.
+
+### Reprodução
+
+```bash
+uv run --group baseline python scripts/spec02_maddpg_campanha.py
+uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo   # só agrega
+```
+
+CSVs em `reports/maddpg/campanha-a{Na}s{Ns}.csv`, uma linha por run, com colunas
+que o resumo não mostra: `completion_time_std_episodios`, `coleta_media`,
+`latencia_p99_us` e `wall_s`.
