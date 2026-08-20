@@ -1,0 +1,61 @@
+{
+  "config": {
+    "execucoes": 200,
+    "n_episodios": 500,
+    "B": 1000,
+    "raiz": 20260809,
+    "fonte": "ambas",
+    "saida": "reports/spec02-aa.json"
+  },
+  "nominal": 0.95,
+  "resultados": {
+    "sintetica_pareado": {
+      "cobertura": 0.955,
+      "ic_cobertura": [
+        0.9167024063390321,
+        0.9761477282752957
+      ],
+      "largura_media_ic": 0.9833697365156208,
+      "execucoes": 200,
+      "n_episodios": 500,
+      "B": 1000
+    },
+    "sintetica_indep": {
+      "cobertura": 1.0,
+      "ic_cobertura": [
+        0.981153994081679,
+        0.9999999999999999
+      ],
+      "largura_media_ic": 5.1365254462282675,
+      "execucoes": 200,
+      "n_episodios": 500,
+      "B": 1000
+    },
+    "maddpg_pareado": {
+      "cobertura": 0.935,
+      "ic_cobertura": [
+        0.8919799625008205,
+        0.9616240123502402
+      ],
+      "largura_media_ic": 0.17859385338415476,
+      "execucoes": 200,
+      "n_episodios": 500,
+      "B": 1000
+    },
+    "maddpg_indep": {
+      "cobertura": 0.99,
+      "ic_cobertura": [
+        0.9642775148038204,
+        0.997253399396225
+      ],
+      "largura_media_ic": 0.24768618468033549,
+      "execucoes": 200,
+      "n_episodios": 500,
+      "B": 1000
+    }
+  },
+  "veredito": {
+    "calibrado": true,
+    "contraexemplo_falha": true
+  }
+}
