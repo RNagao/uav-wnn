@@ -326,3 +326,46 @@ por decisão contra **zero** no nosso aproximador.
   e a Etapa 1 começa em `Na = 1`. Ali **não existe baseline MADDPG** — as
   referências são a heurística e a MLP pareada. Precisa aparecer no relatório;
   não há o que decidir.
+
+
+---
+
+## Adendo — 2026-08-20 (b): SPEC-02 concluída, o bloqueio estatístico caiu
+
+**O teste A/A está calibrado.** Cobertura 95,5 % (sintética) e 93,5 % (campanha
+MADDPG), com o IC de Wilson contendo 95 % nas duas. O contra-exemplo —
+reamostragem independente — falha como deve, com IC **5,2× mais largo**.
+
+Consequência retroativa: **os ICs já reportados se sustentam.** Isso cobre a
+validação 9/9 do guloso e o `greedy` vs `smart` (SPEC-00), a comparação de custo
+(SPEC-03), a replicação de §5.2.2 (T-B2) e a validação 3/3 do MADDPG.
+
+### Achado novo que reforça a TS4
+
+O guloso **não escala com `Na`**: de 1 para 4 drones acelera **1,10×**, contra
+3,32× do planejador. Quadruplicar o enxame melhora o baseline em 9,5 %.
+
+O mecanismo está medido: coletas redundantes saltam de 0,0 (`Na=1`) para **10,9**
+(`Na=2` e `Na=4`), e o Gini das visitas **piora** com mais agentes (0,469 →
+0,707). A TS4 dizia que a barra da H6 era baixa porque o baseline não coordena;
+agora se sabe também que **acrescentar drones a ele quase não ajuda**.
+
+### Achado sobre o problema, não sobre o método
+
+Em `Na = 1` não há particionamento, então o `kmeans_tsp` degenera em ordenação
+ótima de rota. Isso separa as fontes de ganho:
+
+| fonte | ganho sobre o guloso |
+|---|---|
+| roteamento só (`Na = 1`) | **8,1 %** |
+| roteamento + particionamento (`Na = 4`) | **69,4 %** |
+
+**O gargalo da coleta por enxame é *quem vai onde*, não *em que ordem*.** Vale
+para a leitura da Etapa 1: se a nossa política aprender particionamento, ganha
+quase tudo; se aprender só roteamento, ganha 8 %.
+
+### Não feito, e registrado como tal
+
+**T-02.9 §7 — sensibilidade a `communication_range`.** O motivo original era
+decidir entre candidatos da P1, que foi fechada na SPEC-00 com o valor lido do
+código (20 m). Continua valendo como análise de robustez.

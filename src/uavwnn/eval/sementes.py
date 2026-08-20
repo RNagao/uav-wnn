@@ -77,7 +77,12 @@ class ArvoreSementes:
         if ramo not in ("treino", "avaliacao"):
             raise ValueError(f"cenários vêm de 'treino' ou 'avaliacao', não {ramo!r}")
         seq = self._ramo(ramo)
-        return [int(s) for s in seq.generate_state(n, dtype=np.uint64)]
+        # `uint32` e não `uint64`: a semeadura do cenário passa por
+        # `np.random.seed`, o gerador LEGADO, que exige `< 2**32`. É ele porque o
+        # `reset()` de referência sorteia as posições com o `random` da stdlib e
+        # com o estado global do numpy — não com um `Generator` que pudéssemos
+        # injetar. Sementes de 64 bits levantam `ValueError` aqui.
+        return [int(s) for s in seq.generate_state(n, dtype=np.uint32)]
 
     # -- política -----------------------------------------------------------
 
