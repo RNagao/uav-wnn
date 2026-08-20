@@ -6,6 +6,37 @@
 
 ---
 
+
+## 0-ter. A dissertação corrige o código do autor em dois pontos (2026-08-15)
+
+A §0-bis tratava o `ContinousFunctionalAC.jl` como referência. Com a leitura da
+**dissertação** — fonte primária — dois pontos dela **prevalecem sobre o código**:
+
+**1. `Σ` e `α` são constantes, não recozidas.** O apêndice A lista as duas como
+hiperparâmetros fixos (`Σ` = 0,5 em Mountain Car, 0,3 em Hopper). O recozimento
+existe só no Julia. Implementado desligado por padrão, e a **D6 do PRD foi
+corrigida** — ela prescrevia recozimento.
+
+**2. `Σ` é covariância, não desvio (P10).** A eq. (4.34) diz *"predefined
+**covariance** matrix"*, logo a amostragem correta é `√Σ·z`. O
+`ContinousActionPolicy.jl` amostra `Σ·z` mas usa `inv(Σ)` no gradiente — trata o
+mesmo número como desvio num lugar e variância no outro. **Seguimos o artigo**;
+`escala_como_desvio=True` reproduz o Julia. Com `Σ = 0,25` a diferença é **fator
+2 na exploração**, então a escolha tem de aparecer na tabela de hiperparâmetros.
+
+**Estado da implementação.** `src/uavwnn/rl/politica.py` e
+`src/uavwnn/rl/actor_critic.py`. As duas redes são **idênticas bit a bit** ao
+`Ramnet.jl` em 5 configurações (`tests/test_redes.py`), e as identidades do
+capítulo 4 estão testadas (`tests/test_identidades_artigo.py`).
+
+**O laço do Algoritmo 4.4 continua sem oráculo diferencial** — validá-lo exigiria
+rodar o agente Julia inteiro, amarrado aos tipos de ambiente e buffer do
+`RLWorktable.jl`. Há invariantes estruturais e dois testes de comportamento. **O
+relatório final precisa declarar isso**, e está registrado em
+`specs/PLANO-TESTES.md` §5.
+
+---
+
 ## 0-bis. Implementado (2026-08-15)
 
 `src/uavwnn/rl/actor_critic.py` traz o **Algoritmo 4.4** transcrito do

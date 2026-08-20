@@ -34,7 +34,7 @@ Uma observação de honestidade que atravessa a spec: Lamenza descreve a coorden
 
 **Fora:** qualquer mudança na observação, ação ou recompensa de Lamenza (PRD D1–D4); mensagem de reivindicação ou canal aprendido entre agentes (**D5**); crítico centralizado / CTDE; reprodução de MADDPG (D7); trilateração não linear por RSSI (P3 — caso linear, PRD §10); Split-CI, ICI e demais variantes menos conservadoras da interseção de covariância (registradas como trabalho futuro em §10).
 
-**Herdado e congelado** ao entrar nesta spec: codificador e `(T, n, N)` escolhidos no G0; `η = c/N` com asserção ativa (RNF-01); KF com entrada de controle e filtro de informação validados no G2; harness de custo T1/T2/T3 da SPEC-03; baselines (aleatório, guloso, k-means+TSP) da SPEC-02.
+**Herdado e congelado** ao entrar nesta spec: codificador e `(T, n)` escolhidos no G0 — com `N = ⌈B/n⌉` determinado pela partição, não escolhido; `α` fixado com asserção de finitude no passo efetivo (RNF-01 **reformulada**: não há regra `η = c/N` na convenção de média do artigo); KF com entrada de controle e filtro de informação validados no G2; harness de custo T1/T2/T3 da SPEC-03; baselines (aleatório, guloso, k-means+TSP) da SPEC-02.
 
 ---
 
