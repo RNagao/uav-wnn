@@ -5,6 +5,34 @@
 
 ---
 
+## 0-bis. Implementado — e validado contra o Ramnet.jl (2026-08-15)
+
+As duas redes estão em `src/uavwnn/wnn/redes.py`, com **armazenamento esparso
+por dicionário**. A motivação não é elegância: o apêndice A da dissertação usa
+tuplas de **16, 32 e 64 bits**, e `2^64` posições por RAM não cabem em array
+denso. O `NTupleRegressor` de `ntuple.py` segue servindo a SPEC-01 e a SPEC-03,
+preso a `n <= 16`.
+
+Mapeamento por **partição** (`randperm(B)` fatiado), como o `:uniform_random` do
+Ramnet: cada bit lido exatamente uma vez, logo **C4 fica fechada pela
+estrutura**. Quando `B` não divide `n` a última tupla é mais curta — fiel ao
+`Iterators.partition` do Julia, e exatamente o caso que quebra o `NTNModel` em
+PyTorch (`ceil` para os nós, `floor` na `conv1d`).
+
+Teste diferencial contra `Ramnet.jl@faster_hashing`: **desvio zero** em 5
+configurações, cobrindo os dois papéis e `phi` em {0,50; 0,85; 1,00}. Fixtures
+congeladas em `tests/fixtures/diferencial_redes/`.
+
+Relatório: `reports/spec04-redes-dissertacao.md`.
+
+**Pendência nova, e é a que mais importa aqui:** a SPEC-01 escolheu `n = 12` e a
+SPEC-03 achou `n = 10` dominante, mas as duas rodaram sobre o armazenamento
+denso, que torna `n = 32` caro e `n = 64` impossível. Essa escolha pode ser
+consequência do armazenamento, não do problema. Revarrer com
+`n` em {8, 12, 16, 24, 32} antes de fixar a Etapa 1.
+
+---
+
 ## 0. Revisão — o código do Katopodis resolve a C2, e ela estava mal formulada
 
 A implementação de referência é do **próprio autor**: `rkatopodis/RLWorktable.jl` (agentes) e `rkatopodis/Ramnet.jl` (núcleo). Atenção: os `AltDiscriminators` estão na branch **`faster_hashing`**, não na `master`. Ambos MIT.

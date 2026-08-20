@@ -6,6 +6,40 @@
 
 ---
 
+## 0-bis. Implementado (2026-08-15)
+
+`src/uavwnn/rl/actor_critic.py` traz o **Algoritmo 4.4** transcrito do
+pseudocódigo da p. 48, e `src/uavwnn/rl/politica.py` a gaussiana de covariância
+predefinida das eqs. (4.34)/(4.35).
+
+Dois pontos que o pseudocódigo esconde e que o código do autor esclarece: a
+vantagem `delta = G - f_value(S_tau)` usa o valor **antes** do treino do
+crítico; e o crítico **acumula** `G` pela eq. (4.8), não faz um passo de
+gradiente para o alvo `G`.
+
+Recozimento de `alpha` e de `Sigma` existem no `ContinousFunctionalAC.jl` mas
+**não na dissertação** (apêndice A lista ambos constantes). Ficam desligados por
+padrão.
+
+**Divergência P10:** a eq. (4.34) diz "predefined **covariance** matrix", logo a
+amostragem correta é `sqrt(Sigma)*z`. O Julia amostra `Sigma*z` mas usa
+`inv(Sigma)` no gradiente. Seguimos o artigo; `escala_como_desvio=True`
+reproduz o Julia. Com `Sigma = 0,25` a diferença é fator 2 na exploração.
+
+**Achado que afeta a SPEC-06:** a instabilidade de passo fixo é mensurável. No
+bandido contextual, o pior erro entre 5 sementes cresce **monotonicamente** com
+`alpha` (0,044 em 0,002 -> 0,238 em 0,05), e em 0,05 uma semente diverge. A
+busca de `alpha` precisa de faixa larga e várias sementes; meu primeiro palpite
+era 25x grande demais.
+
+**Sem oráculo:** as duas redes são idênticas ao Ramnet.jl, mas o *laço* não foi
+validado diferencialmente — só por invariantes estruturais e dois testes de
+comportamento. O relatório final precisa declarar isso.
+
+Relatório: `reports/spec04-redes-dissertacao.md`.
+
+---
+
 ## 0. Revisão — o algoritmo está no código do autor, e pode ser copiado
 
 `rkatopodis/RLWorktable.jl`, arquivo `src/Agents/WNN/PG/ContinousFunctionalAC.jl`. MIT. Deixa de ser reconstrução a partir do texto e passa a ser adaptação de código existente.

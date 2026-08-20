@@ -112,3 +112,62 @@ Duas exceções que **parecem** locais e não são:
 
 - **SPEC-09 Q7** — cortar a Etapa 3 para `Na = 2` está na linha de corte do PRD como item 6. Mas com um único vizinho perdem-se o equilíbrio de carga, a dependência de ordem da CI e o achado de retornos decrescentes de Lamenza. **Deveria ser a última opção, não a sexta.**
 - **SPEC-09 Q4** — o gatilho para ligar o degrau 5 na Etapa 3 depende do resultado do G2, então não pode ser decidido agora. Mas **precisa ser acordado antes**, senão vira decisão pós-hoc.
+
+---
+
+## Adendo — 2026-08-15: a fonte primária é a dissertação, não o código
+
+Com a leitura de `tmp/947841_compressed.pdf` (Katopodis, *Reinforcement
+Learning with Weightless Neural Networks*, PESC/COPPE-UFRJ, jan/2022) a
+hierarquia de fontes fica clara, e ela **reordena** algumas pendências.
+
+Os algoritmos da dissertação são 4.1 (SARSA com esquecimento), 4.3 (REINFORCE) e
+**4.4 (Actor-Critic)**. **PPO aparece uma única vez em 87 páginas**, no capítulo
+6 de trabalhos futuros (p. 70), como sugestão para corrigir a instabilidade de
+passo fixo do SGD. Logo:
+
+- **`rkatopodis/RLWorktable.jl` + `Ramnet.jl` = a dissertação implementada.**
+- **`anbubus/ntn_neurocomputing_v0` (PyTorch + Ray RLlib PPO) = o capítulo 6.**
+
+### Fechadas
+
+- ~~**C2** — esquecimento com gradiente funcional.~~ São **duas redes**
+  (§4.2.1 crítico, §4.3.1 ator). Implementadas em `wnn/redes.py` e **idênticas
+  bit a bit** ao `Ramnet.jl` em 5 configurações.
+- ~~**C4** — cobertura de bits.~~ Fechada **pela estrutura**: o mapeamento por
+  partição (`:uniform_random`) lê cada bit exatamente uma vez.
+
+### Nova
+
+- **P10 — Σ é covariância ou desvio-padrão?** A eq. (4.34) diz *"predefined
+  **covariance** matrix"*, logo a amostragem é `√Σ·z`. O
+  `ContinousActionPolicy.jl` amostra `Σ·z` mas usa `inv(Σ)` no gradiente —
+  trata o mesmo número como desvio num lugar e variância no outro. **Seguimos o
+  artigo**; `escala_como_desvio=True` reproduz o Julia. Com Σ = 0,25 a
+  diferença é fator 2 na exploração, então precisa aparecer na tabela de
+  hiperparâmetros. *Resolvida em recomendação; falta aval.*
+
+- **P11 — o regime de `n` foi escolhido pelo problema ou pelo armazenamento?**
+  O apêndice A da dissertação usa `n ∈ {16, 32, 64}`. Nós escolhemos `n = 12`
+  (SPEC-01) e achamos `n = 10` dominante (SPEC-03) — **mas as duas rodaram
+  sobre armazenamento denso**, que aloca `2ⁿ` por RAM e torna `n = 32` caro e
+  `n = 64` impossível. Agora que as redes esparsas alcançam 64, isso é
+  verificável. **Revarrer `n ∈ {8, 12, 16, 24, 32}` antes de fixar a Etapa 1**,
+  porque muda a configuração de referência de todas as specs seguintes. *Aberta,
+  e é a de maior impacto no momento.*
+
+### Reordenada
+
+- **C1 — ação circular.** Segue aberta e segue nossa: a dissertação usa
+  gaussiana isotrópica sem tratamento de wrap-around. O `CircularEncoder` do
+  repositório PyTorch resolve **entrada** circular, não **ação** — não fecha
+  C1, mas vale portar (~15 linhas) porque as tabelas do apêndice A usam
+  codificação circular em CartPole e Hopper, e nós não temos nada equivalente.
+
+### Achado que afeta a SPEC-06
+
+A instabilidade de passo fixo é **mensurável**: no bandido contextual, o pior
+erro entre 5 sementes cresce monotonicamente com α (0,044 em α=0,002 contra
+0,238 em α=0,05), e em 0,05 uma semente diverge. A busca de α precisa de faixa
+larga e várias sementes. Se o Algoritmo 4.4 não passar o portão G1, a
+instabilidade é a primeira suspeita — e a saída já está nomeada pelo autor.
