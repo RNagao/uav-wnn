@@ -92,6 +92,21 @@ A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O err
 
 Como as features entram **sem tocar no cenário**, com os diagramas do fluxo: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 
+## Baseline MADDPG — sem treinar
+
+O submodule de referência traz os **pesos publicados** por Lamenza: 9 checkpoints
+(`Na ∈ {2,4,8} × Ns ∈ {12,24,36}`) e o harness de avaliação. Tamanho e latência do
+ator saem de uma leitura, não de um treino:
+
+```bash
+uv sync --group baseline          # ~200 MB, só para ler os .cleanrl_model
+uv run --group baseline python scripts/spec02_baseline_maddpg.py
+```
+
+Ator `obs → 256 → 256 → 2`: **287 a 299 KB** conforme `Na`, ~35 µs de mediana,
+~73 000 multiplicações em ponto flutuante por decisão. Ressalva: **não há
+checkpoint para `Na = 1`**. Ver `reports/spec02-baseline-maddpg.md`.
+
 ## Instalação
 
 Requer [uv](https://docs.astral.sh/uv/). O ambiente vem de um **submodule**:

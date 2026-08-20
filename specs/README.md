@@ -14,7 +14,7 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 |---|---|---|---|---|---|---|
 | **00** | [Ambiente de referência](SPEC-00-ambiente.md) | infra | 1 | — | 3 d | **concluída** |
 | **01** | [Estudo de binarização](SPEC-01-binarizacao.md) | estudo | pré-1 | 00 | 3 d | **concluída** — G0 fechado |
-| **02** | [Baselines e harness de avaliação](SPEC-02-baselines.md) | infra | 1 | 00 | 1 d | **próxima** — o teste A/A é o último bloqueio estatístico |
+| **02** | [Baselines e harness de avaliação](SPEC-02-baselines.md) | infra | 1 | 00 | 1 d | **em curso** — baseline MADDPG medido (P4 fechada); faltam o teste A/A e o tempo de conclusão |
 | **03** | [Harness de custo — T1/T2/T3](SPEC-03-custo.md) | infra | todas | — | 2 d | **T1 e T3 concluídos**; T2 pendente da SPEC-04 |
 | **04** | [Núcleo n-tuple esparso](SPEC-04-ntuple.md) | modelo | 1 | 01 | 2 d | **implementada** — duas redes, desvio zero contra o `Ramnet.jl`; **C2 e C4 fechadas** |
 | **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | **Algoritmo 4.4 implementado**; falta o MLP AC pareado |
