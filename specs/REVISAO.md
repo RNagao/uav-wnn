@@ -20,7 +20,7 @@
 > | **F.1** — sementes de treino | **aberto** (E1) |
 > | **G.1** — cobertura de bits na SPEC-01 | **aplicado** |
 >
-> Achados novos, posteriores a esta revisão: **T3** (física do ruído no sensor), **P9**/**P10** (parâmetros dos canais), e a separação da Etapa 2 em blocos 2a/2b.
+> Achados novos, posteriores a esta revisão. **Atualizado por D13 (2026-08-15):** o ruído passa a incidir apenas no GPS do drone, o que **fecha TS3, P3 e P9 por decisão** (não por resposta) e **retira a H4**. Ver o adendo em `PENDENCIAS.md`.
 
 ---
 

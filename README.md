@@ -23,10 +23,11 @@ O simulador está fixado em **`gradysim==0.6.11`**: o `environment.py` de refer�
 |---|---|
 | SPEC-00 — Ambiente de referência | **concluída**: 18 testes, P1 e P2 fechadas, validação contra a fig. 7.3 |
 | SPEC-01 — Estudo de binarização | **concluída**: portão G0 fechado, codificador escolhido com evidência |
-| SPEC-02, 03, 07 | revisadas; **próximas**, rodam em paralelo |
+| SPEC-03 — Harness de custo | **T1 e T3 medidos**; T2 depende da SPEC-04 |
+| SPEC-02, 07 | revisadas; **próximas**, rodam em paralelo |
 | SPEC-04 a 06, 08 a 10 | revisadas |
 
-**Bloqueio único:** a pendência **T3** — a física do ruído no sensor — decide se a H4 tem mecanismo. Ela trava o bloco 2b e nada mais.
+**Escopo do ruído (D13):** apenas o **GPS do drone**. O canal do sensor saiu, e com ele o antigo bloco 2b, o filtro de informação, a hipótese H4 e as pendências TS3 e P3. O conteúdo de fusão permanece: KF com entrada de controle (Etapa 2) e interseção de covariância entre UAVs (Etapa 3).
 
 ## Resultados medidos
 
@@ -39,6 +40,21 @@ Isso vale mais que qualquer teste unitário: se submodule, versão do simulador,
 ### Custo: 1,8 a 5,2 h por núcleo
 
 Para o orçamento de 50 M passos de Lamenza, contra 7 dias de GPU por célula no original. O PRD estimava 8–30 h; o real é menor, com folga. E a célula cara em horas de treino é **`Na = 1`**, não `Na = 8` — o contador de passos é `passos × Na`. Ou seja, a Etapa 1 é a mais cara do projeto. Ver [`reports/spec00-orcamento.md`](reports/spec00-orcamento.md).
+
+### O custo: a alegação de "modelo menor" não se sustenta
+
+Medido na configuração escolhida, na tarefa de clonagem, **com os dois modelos convergidos**:
+
+| | erro | persistente |
+|---|---|---|
+| **MLP pareada 25-32-32-2** | **1,1°** | **7,6 KB** |
+| WNN E2/T=8/N=48 | 5,6° | 133,9 KB |
+
+A MLP é 5× mais precisa e **17,5× menor**. A estimativa anterior (~12–15 KB) errou uma ordem de grandeza porque partia de um protótipo com **2 variáveis de entrada**; a observação real tem 25.
+
+O que sobrevive, e está medido: **zero multiplicações em ponto flutuante no aproximador**, com vantagem de ciclos **condicional à classe de alvo** — 1,6× em x86, 4,1× em Cortex-M4F, **19,9× em Cortex-M0 sem FPU**. Ver [`reports/spec03-custo.md`](reports/spec03-custo.md).
+
+*(Ressalva: a comparação é sobre clonagem supervisionada. As vantagens que a literatura atribui às redes sem peso — aprendizado online, sem replay, esquecimento — não são exercitadas por regressão estacionária.)*
 
 ### O codificador binário: quantis por slot
 
@@ -69,11 +85,10 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | Etapa | Configuração | Dificuldade nova | Hipóteses | Portão |
 |---|---|---|---|---|
 | 1 | 1 UAV, sem ruído | aproximação de função sobre entrada binarizada | H1 | G1 |
-| **2a** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
-| **2b** | 1 UAV, + ruído no **canal do sensor** | filtro de informação; ranking sobre estimativas | H4 | G2 |
+| **2** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
 | 3 | `Na` UAVs, com ruído | coordenação e erros correlacionados | H5, H6 | G3 |
 
-A Etapa 2 roda em dois blocos porque os canais têm estruturas opostas — o do drone é deslocamento **comum** a todas as entradas da observação, o do sensor é **por slot** — e ligá-los juntos tornaria qualquer degradação inatribuível.
+A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O erro é deslocamento **comum** a todas as entradas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)` — estrutura que a álgebra do filtro aproveita. A posição dos sensores permanece exata; a única costura é que o ranking por distância passa a sair da estimativa filtrada, nunca da verdade.
 
 Como as features entram **sem tocar no cenário**, com os diagramas do fluxo: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 
@@ -145,6 +160,12 @@ Os valores do cenário vieram do **código de referência** (`Project-GrADyS/gra
 - `algorithm_iteration_interval` é **0,5 s** no código, contra 2 s na tab. 7.1 — e 2 s é fisicamente inconsistente com `communication_range = 20 m`, porque a 15 m/s o UAV atravessaria a cobertura de um sensor entre dois heartbeats;
 - a observação é **normalizada** e o padding é **`-1`**, não `(0,0)` — o que torna desnecessário o bit de validade que o projeto havia previsto;
 - na fig. 7.3 o MADDPG é avaliado a 0,5 s por decisão e o guloso a **0,1 s**, uma variável não controlada que vale ~10 % no tempo de conclusão.
+
+## Implementação de referência do aproximador
+
+Além do ambiente, o **aproximador** também tem fonte primária em código: [`rkatopodis/RLWorktable.jl`](https://github.com/rkatopodis/RLWorktable.jl) e [`rkatopodis/Ramnet.jl`](https://github.com/rkatopodis/Ramnet.jl), do próprio Katopodis, MIT. O núcleo está na branch **`faster_hashing`** do segundo, não na `master`.
+
+A leitura dele mostrou que **ator e crítico são modelos diferentes** — `FunctionalDiscriminator` (média simples, sem esquecimento) e `RegressionDiscriminator` (auto-normalizado, com esquecimento e contador) —, o que fechou uma pendência que estava mal formulada, e que **ele não trata ação circular**, o que confirma o `θ` do nosso problema como questão nova.
 
 ## Referências
 

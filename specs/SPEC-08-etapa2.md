@@ -1,56 +1,88 @@
 # SPEC-08 — Etapa 2: escada de ablação 0–5 e varredura conjunta σ × T
 
 **Etapa:** 2 · **Depende de:** SPEC-06 (políticas e números da Etapa 1), SPEC-07 (ruído, KF, NEES/NIS), SPEC-03 (harness de custo) · **Estimativa:** 3 dias
-**Portão de saída:** `G2` · **Referência:** PRD §1 (achados A2/A3 e a regra *bin ≈ σ*), §2 (H2, H3, H4), §5.4 (desvios), §5.5 (custo), §6.2 (Etapa 2), §6.4 (métricas)
+**Portão de saída:** `G2` · **Referência:** PRD §1 (achados A2/A3 e a regra *bin ≈ σ*), §2 (H2 e H3 — a **H4 saiu** com D13), §5.4 (desvios), §5.5 (custo), §6.2 (Etapa 2), §6.4 (métricas)
 
 ---
 
-## 0. Revisão — a Etapa 2 roda em dois blocos
+## 0-CORTE. O ruído entra apenas no GPS do drone (D13, 2026-08-15)
 
-Os dois canais de ruído têm estruturas **opostas**: o do drone é **deslocamento comum** a todas as entradas da observação; o do sensor é **por slot**. Ligá-los juntos torna qualquer degradação inatribuível. Um portão só (`G2`), um capítulo só, ordenação interna que isola os canais:
+> **Decisão de escopo.** O canal do sensor saiu. Com ele saem: o bloco 2b, o
+> filtro de informação, a hipótese **H4** e as pendências **TS3** e **P3**.
+>
+> | item | estado |
+> |---|---|
+> | GPS do drone, `p̂_k = p_k + e_k` | **é o canal, e o único** |
+> | KF com **entrada de controle** | permanece — é onde vive o achado A3 (18,8×) |
+> | ranking sobre a estimativa filtrada | permanece |
+> | NEES/NIS | permanece |
+> | interseção de covariância entre UAVs (H5) | permanece — Etapa 3 |
+> | canal do sensor, `z = p_i + b_i + v_t` | **fora** |
+> | filtro de informação (alvo estático) | **fora** |
+> | `R(d)` crescente com a distância | **fora** |
+> | H4 (busca ativa) | **retirada** — perdeu a causa física, não só o experimento |
+> | TS3, P3 | **fechadas por decisão**, não resolvidas |
+>
+> **O que o corte ganha.** O canal do drone é o único com modelo fechado — ruído
+> branco, estado móvel, comando conhecido — e é onde a medição de 18,8× existe. O
+> que sai dependia de uma decisão de física nunca tomada (TS3) e tinha ganho
+> conjectural.
+>
+> **O que o corte custa.** A H4 perde a causa física: com ruído só na posição
+> própria, a covariância converge para regime estacionário e não há incerteza
+> *por sensor* a reduzir, logo aproximar-se não compra informação. O degrau 5 da
+> escada continua como ablação, sem hipótese forte associada.
+>
+> **Trechos abaixo que tratam do canal do sensor estão revogados.** Foram
+> mantidos porque a análise é boa e é a primeira coisa a reaproveitar se o escopo
+> crescer. Nada deles está em execução.
 
-| Bloco | Ruído | Filtro | Hipóteses | Varredura | Bloqueado? |
-|---|---|---|---|---|---|
-| **2a** | só GPS do drone | KF + entrada de controle | H2, H3 | `σ_own × T` = 12 configs | **não — pode começar** |
-| **2b** | + canal do sensor | filtro de informação | H4 | `σ_sensor × T` = 12 configs | **sim — depende de T3** |
+---
 
-**Custo medido de dobrar a grade:** ~5 h de um núcleo por bloco, a 2 M passos por corrida com 3 sementes, na célula base `Na=1, Ns=12` (0,0174 s/ep, 68,5 passos/ep → ~3 900 passos/s). As configurações são independentes e paralelizam trivialmente. Compute não é o gargalo — calendário é, e por isso os blocos ficam **dentro** de uma etapa em vez de virar uma quarta com portão e capítulo próprios.
+## 0. ~~Revisão — a Etapa 2 roda em dois blocos~~ — REVOGADO por D13
 
-Três ganhos além da atribuição:
+*A Etapa 2 roda em **um** bloco: GPS do drone, KF com entrada de controle, varredura `σ_own × T` = 12 configurações, portão G2. A tabela e a discussão de 2a/2b abaixo ficam como registro.*
 
-1. **2a não depende de T3.** O modelo do canal próprio está fechado — ruído branco, estado móvel, comando conhecido — e o achado A3 já foi medido. Antes desta separação, a Etapa 2 inteira estava travada na pergunta sobre a física do sensor.
-2. **2a mede `σ_own`** em vez de o fixarmos por decreto. Fecha a pendência P10, e o valor medido alimenta 2b.
-3. **Linha de corte honesta.** Se o tempo apertar, 2b é a metade cortável; 2a sozinha ainda entrega H2, H3 e a réplica de A3 — que é a metade com resultado pré-existente medido.
+### A escada, num canal só
 
-### A escada muda de sentido entre os blocos
-
-A escada de ablação roda nos dois, mas os degraus intermediários não são os mesmos:
-
-| # | Bloco 2a (alvo móvel) | Bloco 2b (alvo estático) |
+| # | Configuração | Papel |
 |---|---|---|
-| 0 | sem ruído — política da Etapa 1 | idem |
-| 1 | ruído bruto | ruído bruto |
-| 2 | média móvel / passa-baixa | média simples, sem ponderar pela precisão |
-| 3 | **KF de velocidade constante** — o "óbvio" que já sabemos que falha | *não existe*: alvo estático não tem modelo de velocidade |
-| 4 | **KF + entrada de controle** | **filtro de informação com `R` correto** |
-| 5 | 4 + covariância na observação | idem |
+| 0 | sem ruído — a política da Etapa 1 | teto |
+| 1 | ruído bruto, sem filtro | piso |
+| 2 | média móvel / passa-baixa | filtro barato que o KF precisa bater |
+| 3 | **KF de velocidade constante** | o "óbvio" que já sabemos que falha |
+| 4 | **KF + entrada de controle** | a proposta — onde vive o achado A3 |
+| 5 | 4 + covariância própria na observação | ablação, **sem hipótese forte** |
 
-Para o alvo estático o espantalho não é o KF de velocidade constante — é o **filtro que ignora o viés**, que converge para `p_i + b_i` com `P → 0` e só é denunciado pelo NEES.
+A ressalva antiga — de que os degraus 2 e 3 mudavam de sentido no bloco de alvo
+estático — deixa de se aplicar: só há alvo móvel, que é o próprio drone, e o
+degrau 3 mantém o sentido literal de espantalho.
 
-### T3 — pendência que bloqueia 2b
+**O degrau 5 perdeu a hipótese, não a razão de existir.** A H4 previa *busca
+ativa*: com `R(d)` crescente, aproximar-se compraria informação. Sem o canal do
+sensor a covariância própria converge para regime estacionário e não há incerteza
+*por sensor* a reduzir. O que sobra é a pergunta mais modesta — **a política usa
+os canais de `P` para algo?** — e ela continua respondível pelos testes de
+intervenção da T-08.9, que medem *uso* e não *busca*.
 
-A física do canal do sensor decide se a **H4 tem mecanismo**:
+**Custo:** ~5 h de um núcleo, 2 M passos por corrida com 3 sementes na célula
+base `Na=1, Ns=12` (0,0174 s/ep, medido na SPEC-00).
 
-- **sensor transmite o próprio GPS** → erro é dele, **não depende da distância**, dominado por **viés fixo**. O canal vira piso irredutível, não objeto de fusão, e a H4 perde a causa física;
-- **drone localiza o sensor por rádio** → erro **branco** e **crescente com a distância**, filtragem tem função, aproximar-se compra informação — ao custo de declarar na §5.4 do PRD um alcance de detecção maior que o de coleta.
+<details>
+<summary><b>Registro histórico:</b> por que havia dois blocos (revogado por D13)</summary>
 
-Enquanto T3 estiver aberta, 2b não roda. **2a roda.**
+Os dois canais tinham estruturas **opostas** — o do drone é deslocamento comum a
+todas as entradas da observação, o do sensor seria por slot —, e ligá-los juntos
+tornaria qualquer degradação inatribuível. Daí a separação em 2a/2b, com o 2b
+bloqueado pela TS3 (a física do canal do sensor: GPS próprio do sensor, dominado
+por viés fixo, ou localização por rádio, com erro branco crescente com a
+distância). Com um canal só, não há o que atribuir e a TS3 não tem consequência.
 
----
+</details>
 
 ## 1. Objetivo
 
-Produzir os **números e os vereditos** de H2, H3 e H4 na célula `Na = 1, Ns = 12`, executando a escada de ablação 0–5 nos dois regimes de treino e a varredura **conjunta** `σ_GPS × T`, e fechar o portão `G2`.
+Produzir os **números e os vereditos** de H2 e H3 na célula `Na = 1, Ns = 12` — a **H4 saiu com D13** e o degrau 5 fica como ablação sem hipótese —, executando a escada de ablação 0–5 nos dois regimes de treino e a varredura **conjunta** `σ_GPS × T`, e fechar o portão `G2`.
 
 Esta é uma spec de **experimento**. Ela não escreve camada de ruído, filtro nem verificador de consistência — isso é SPEC-07 — nem harness de custo — isso é SPEC-03. Ela **consome** esses artefatos, orquestra rodadas, aplica um protocolo estatístico declarado antes das rodadas, e escreve vereditos.
 
@@ -211,7 +243,7 @@ Três decisões que precisam ficar escritas:
 
 **Desvio §5.4.** O degrau 5 acrescenta canais à observação e portanto **entra na tabela de desvios do PRD quando executado**, com decisão registrada na §10. Texto proposto para a linha 2:
 
-> | 2 | **Canais de incerteza na observação** (`sqrt(tr P)` própria e por slot), apenas no degrau 5 da Etapa 2 | Testar H4 exige que a política enxergue a covariância que o KF já produz; não há como fazê-lo sem estender a entrada | Executado como **ablação explícita**, com resultado reportado com e sem; anexo ao padrão binário, sem alterar a eq. 5-1; ausente nas Etapas 1 e 3a; se H4 não se confirmar, o degrau 5 não é retido na configuração final e a linha é marcada como ablação não adotada |
+> | 2 | **Canais de incerteza na observação** — só `sqrt(tr P)` **própria**; a versão *por slot* saiu com D13 —, apenas no degrau 5 da Etapa 2 | Testar H4 exige que a política enxergue a covariância que o KF já produz; não há como fazê-lo sem estender a entrada | Executado como **ablação explícita**, com resultado reportado com e sem; anexo ao padrão binário, sem alterar a eq. 5-1; ausente nas Etapas 1 e 3a; se H4 não se confirmar, o degrau 5 não é retido na configuração final e a linha é marcada como ablação não adotada |
 
 A atualização do PRD faz parte do entregável, não é tarefa posterior.
 
@@ -298,7 +330,24 @@ Rodar em L→R (política limpa de ambos os lados, avaliação sob degraus 1 e 4
 
 Reportar também a versão com estimativa filtrada (degrau 4): se ambas voltarem ao regime sem ruído, H2 fica confirmada de forma pouco interessante. O teste com conteúdo é o do degrau 1.
 
-### T-08.9 — H4: medir busca ativa com número, não com anedota
+### T-08.9 — ~~H4: medir busca ativa~~ → o degrau 5 usa os canais de `P`?
+
+> **Reenquadrada por D13.** A H4 saiu: sem `R(d)` crescente, aproximar-se não
+> compra informação e não há busca ativa a detectar. **A tarefa não é
+> descartada** — as métricas B1/B2 medem se a política *usa* os canais de
+> incerteza, o que continua sendo pergunta legítima e continua exigindo número em
+> vez de anedota.
+>
+> O que muda: **as predições da coluna "Predição de H4" perdem o respaldo
+> teórico.** Deixam de ser predições e passam a ser *observações a reportar*.
+> Concretamente, o teste de intervenção `κ` (multiplicar os canais de `P` por um
+> fator e ver se a trajetória muda) responde "a política lê esses bits?"; ele
+> **não** responde mais "a política busca reduzir incerteza?", porque não há
+> incerteza reduzível por deslocamento.
+>
+> **Veredito possível agora:** *usa* / *não usa* / *usa sem ganho*. O terceiro
+> caso — lê os canais mas o tempo de conclusão não melhora — deixa de ser
+> surpreendente e passa a ser o resultado esperado por omissão.
 
 **Esta tarefa é a lacuna real da spec e recebe tratamento próprio.** O PRD lista "inspeção de trajetórias" como método para H4, e inspeção de trajetórias não decide nada: sempre se acha uma trajetória bonita. A hipótese — *uma política que enxerga a própria covariância aprende a se aproximar antes de decidir, reduzindo variância antes de comprometer trajetória* — é uma afirmação sobre **política condicional**, e é isso que precisa ser estimado.
 
@@ -312,7 +361,7 @@ Reportar também a versão com estimativa filtrada (degrau 4): se ambas voltarem
 
 **Bateria de métricas.** Primárias em negrito; o resto é secundário e corrigido por Holm.
 
-| id | Métrica | Definição | Predição de H4 |
+| id | Métrica | Definição | ~~Predição de H4~~ → observação a reportar |
 |---|---|---|---|
 | **B1** | **Índice de desvio condicional (IDC)** | coeficiente `β_U` na regressão `Δθ_t ~ β_U·U_t + controles`, com controles de distância ao alvo, número de sensores restantes e passo no episódio, e efeito fixo de episódio | `β_U > 0`: desvia do guloso **quando, e só quando**, está incerta |
 | **B2** | **Teste de intervenção κ** | multiplicar **apenas os canais de `P`** por `κ ∈ {0,25; 1; 4}` na avaliação, sem tocar na estimativa nem no ruído; medir variação de velocidade média comandada, de IDC e de tempo de conclusão | efeito **monótono** em κ. Se nada muda, os canais são decorativos e H4 cai, independentemente de qualquer outra métrica |
@@ -357,7 +406,7 @@ O KF é código que voa no UAV. T1/T2/T3 da §5.5 são **recalculados**, não co
 2. **Degrau 4 indistinguível do degrau 0** por TOST com margem δ na célula-âncora, com meia-largura reportada ≤ δ.
 3. **Degrau 4 supera os degraus 2 e 3** com IC da diferença pareada separado de zero, após Holm — incluindo a variante do degrau 2 **com** termo de comando.
 4. **Varredura σ × T reportada** na grade executada, com a análise de `ρ = w/σ_eff` e a tabela `T*(σ, degrau)`, confrontada com a predição de T-01.8.
-5. **Vereditos escritos de H2, H3 e H4**, com número e IC.
+5. **Vereditos escritos de H2 e H3**, com número e IC. Para o **degrau 5**, relato de *uso dos canais de `P`* pelas métricas da T-08.9 — não veredito de hipótese, porque a H4 saiu com D13.
 6. **T1/T2/T3 recalculados com o filtro embutido**, incluindo a curva de ocupação do degrau 5 se ele for executado.
 7. **PRD §5.4 atualizado** com a linha 2 e decisão registrada na §10, se o degrau 5 foi executado.
 8. Configurações, sementes e resultados versionados; `make repro` regenera as tabelas desta spec.
@@ -373,7 +422,7 @@ Portão não atingido é resultado publicável (PRD §2). O que muda é a ação
 | `4 ≢ 0` com `ρ > 1` folgado | H3 refutada | reportar a lacuna residual em segundos; diagnosticar por canal (a incerteza que sobra é própria ou dos sensores?); a resposta prática passa a ser o braço R→R, e é assim que se escreve |
 | `4 ≯ 2` | o filtro barato basta | resultado legítimo e desconfortável: reportar, e manter o degrau 2 como referência na Etapa 3. A tese migra para "conhecer o comando é o que importa" |
 | `4 ≯ 3` | contradiz o achado A3, que é **medido** | suspeitar de implementação antes de suspeitar da hipótese: reproduzir a tabela sintética de PLANO §9.4 com o mesmo código; se ela reproduz e o ambiente não, a diferença é do ambiente (inércia, atraso, saturação) e vira achado sobre `Q` |
-| H4 nula | degrau 5 não é retido | §5.4 volta a ter uma linha só; reportar a ablação como executada e negativa. Nenhum impacto sobre a Etapa 3 |
+| Degrau 5 sem uso detectável | degrau 5 não é retido | §5.4 volta a ter uma linha só; reportar a ablação como executada e negativa. Nenhum impacto sobre a Etapa 3 |
 | Falta de tempo | — | linha de corte da §8 do PRD, na ordem declarada em T-08.7. **Não podem cair:** degraus 0, 1 e 4; NEES/NIS; RF-04; ao menos um dos degraus 2/3; a tabela de custo |
 
 **Regra de escalonamento (PRD §8):** portão não atingido ao fim da semana 3 aciona a linha de corte da **Etapa 3**, nunca estende a Etapa 2 para dentro dela.
@@ -407,7 +456,7 @@ Portão não atingido é resultado publicável (PRD §2). O que muda é a ação
 - `results/etapa2/*.parquet` — resultados por episódio, com `(degrau, σ, T, regime, seed_train, seed_eval)` como chave, para que o pareamento seja verificável a posteriori
 - `reports/spec08-etapa2.md` + figuras: escada na âncora, mapa de calor `σ × T`, curva `ρ` vs degradação, degradação relativa WNN vs MLP, bateria de busca ativa com controles, tabela de custo com filtro
 - Atualização do **PRD §5.4 (linha 2) e §10 (decisão)** se o degrau 5 for executado
-- Trechos de E2: capítulo de extensão com os vereditos de H2, H3 e H4
+- Trechos de E2: capítulo de extensão com os vereditos de H2 e H3, mais o registro da **H4 como hipótese abandonada com justificativa** (D13)
 
 ---
 

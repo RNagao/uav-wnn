@@ -34,7 +34,7 @@ Uma observação de honestidade que atravessa a spec: Lamenza descreve a coorden
 
 **Fora:** qualquer mudança na observação, ação ou recompensa de Lamenza (PRD D1–D4); mensagem de reivindicação ou canal aprendido entre agentes (**D5**); crítico centralizado / CTDE; reprodução de MADDPG (D7); trilateração não linear por RSSI (P3 — caso linear, PRD §10); Split-CI, ICI e demais variantes menos conservadoras da interseção de covariância (registradas como trabalho futuro em §10).
 
-**Herdado e congelado** ao entrar nesta spec: codificador e `(T, n, N)` escolhidos no G0; `η = c/N` com asserção ativa (RNF-01); KF com entrada de controle e filtro de informação validados no G2; harness de custo T1/T2/T3 da SPEC-03; baselines (aleatório, guloso, k-means+TSP) da SPEC-02.
+**Herdado e congelado** ao entrar nesta spec: codificador e `(T, n)` escolhidos no G0 — com `N = ⌈B/n⌉` determinado pela partição, não escolhido; `α` fixado com asserção de finitude no passo efetivo (RNF-01 **reformulada**: não há regra `η = c/N` na convenção de média do artigo); KF com entrada de controle e filtro de informação validados no G2; harness de custo T1/T2/T3 da SPEC-03; baselines (aleatório, guloso, k-means+TSP) da SPEC-02.
 
 ---
 
@@ -88,7 +88,7 @@ O ponto de projeto: **se a correlação não for construída de propósito e par
 | **4** | KF + entrada de controle | **KF (Etapa 2)** | broadcast cru | medida crua |
 | **6a** | KF local isolado, **sem troca de estimativas** | KF | trilha local de `j`, atualizada com o broadcast tratado como **medida** com `R₀` conservador **fixo** (o `P_j` transmitido é **ignorado**) | filtro de informação local |
 | **6b** | **KF ingênuo entre UAVs** | KF | funde a estimativa de `j` usando o `P_j` transmitido como se fosse independente: `P⁻¹ ← P⁻¹ + P_j⁻¹` | idem entre UAVs |
-| **6c** | **interseção de covariância** | KF | `CI(trilha, estimativa recebida)` | `CI` entre estimativas do mesmo sensor |
+| **6c** | **interseção de covariância** | KF | `CI(trilha, estimativa recebida)` | — *(a coluna do canal do sensor caiu com D13)* |
 
 Notas que fecham a definição:
 

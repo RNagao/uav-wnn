@@ -4,7 +4,7 @@
 **Disciplina:** Fusão de Dados — PESC/COPPE-UFRJ
 **Autor:** Raphael Nagao Ferreira · rnagao@cos.ufrj.br
 **Data:** 09/08/2026 · **Prazo:** 4 semanas (entrega em ~06/09/2026)
-**Status:** em execução · **Versão:** 3.0 — *o ambiente passa a ser o de Lamenza verbatim (submodule); features entram por costuras externas (ver `specs/ARQUITETURA.md`)*
+**Status:** em execução · **Versão:** 5.0 — *escopo do ruído reduzido ao **GPS do drone**; o canal do sensor sai, e com ele o bloco 2b, o filtro de informação, a H4, a T3 e a P3* · 4.0 — *a fonte primária passa a ser a **dissertação** de Katopodis, não código: RNF-01 corrigida, D6 corrigida, e a fundamentação de núcleo deixa de ser analogia e passa a ser identidade testada (ver [`specs/PLANO-TESTES.md`](specs/PLANO-TESTES.md))*
 
 ---
 
@@ -34,7 +34,7 @@ Experimentos preliminares já executados (documentados em `tmp/PLANO.md`) produz
 
 | # | Achado | Número |
 |---|---|---|
-| A1 | Ocupação real das LUTs é minúscula | 2 268 de 196 608 entradas (**1,2 %**) após 80k passos → ~4,4 KB em int16 |
+| A1 | ~~Ocupação real das LUTs é minúscula~~ **REFUTADO (SPEC-03)** | O protótipo media 2 268 entradas → ~4,4 KB, mas tinha **2 variáveis de entrada**; a observação real tem **25**. Medido no problema real: **13 555 entradas → 133,9 KB**. Extrapolar de um brinquedo 2-D para 25-D foi a origem do erro. Ver `reports/spec03-custo.md` |
 | A2 | WNN não é mais frágil a ruído que MLP | degradação estatisticamente indistinguível de σ=0 a σ=0,2 |
 | A3 | KF ingênuo piora; KF **com entrada de controle** ganha muito | erro de posição 12,54 m → 0,67 m com σ_GPS = 10 m (**18,8×**) |
 
@@ -51,8 +51,7 @@ E uma regra de projeto que amarra as duas metades do trabalho:
 | Etapa | Configuração | O que muda em relação a Lamenza | Responde |
 |---|---|---|---|
 | **1** | 1 UAV, sem ruído | só o aproximador | H1 — a rede sem peso aprende o problema? |
-| **2a** | 1 UAV, ruído no **GPS do drone** | + medição ruidosa e KF com entrada de controle | H2, H3 |
-| **2b** | 1 UAV, + ruído no **canal do sensor** | + filtro de informação e ranking sobre estimativas | H4 |
+| **2** | 1 UAV, ruído no **GPS do drone** | + medição ruidosa e KF com entrada de controle | H2, H3 |
 | **3** | `Na` UAVs, com ruído | + coordenação e estimativas correlacionadas | H5, H6 |
 
 A Etapa 1 é a **reprodução**. As Etapas 2 e 3 são a **extensão de Fusão de Dados**.
@@ -65,10 +64,10 @@ Cada etapa tem um **portão** (`G1`, `G2`, `G3`): critério objetivo a ser ating
 
 | ID | Etapa | Hipótese | Como é falsificada |
 |---|---|---|---|
-| **H1** | 1 | Sobre o problema **inalterado**, a política n-tuple atinge desempenho comparável ao de uma rede densa, a custo de **modelo** e **inferência** materialmente menor | Comparação pareada: mesmo ambiente, mesma observação, mesma recompensa, **mesmo algoritmo**, trocando só o aproximador. Critério detalhado em **§5.5** — H1 cai se o tempo de conclusão da WNN for pior além do IC, ou se o ator não couber em poucas dezenas de KB **realizados**, ou se a contagem de operações não mostrar o aproximador livre de **multiplicações em ponto flutuante**. **Atenção:** três specs independentes (03, 04, 05) estimam que o ator WNN realizado fica entre ~12 e ~15 KB contra ~8,6 KB da MLP pareada — isto é, provavelmente **maior**. Ver §5.5 e a nota de revisão |
+| **H1** | 1 | Sobre o problema **inalterado**, a política n-tuple atinge desempenho comparável ao de uma rede densa, a custo de **modelo** e **inferência** materialmente menor | Comparação pareada: mesmo ambiente, mesma observação, mesma recompensa, **mesmo algoritmo**, trocando só o aproximador. Critério detalhado em **§5.5** — H1 cai se o tempo de conclusão da WNN for pior além do IC, ou se o ator não couber em poucas dezenas de KB **realizados**, ou se a contagem de operações não mostrar o aproximador livre de **multiplicações em ponto flutuante**. **MEDIDO (SPEC-03), e H1 cai na parte de tamanho:** o ator WNN realizado é **133,9 KB** contra **7,6 KB** da MLP pareada — **17,5×** —, e ainda 5× menos preciso na clonagem. A estimativa anterior de 12–15 KB errou uma ordem de grandeza porque vinha de um protótipo com 2 variáveis de entrada. Sobrevive, medido: **zero multiplicações em ponto flutuante no aproximador** e vantagem de ciclos condicional ao alvo (1,6× em x86, **19,9× em Cortex-M0 sem FPU**). Ver `reports/spec03-custo.md` |
 | **H2** | 2a | A binarização por termômetro **não** torna a WNN mais frágil a ruído de medição que uma rede densa | Curvas de degradação WNN vs MLP sobre σ crescente. H2 cai se os ICs separarem |
 | **H3** | 2a | O KF com a **ação da política como entrada de controle** devolve a rede ao regime praticamente sem ruído | Escada de ablação 1→4. H3 cai se a degradação com filtro for estatisticamente distinguível do oráculo |
-| **H4** | 2b | Uma política que enxerga a **própria covariância** aprende busca ativa | Ablação com/sem canais de `P`; inspeção de trajetórias. H4 cai se o ganho for nulo |
+| ~~**H4**~~ | — | ~~Uma política que enxerga a própria covariância aprende busca ativa~~ **RETIRADA pelo corte de escopo (D13)** | O mecanismo dela era o canal do sensor: relatórios ficam mais precisos de perto, logo aproximar-se **compra informação** e a busca ativa tem causa física. Com ruído só no GPS do drone, a covariância própria converge para regime estacionário e **não há incerteza por sensor a reduzir** — a hipótese perde a causa, não só o experimento. O degrau 5 da escada (política que enxerga o próprio `P`) continua como **ablação sem hipótese forte associada**. Retomar a H4 exigiria devolver o canal do sensor ao escopo |
 | **H5** | 3 | Fundir estimativas entre UAVs por **interseção de covariância** supera o KF local isolado e não diverge, ao contrário do KF ingênuo | Erro de estimativa e NEES/NIS. H5 cai se CI não bater o KF local, ou se o KF ingênuo não divergir |
 | **H6** | 3 | A coordenação emerge também com aproximador sem peso | **Barra revista.** Superar a `greedy` é barra baixa: medimos que ela não coordena — separação média entre UAVs de **0,1 m** contra alcance de 20 m, quatro drones em formação. A barra honesta é a **`smart`** do próprio `heuristics.py`, que coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. H6 divide-se: **H6a** supera `greedy` (provável), **H6b** supera `smart` (incerto). Ver `reports/spec00-parametros.md` §9 |
 
@@ -156,24 +155,42 @@ Sem *reward shaping*, sem penalidade de borda, sem termo de coordenação. A rec
 
 ### 5.3 O que trocamos: o aproximador
 
-**Algoritmo: n-tuple Actor-Critic** (Katopodis §4.3.4), com política gaussiana cuja média vem de uma rede n-tuple e crítico n-tuple para `V`. É a variante do trabalho de referência que suporta **ação contínua** e que, no benchmark Hopper, superou o Actor-Critic com MLP.
+**Algoritmo: n-tuple Actor-Critic** — **Algoritmo 4.4** da dissertação, p. 48. É a variante do trabalho de referência que suporta **ação contínua** e que, no benchmark Hopper, superou o Actor-Critic com MLP.
 
-Duas saídas contínuas (`θ`, `s`), variância `σ²` como hiperparâmetro, como em Katopodis (0,5 em Mountain Car; 0,2 em Hopper).
+**Hierarquia de fontes.** A fonte primária é a **dissertação** (`tmp/947841_compressed.pdf`), não código. Os algoritmos dela são 4.1 (SARSA com esquecimento), 4.3 (REINFORCE) e 4.4 (Actor-Critic); **PPO aparece uma única vez em 87 páginas**, no capítulo 6 de trabalhos futuros (p. 70), como sugestão para corrigir a instabilidade de passo fixo do SGD. Logo:
+
+| repositório | o que é |
+|---|---|
+| `rkatopodis/RLWorktable.jl` + `Ramnet.jl` (`faster_hashing`) | **a dissertação implementada** — Algoritmo 4.4 literal |
+| `anbubus/ntn_neurocomputing_v0` (PyTorch + Ray RLlib PPO) | **o capítulo 6** — o trabalho futuro, não o trabalho |
+
+Duas saídas contínuas (`θ`, `s`), com **covariância `Σ` predefinida** — a eq. (4.34) é explícita: *"Σ is a **predefined** covariance matrix"*, e o apêndice A a lista como hiperparâmetro constante (0,5 em Mountain Car; **0,3** em Hopper). Nas tarefas multivariadas o artigo usa **identidade escalada** (§5.1.3). Ver **P13** sobre a divergência entre o artigo e o código do autor quanto a `Σ` ser covariância ou desvio.
 
 **Compartilhamento de parâmetros** entre os UAVs homogêneos, como Lamenza faz (§5, citando Chu & Ye 2017), com o índice do agente na observação para permitir individualidade.
 
-**Núcleo n-tuple.** Cada RAM lê `n` bits pseudo-aleatórios formando um endereço `a_i(x)`; com `φ(x)` = concatenação dos one-hots por RAM (exatamente `N` bits ligados):
+**Núcleo n-tuple — e agora com a fundamentação verificada, não presumida.** Cada RAM lê `n` bits formando um endereço `τ[i](x)`. A saída é a **média** sobre as RAMs, eq. (4.12):
 
 ```
-f_k(x) = ⟨W_k, φ(x)⟩ = Σ_i W[k, i, a_i(x)]
+f(x) = (1/N) Σ_i v[i](x)
 ```
 
-Isso é **tile coding com ladrilhamento aleatório**, e portanto herda as garantias de convergência de TD com aproximação linear. Vai para a fundamentação do relatório.
+A versão anterior deste PRD afirmava que isso "é tile coding com ladrilhamento aleatório, e portanto herda as garantias de convergência de TD com aproximação linear". A afirmação está certa, mas era **presumida por analogia**. A dissertação a **prova**, e agora nós a **testamos** (`tests/test_identidades_artigo.py`, 21 testes):
 
-- **RNF-01 (estabilidade).** `‖φ(x)‖² = N` ⇒ passo efetivo é `η·N`. Medido: `η = 0,05` com `N = 48` **divergiu para NaN**. Regra codificada com asserção: **`η = c/N`, `c ≲ 0,5`**.
+| eq. | o que prova | teste |
+|---|---|---|
+| (3.22) | a rede de regressão **é** um estimador de Nadaraya-Watson | `test_rede_de_regressao_e_estimador_de_nadaraya_watson` |
+| (4.16) | a rede de gradiente funcional **é** máquina de núcleo: `f(x) = Σ_j α_j k(x,x_j)` | `test_rede_de_gradiente_funcional_e_maquina_de_nucleo` |
+| (4.19) | a atualização **é** um passo de gradiente funcional: `Δf(x) = αΔ·k(x_t,x)` | `test_uma_atualizacao_propaga_pelo_nucleo` |
+| (4.23) | o núcleo `k = 1 − δ/N` **é positivo-definido**, via mapa explícito `φ` | `test_matriz_de_gram_e_positiva_semidefinida` |
+
+A (4.23) é a que sustenta as outras: o texto assinala que a passagem de (4.18) para (4.19) *"hinges on the kernel being positive-definite"*. Verificado no espectro — matriz de Gram 60×60, autovalor mínimo `> −1e−9`.
+
+- **RNF-01 (estabilidade). CORRIGIDA — a regra anterior estava errada.** A versão anterior dizia `‖φ(x)‖² = N ⇒ passo efetivo η·N`, e prescrevia `η = c/N`. Isso vale para a convenção de **soma**; a eq. (4.12) do artigo usa a **média**, e a eq. (4.22) normaliza o mapa por `1/√N`, de modo que `‖φ(x)‖² = 1`. Com a média e `Δ = −η(f − y)`, a variação da saída num passo é **exatamente `−η(f − y)`, independente de `N`** — testado em `test_ator_usa_media_e_o_passo_independe_de_N`. **Não há regra `η = c/N`.** O NaN observado com `η = 0,05` e `N = 48` veio do protótipo em convenção de soma, não do modelo do artigo.
+  Isto é o que **permite varrer `N` sem confundir capacidade com passo** — e é a razão de o `EmbeddingBag(mode='sum')` do repositório em PyTorch divergir do artigo nesse ponto.
+- **RNF-01b (instabilidade de passo fixo). MEDIDO.** O que de fato limita `α` não é `N`, é a variância do gradiente de política. No bandido contextual, o pior erro entre 5 sementes cresce **monotonicamente** com `α` — 0,044 em `α = 0,002` contra 0,238 em `α = 0,05`, com uma semente divergindo em 0,05. É a limitação que a própria dissertação nomeia no capítulo 6 ao sugerir TRPO/PPO. **A busca de `α` da Etapa 1 precisa de faixa larga e múltiplas sementes.**
 - **RNF-02 (memória).** LUTs em armazenamento esparso/hash. Reportar **entradas ocupadas × bytes**, fp32 e int16 — nunca o array alocado.
 - **RNF-03 (latência).** Mediana e p99 por decisão. Referência do protótipo NumPy: ~15 µs.
-- **RNF-04.** Fator de esquecimento multiplicativo `φ ∈ [0,1]` (Katopodis §4.2.1), que trata a não-estacionariedade e é o que viabiliza o modelo em RL.
+- **RNF-04.** Fator de esquecimento `γ ∈ [0,1]` (Katopodis §4.2.1) **no crítico, não no ator**. O código do autor (`rkatopodis/Ramnet.jl`, branch `faster_hashing`) usa dois modelos distintos: `RegressionDiscriminator` com γ e contador para o crítico, `FunctionalDiscriminator` sem γ e sem contador para o ator. O esquecimento existe porque o crítico faz **regressão para o retorno**, cujo alvo se desloca com a política — no ator não há alvo se movendo assim. Consequência de custo: o crítico guarda **valor e contador**, dobrando os bytes por entrada.
 
 ### 5.4 Desvios em relação ao problema original
 
@@ -182,6 +199,8 @@ Esta tabela é o contrato da §0. Ela tem hoje **uma linha**, e qualquer acrésc
 | # | Desvio | Por que é inevitável | Como é mitigado |
 |---|---|---|---|
 | **1** | **Binarização da observação** por termômetro (Katopodis §3.2.3) | Redes n-tuple endereçam RAMs com bits; não há como alimentá-las com reais | O **vetor de observação é idêntico** ao de Lamenza; o codificador é parte do aproximador, não do MDP. A resolução `T` é varrida e reportada, como Katopodis faz |
+
+**O nosso codificador também difere do de Katopodis, e isso não é desvio do problema de Lamenza.** A eq. (3.23) da dissertação usa limiares **uniformes** sobre `[l, u]` e comparação estrita; a SPEC-01 mediu que **quantis por slot** vencem por 4,3° contra 7,6°, porque a distribuição depende do slot (a ordenação por distância gera estatísticas de ordem). Os codificadores literais do artigo — termômetro (3.23) e circular (3.24) — estão em `src/uavwnn/encoding/artigo.py` como referência de fidelidade, com testes. Como o codificador é parte do aproximador e não do MDP, isto **não** acrescenta linha a esta tabela — mas precisa aparecer no relatório, porque é um ponto em que deliberadamente **não** somos fiéis à dissertação.
 
 **Detalhe de codificação — `padding`. RESOLVIDO, e o desvio caiu.** A spec projetava um bit de validade porque supunha padding em `(0,0)`, indistinguível de "sensor exatamente sobre o UAV". O código de referência usa **`-1`**, que está **fora da faixa dos valores válidos** — logo slot vazio e sensor sobre o UAV (que normaliza para 0,5) são distinguíveis **por construção**. O bit de validade é **desnecessário** e não entra nesta tabela.
 
@@ -284,7 +303,19 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 **Comparação pareada (H1):** mesmo ambiente, mesma observação, mesma recompensa, **mesmo algoritmo** (Actor-Critic on-policy com parameter sharing), trocando só o aproximador — n-tuple vs MLP de 2 camadas × 32 unidades, a arquitetura que Katopodis usou nos baselines (§5.4).
 
-**Varreduras:** resolução do termômetro `T ∈ {8, 32, 128}` × tamanho da tupla `n ∈ {8, 10, 12}` × número de RAMs `N ∈ {16, 48, 128}` × esquema de codificação (simples vs circular) × fator de esquecimento. Medição preliminar indica retorno decrescente em `N` (8× mais memória para 13 % menos erro): a varredura documenta o joelho da curva, não maximiza.
+**Varreduras — revistas com o que foi medido.** O eixo mudou em três pontos:
+
+| eixo | como era | como fica | por que |
+|---|---|---|---|
+| tupla | `n ∈ {8, 10, 12}` | **`n/B ∈ {0,04; 0,06; 0,09; 0,12}`** | O que governa a generalização é a razão, não `n`. Testado: a fração de consultas novas que só endereçam posições nunca escritas cresce monotonicamente com `n/B` (§3.2.4 da dissertação). A faixa cobre a do artigo, 0,042 a 0,125 |
+| RAMs | `N ∈ {16, 48, 128}` livre | **`N = ⌈B/n⌉`, determinado** | O mapeamento é **partição** (`randperm` fatiado), como o `:uniform_random` do Ramnet. `N` deixa de ser eixo livre — e a cobertura de bits passa a ser 1,0 por construção, fechando **C4** |
+| taxa `α` | não era eixo | **eixo obrigatório, faixa larga, múltiplas sementes** | Medido: o pior erro entre 5 sementes cresce monotonicamente com `α` (0,044 em 0,002 contra 0,238 em 0,05, com divergência em 0,05). Sem varrer `α` com sementes, uma curva ruim seria lida como limitação do modelo |
+
+Mantidos: resolução `T ∈ {8, 32, 128}` e fator de esquecimento `φ`. Retirado o eixo **simples vs circular** — o circular acende sempre `⌊R/2⌋` bits, logo não tem padrão todo-zero e **quebra a convenção de padding** que dispensa o bit de validade. Fica como sub-experimento opcional para dimensões angulares, onde o wrap-around é a topologia correta (ver **P12** e a conexão com **C1**).
+
+Medição preliminar indica retorno decrescente em capacidade (8× mais memória para 13 % menos erro): a varredura documenta o joelho da curva, não maximiza.
+
+**Predição do artigo a checar em `φ` (§5.2.3).** O texto apresenta `φ` como compromisso: 0 descarta o histórico, 1 ignora a não-estacionariedade. Se a nossa varredura der efeito **monótono**, é sinal de que o problema não é suficientemente não-estacionário para o esquecimento importar — e isso é resultado a reportar, não bug.
 
 **Orçamento de simulação — MEDIDO (P2 fechada).** No ambiente de referência, guloso, grade completa: **1,8 a 5,2 h por núcleo** para os 50 M passos de Lamenza, contra 7 dias de GPU. A estimativa anterior de 8–30 h se sustenta com folga. Tabela por célula em `reports/spec00-orcamento.md`.
 
@@ -297,26 +328,25 @@ Segue a mesma sequência iterativa que Lamenza usou, o que dá alvos numéricos 
 
 Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado e a extensão é declarada.
 
-**Dois blocos, um canal por vez.** A Etapa 2 introduz dois canais de ruído com estruturas **opostas** — o do drone é deslocamento comum a todas as entradas da observação, o do sensor é por slot. Ligá-los juntos torna qualquer degradação inatribuível. Um portão só (G2), um capítulo só, mas ordenação interna que isola os canais:
+**Um canal só — decisão D13.** A Etapa 2 introduz ruído **exclusivamente no GPS do drone**. O canal do sensor saiu do escopo, e com ele o antigo bloco 2b, o filtro de informação, a H4, a T3 e a P3.
 
 | Bloco | Ruído | Filtro | Hipóteses | Varredura |
 |---|---|---|---|---|
-| **2a** | só GPS do drone | KF + **entrada de controle** | H2, H3 | `σ_own ∈ {1,3,5,10}` × `T ∈ {8,32,128}` |
-| **2b** | + canal do sensor | filtro de informação | H4 | `σ_sensor × T`, com `σ_own` **fixado pelo resultado de 2a** |
+| **2** | só GPS do drone | KF + **entrada de controle** | H2, H3 | `σ_own ∈ {1,3,5,10}` × `T ∈ {8,32,128}` = 12 configurações |
 
-Custo medido de dobrar a grade: **~5 h de um núcleo** a 2 M passos por corrida, com as configurações paralelizando trivialmente. Não é o gargalo; o gargalo seria calendário, e por isso os blocos ficam dentro de uma etapa em vez de virarem uma quarta.
+Custo medido: **~5 h de um núcleo** a 2 M passos por corrida, paralelizando trivialmente.
 
-Três razões para a separação, além da atribuição:
+**O que o corte ganha.** O canal do drone é o único cujo modelo estava **fechado** — ruído branco, estado móvel, comando conhecido — e é exatamente onde vive o achado medido A3 (`12,54 m → 0,67 m`, 18,8×). O bloco que sai era o que dependia de uma decisão de física não tomada (TS3) e cujo ganho era conjectural. O projeto fica mais estreito e inteiramente apoiado em medição.
 
-1. **2a não depende da física do canal do sensor** (ver T3), que segue em discussão. Pode começar imediatamente.
-2. **2a mede `σ_own`** em vez de o fixarmos por decreto — resolve a pendência P10.
-3. **Linha de corte honesta:** se o tempo apertar, 2b é a metade cortável, e 2a sozinha ainda entrega H2, H3 e a réplica do achado A3.
+**O que o corte custa, dito sem eufemismo.** A H4 perde a causa física, não só o experimento — ver a tabela de hipóteses. Some também a leitura mais bonita do trabalho, a de que *aproximar-se compra informação*.
+
+**O conteúdo de Fusão de Dados não some.** Ele estava em três lugares e dois permanecem: **KF com entrada de controle** (esta etapa) e **interseção de covariância entre UAVs** (Etapa 3, H5), esta última fundindo as estimativas de posição própria que os vizinhos transmitem — construída sobre o degrau 4, e portanto indiferente ao canal do sensor. A validação de consistência por **NEES/NIS** também permanece.
 
 **Bloco 2a — GPS do drone.** `p̂_k = p_k + e_k`. O erro é **comum** a todas as entradas válidas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)`. Estado móvel, comando conhecido: é onde vive o achado A3 e onde o KF com entrada de controle faz sentido. Modelo fechado, nada pendente.
 
-**Bloco 2b — canal do sensor.** O drone obtém a posição do sensor pelo **canal global reinterpretado**, não por rádio: no mecanismo de referência ouvir o drone é ser coletado, então um relatório por rádio já teria tirado o sensor do problema antes de haver medições a acumular. **Todo dado derivado — inclusive o ranking dos sensores — é computado sobre a estimativa filtrada**, nunca sobre a verdade. Desenho em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
+**A posição dos sensores continua exata**, como no problema original de Lamenza. O que o drone estima é a **própria** posição; e o dado derivado que isso afeta — o ranking dos sensores por distância — passa a ser computado sobre a estimativa filtrada da posição própria, nunca sobre a verdade. É a única costura que o ruído exige. Desenho em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
 
-> **T3 — pendente.** A física deste canal ainda não foi decidida, e ela determina se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância, e é dominado por **viés fixo** — o canal vira piso irredutível, não objeto de fusão, e a H4 perde a causa física. Se o drone **localiza o sensor por rádio**, o erro é branco e **cresce com a distância**, a filtragem tem função e aproximar-se compra informação — ao custo de declarar na §5.4 um alcance de detecção maior que o de coleta. O bloco 2b não roda antes dessa decisão; o 2a roda.
+> **~~TS3~~ — FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era a física do canal do sensor: GPS próprio do sensor (erro dominado por viés fixo, canal vira piso irredutível) ou localização por rádio (erro branco crescente com a distância, filtragem tem função). **Com o canal fora do escopo, a pergunta deixa de ter consequência.** Fica registrada porque é o primeiro item a reabrir se o escopo voltar a crescer — e porque a resposta determinaria se a H4 tem mecanismo.
 
 **Escada de ablação:**
 
@@ -329,13 +359,13 @@ Três razões para a separação, além da atribuição:
 | 4 | **KF + entrada de controle** | a proposta |
 | 5 | 4 + covariância na observação | política consciente da incerteza |
 
-A escada roda **em cada bloco**: em 2a sobre o canal do drone, em 2b sobre o do sensor. Os degraus 2 e 3 mudam de sentido entre eles — para alvo estático não existe "KF de velocidade constante", e o degrau 3 vira "média simples sem ponderar pela precisão".
+A escada roda **uma vez**, sobre o canal do drone. A ressalva anterior — de que os degraus 2 e 3 mudam de sentido para alvo estático — deixa de se aplicar: só há alvo móvel, que é o próprio drone, e portanto o degrau 3 ("KF de velocidade constante") mantém o sentido literal de ser o *óbvio que falha*.
 
 O degrau 5 acrescenta canais à observação e portanto **entra na tabela de desvios (§5.4) quando executado** — é ablação explícita, com resultado reportado com e sem.
 
 Cruzado com o regime de treino: **treino limpo → avaliação ruidosa** vs **treino ruidoso → avaliação ruidosa**. Se o degrau 4 tornar os dois equivalentes, é o argumento mais forte possível a favor do filtro.
 
-**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ × T` dentro de cada bloco, **12 configurações por bloco**. Medido: ~5 h de um núcleo por bloco a 2 M passos com 3 sementes. Roda muito mais barato com 1 UAV — razão de a Etapa 2 vir antes do multiagente.
+**Varredura conjunta** (não uma de cada vez, pela regra da §1): `σ_own × T`, **12 configurações**. Medido: ~5 h de um núcleo a 2 M passos com 3 sementes. Roda muito mais barato com 1 UAV — razão de a Etapa 2 vir antes do multiagente.
 
 **RF-04 (invariante de vazamento).** A verdade **nunca** chega à política. `handle_telemetry` do gradysim entrega posição exata; a corrupção acontece na entrada do protocolo e a verdade fica guardada só para métricas. Teste automatizado obrigatório.
 
@@ -420,7 +450,7 @@ uav-wnn/
 │   │   └── rewards.py             # eq. 5-6 e eq. 7-2, verbatim
 │   ├── fusion/                    # ETAPA 2+ — extensão, isolada do núcleo
 │   │   ├── noise.py               # GPS, enlace local, atraso de broadcast
-│   │   ├── kalman.py              # KF com entrada de controle; filtro de informação
+│   │   ├── kalman.py              # KF com entrada de controle (só isto, D13)
 │   │   ├── ci.py                  # interseção de covariância
 │   │   └── consistency.py         # NEES / NIS
 │   ├── train/runner.py
@@ -449,8 +479,17 @@ A execução é decomposta em specs pequenas, com escopo fechado e critério de 
 | ~~**1**~~ | ~~SPEC-00~~ | **Concluída.** Ambiente de referência via submodule, `gradysim==0.6.11`, 18 testes, P1 e P2 fechadas, guloso reproduzindo a fig. 7.3 em 9/9 células | ✔ |
 | **1** | SPEC-01, 02, 03, 07 | Binarização (**G0**) · baselines e harness · harness de custo · ruído e KF. As quatro são independentes e rodam em paralelo | **G0**: codificador escolhido com evidência, `(T, N)` varridos juntos |
 | **2** | SPEC-04, 05, 06 | Núcleo n-tuple · Actor-Critic e MLP pareado · Etapa 1 (réplicas 1a/1b, varreduras, tabela de custo da §5.5) | **G1** e veredito de H1 |
-| **3** | SPEC-08, bloco **2a** | Ruído no GPS do drone; KF com entrada de controle; NEES/NIS; escada 0–5; varredura `σ_own × T` | H2 e H3 |
-| **4** | SPEC-08 bloco **2b** + SPEC-09 + fechamento | Canal do sensor *(se T3 resolver)*; multiagente 3a/3b; degraus 6a/6b/6c; relatório e slides | **G2**, **G3**; `make repro` verde; E2 e E3 |
+| **3** | SPEC-08 | Ruído no GPS do drone; KF com entrada de controle; NEES/NIS; escada 0–5; varredura `σ_own × T` | **G2**, H2 e H3 |
+| **4** | SPEC-09 + fechamento | Multiagente 3a/3b; degraus 6a/6b/6c; interseção de covariância; relatório e slides | **G3**; `make repro` verde; E2 e E3 |
+
+> **Estado real, 2026-08-15 — a numeração de semanas já não descreve a ordem em que as coisas saíram.** Concluídas: SPEC-00 (ambiente), SPEC-01 (**G0** fechado), SPEC-03 (T1 e T3 medidos, T2 pendente), SPEC-04 (as duas redes, desvio zero contra o `Ramnet.jl`) e a metade da SPEC-05 (Algoritmo 4.4 implementado; falta a MLP AC pareada). **Pendente e bloqueando:** a SPEC-02, cujo teste A/A é o último item estatístico de que todo IC já reportado depende.
+>
+> **O corte D13 devolveu folga à semana 4**, que perdeu o bloco 2b. Duas destinações honestas, em ordem de prioridade:
+>
+> 1. **SPEC-02 completa, com teste A/A e calibração do bootstrap pareado.** É dívida, não escopo novo: a validação 9/9 da SPEC-00, o `greedy` vs `smart` e a comparação de custo da SPEC-03 todos pressupõem um procedimento de intervalo nunca verificado.
+> 2. **T2 (latência)** da SPEC-03, que ficou pendente da estrutura de armazenamento — e a estrutura agora existe, esparsa e validada.
+>
+> Não usar a folga para reabrir o canal do sensor pela porta de trás: o corte foi uma decisão, e revertê-lo informalmente seria pior que nunca tê-lo feito.
 
 **A SPEC-00 saiu antes do prazo e mais barata que o previsto** — o ambiente veio pronto do repositório de referência em vez de ser escrito. Isso liberou a semana 1 para quatro specs em paralelo.
 
@@ -458,13 +497,15 @@ A redação **não** espera a semana 4: cada tabela entra no relatório assim qu
 
 ### Linha de corte (o que cai primeiro se atrasar)
 
-1. Bloco **2b** inteiro (canal do sensor). É a metade cortável da Etapa 2: 2a sozinha ainda entrega H2, H3 e a réplica de A3
-2. Varreduras de `n × N` → fixar `n = 12`, `N = 48` (já testados no protótipo) e varrer só `T` — com a ressalva de que `T` e `N` não são independentes (achado C4)
+O antigo item 1 — bloco 2b — **saiu do escopo por decisão (D13)**, não está mais na fila de corte. A lista encurtou e foi renumerada (havia dois itens rotulados "2"):
+
+1. Varredura de `n/B` → fixar o ponto medido e varrer só `T` — com a ressalva de que `T` e `n/B` não são independentes
 2. Células `Ns ∈ {24, 36}` e `Na = 8` na Etapa 1
-3. Esquema de codificação circular (manter só o termômetro simples)
-4. Varredura σ × T → reduzir a `σ ∈ {1, 10}` × `T ∈ {8, 128}`
-5. Degraus 2 e 3 da escada — reter ao menos um como referência barata
-6. Etapa 3 com `Na = 2` em vez de 4, menos sementes
+3. Varredura `σ_own × T` → reduzir a `σ ∈ {1, 10}` × `T ∈ {8, 128}`
+4. Degraus 2 e 3 da escada — reter ao menos um como referência barata
+5. Etapa 3 com `Na = 2` em vez de 4, menos sementes
+
+**O que não cai:** o degrau 4 (KF com entrada de controle) e o degrau 6c (interseção de covariância). São o conteúdo de Fusão de Dados do trabalho; cortá-los descaracterizaria a disciplina.
 
 **Não podem cair:** os três portões com veredito escrito; réplica 1a; baseline guloso; degraus 0, 1, 4 e 6c; NEES/NIS; sub-passo 3a; **a tabela de custo da §5.5 (T1/T2/T3)**; RF-04 (invariante de vazamento).
 
@@ -504,12 +545,13 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 | **D3** | Recompensa **eq. 5-6 verbatim**: sem shaping potencial, sem penalidade de borda | Reverte o v1. Shaping alteraria o sinal de aprendizado e a comparação |
 | **D4** | Observação **eq. 5-1 verbatim**: coordenadas relativas, `N*_s = 12`, zero-padding, índice do agente | Reverte o v1, que propunha mapa setorial egocêntrico. Fica como trabalho futuro (§12) |
 | **D5** | **Sem mensagem de reivindicação** entre UAVs | Não existe no original; a coordenação de Lamenza emerge só de conhecer posições |
-| **D6** | Algoritmo: **n-tuple Actor-Critic** com política gaussiana e parameter sharing | Única variante do trabalho de referência que suporta ação contínua; validada em Hopper |
+| **D6** | Algoritmo: **Algoritmo 4.4** — n-tuple Actor-Critic de `m` passos, vantagem `δ = G − f_value(S_τ)`, `Σ` e `α` **constantes**, e parameter sharing | Única variante do trabalho de referência que suporta ação contínua, validada em Hopper. **Correção:** a versão anterior desta decisão prescrevia covariância e taxa de aprendizado *recozidas*. O recozimento existe no `ContinousFunctionalAC.jl` mas **não na dissertação** — o apêndice A lista `Σ` e `α` como constantes. Seguimos o artigo; o recozimento fica disponível e desligado por padrão. Implementado em `src/uavwnn/rl/actor_critic.py`, validado contra o `Ramnet.jl` com desvio zero |
 | **D7** | **MADDPG não é reproduzido**; entra como referência de literatura | Reproduzi-lo exigiria replicar exatamente simulador, observação e recompensa; qualquer divergência invalidaria a comparação silenciosamente. Nosso pareamento é n-tuple AC vs MLP AC |
 | **D8** | **Reprodução antes de extensão**; `fusion/` é pacote opcional e desligável | Sem uma linha de base fiel, nenhum efeito de filtro é atribuível |
 | **D9** | **Fusão local (Etapa 2) antes do multiagente (Etapa 3)** | A varredura σ × T é o experimento mais caro e roda muito mais barato com 1 UAV. E a regra *bin ≈ σ* precisa estar fixada antes de o multiagente entrar |
 | **D10** | Etapa 3 tem sub-passo **3a sem ruído** obrigatório | Sem ele, degradação por coordenação e por incerteza ficam confundidas |
 | **D11** | **Tamanho do modelo e tempo de inferência são figuras de mérito de primeira classe**, medidas em toda etapa e reportadas junto com tempo de conclusão e taxa de sucesso | São o conteúdo de H1 e a única contribuição que independe de a política ser boa: mesmo com desempenho apenas comparável, o par (tamanho, aritmética) é resultado. Protocolo em §5.5 |
+| **D13** | **O ruído entra apenas no GPS do drone.** O canal do sensor sai do escopo, e com ele o bloco 2b, o filtro de informação, a H4, a T3 e a P3 | O canal do drone é o único com modelo fechado (ruído branco, estado móvel, comando conhecido) e é onde vive o achado medido A3 (18,8×). O canal do sensor dependia de uma decisão de física não tomada (TS3) e tinha ganho conjectural. **Custo aceito:** a H4 perde a causa física, não só o experimento. **O que se preserva:** KF com entrada de controle, interseção de covariância entre UAVs (H5) e validação NEES/NIS — o conteúdo de fusão permanece |
 | **D12** | O tamanho reportado é o **realizado**, com mapeamento de tuplas contabilizado, e a razão é dada contra **ambas** as referências | Reportar só a LUT ocupada contra o ator do MADDPG seria escolher o numerador e o denominador convenientes |
 
 ### Pendências
@@ -517,7 +559,13 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 - **P1** — Confirmar `communication_range` no repositório `Project-GrADyS/gradys-data-collection` (branch `dissertation`). Não consta nas tabelas 7.1/7.2. **Bloqueia a comparação numérica com os resultados publicados**, então é a primeira tarefa da semana 1.
 - **P2** — Medir o orçamento real de simulação e validar `update_rate = 0,1` contra 0,01 com 8 UAVs.
 - **P4** — Extrair do repositório público a **arquitetura do ator do MADDPG** (largura e profundidade das camadas). Sem ela, a razão de tamanho contra a referência de Lamenza não passa de estimativa (§5.5). O padrão do CleanRL, base declarada da implementação dele, é 256×256.
-- **P3** — Definir se o sensor transmite sua posição estimada (caso linear → filtro de informação) ou apenas distância/RSSI (caso não linear → EKF/UKF e trilateração). **Recomendação:** caso linear; o não linear é um projeto inteiro e fica como trabalho futuro.
+- ~~**P3**~~ — **FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era se o sensor transmite posição estimada (caso linear → filtro de informação) ou distância/RSSI (caso não linear → EKF/UKF e trilateração). Com o canal do sensor fora do escopo, a pergunta não tem consequência. Fica registrada junto com a **TS3** como o par a reabrir se o escopo crescer.
+
+- **P13** — **`Σ` é covariância ou desvio-padrão?** A eq. (4.34) diz *"predefined **covariance** matrix"*, logo a amostragem correta é `√Σ·z`. O `ContinousActionPolicy.jl` do autor amostra `Σ·z` mas usa `inv(Σ)` no gradiente — trata o mesmo número como desvio num lugar e variância no outro. **Seguimos o artigo**; `PoliticaGaussiana(..., escala_como_desvio=True)` reproduz o Julia. Com `Σ = 0,25` a diferença é **fator 2 na exploração**, então a escolha tem de aparecer na tabela de hiperparâmetros do relatório. *Resolvida em recomendação; falta aval.*
+
+- **P14** — **Revarrer o regime de tupla no eixo `n/B`.** *Rebaixada de bloqueio para refinamento.* Registrei-a supondo que o nosso `n = 12` fosse artefato do armazenamento denso diante dos `n ∈ {16, 32, 64}` do apêndice A. **Normalizando por `B` isso não se sustenta:** as dimensões de observação estão no §5.1 da dissertação, e `n/B` do artigo vai de 0,042 (Hopper) a 0,125 (CartPole), com `N` de 8 a 24. O nosso `n/B = 0,060` e `N = 17` ficam **dentro das duas faixas**, quase sobre o Lunar Lander. A diferença real é a decomposição: o artigo usa resolução alta com tupla grande; nós, resolução baixa com tupla pequena. A varredura vale como ajuste fino, no eixo `n/B`.
+
+- **P15** — **Decidir se replicamos §5.2.2 com orçamento cheio.** Nossa replicação parcial dá **empate** na configuração que o artigo declara para CartPole (`R=128, n=64`: 0,96×, IC cruza zero) e **vitória do circular** em baixa resolução (`R=32, n=16`: 1,68×, IC95% [+39,6; +56,1], 20 de 20 sementes). O orçamento é ~1/50 do original. **Não é bloqueio para o nosso trabalho** — o codificador de produção é o quantil, por outras razões —, mas se o relatório citar §5.2.2 como fundamento, a ressalva precisa vir junto. Ver `reports/replica-katopodis-52.md`.
 
 ---
 
@@ -526,7 +574,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 | Etapa | Pronta quando |
 |---|---|
 | **1** | Réplica 1a com taxa de sucesso reportada contra os 100 % publicados; 1b com tempo de conclusão vs guloso, em pelo menos `Na ∈ {1, 2, 4}`; **tabela de custo completa da §5.5** (T1 alocado/ocupado/realizado com mapeamento de tuplas, curva de ocupação, T2 mediana e p99 decomposto, T3 contagem de operações), contra as duas referências; veredito para H1 |
-| **2** | NEES/NIS de cada canal no intervalo qui-quadrado; degraus 0–5 com IC nos dois regimes de treino; varredura σ × T reportada; vereditos para H2, H3, H4 |
+| **2** | NEES/NIS do canal do GPS próprio no intervalo qui-quadrado; degraus 0–5 com IC nos dois regimes de treino; varredura `σ_own` × T reportada; vereditos para H2, H3, H4 |
 | **3** | 3a medido como referência; degraus 1, 4, 6a/6b/6c medidos; vereditos para H5 e H6 |
 
 **Global:**
@@ -536,7 +584,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 3. A tabela de desvios (§5.4) reflete exatamente o que foi executado.
 4. A tabela de custo segue o protocolo da §5.5 integralmente: tamanho **realizado** (não só ocupado), mapeamento de tuplas contabilizado, p99 além da mediana, contagem de operações por tipo, e — nas Etapas 2–3 — T1/T2 recalculados com o filtro embutido.
 5. As razões de tamanho e latência são reportadas contra **ambas** as referências (MLP pareada e ator do MADDPG), com a configuração `T, n, N, Na` que as gerou.
-6. Cada hipótese H1–H6 tem veredito escrito — confirmada, refutada ou inconclusiva — **com o número que o sustenta**. Hipótese refutada é resultado, não fracasso.
+6. Cada hipótese **em vigor** — H1, H2, H3, H5, H6 — tem veredito escrito, confirmada, refutada ou inconclusiva, **com o número que o sustenta**. A **H4 foi retirada** por D13 e entra no relatório como hipótese *abandonada com justificativa*, não como inconclusiva: registrar que o mecanismo saiu do escopo é diferente de tê-la testado sem resultado. Hipótese refutada é resultado, não fracasso.
 7. E2 e E3 entregues.
 
 ---

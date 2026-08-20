@@ -4,6 +4,38 @@
 **Revisada** após a SPEC-00: o gerador analítico foi **descartado** e três premissas caíram — ver §0.
 **Portão de saída:** `G0` · **Referência:** PRD §5.2 (observação), §5.4 (desvios), §5.5 (custo)
 
+
+## 0-ter. Revisão pela dissertação (2026-08-15)
+
+**O nosso codificador não é o da dissertação, e isso é deliberado.** A eq. (3.23)
+usa limiares **uniformes** sobre `[l, u]` com comparação **estrita**; nós usamos
+quantis por slot com `>=`. A medição desta spec justifica o desvio (4,3° contra
+7,6°), mas o relatório precisa dizer que aqui **não** somos fiéis ao artigo.
+
+Os codificadores literais estão agora em `src/uavwnn/encoding/artigo.py`
+(`TermometroArtigo`, `CircularArtigo`), com testes contra as eqs. (3.23) e
+(3.24). Servem de referência de fidelidade, não de substitutos.
+
+**Três achados que mudam esta spec:**
+
+1. **`R+1` palavras-código.** Um termômetro de resolução `R` tem exatamente
+   `R + 1` padrões distintos. É a medida exata do aliasing que `R` impõe, e o
+   teto que a varredura de `T` deve usar como referência.
+2. **O eixo da tupla é `n/B`, não `n`.** As dimensões de observação do artigo
+   estão no §5.1; `n/B` dele vai de 0,042 a 0,125, e o nosso `n/B = 0,060` fica
+   dentro. Ver **P14** no PRD — ela foi rebaixada de bloqueio para refinamento.
+3. **O circular quebra a convenção de padding.** Ele acende sempre `⌊R/2⌋`
+   bits, logo **não existe padrão todo-zero**. A propriedade que dispensa o bit
+   de validade não sobrevive a ele. As tarefas do artigo não têm slot vazio; a
+   nossa tem.
+
+**Se esta spec for revisitada**, o candidato sério é o circular para as
+dimensões **angulares**, onde o wrap-around é a topologia correta em vez de
+apenas conveniente. Replicação de §5.2.2 em `reports/replica-katopodis-52.md`:
+vence em baixa resolução, empata na configuração do artigo.
+
+---
+
 ---
 
 ## 0. O que mudou depois da SPEC-00

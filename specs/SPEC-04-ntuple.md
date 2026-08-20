@@ -5,6 +5,94 @@
 
 ---
 
+
+## 0-quater. A fundamentação teórica passou a ser testada (2026-08-15)
+
+A leitura da **dissertação** (fonte primária, `tmp/947841_compressed.pdf`)
+fechou a auditoria do capítulo 3 e do 4. O que era analogia agora é identidade
+verificada, em `tests/test_identidades_artigo.py`:
+
+| eq. | o que prova |
+|---|---|
+| (3.22) | a rede de regressão **é** um estimador de Nadaraya-Watson |
+| (4.16) | a rede de gradiente funcional **é** máquina de núcleo |
+| (4.19) | a atualização **é** um passo de gradiente funcional: `Δf(x) = αΔ·k(x_t,x)` |
+| (4.22)/(4.23) | mapa de características explícito e `⟨φ(w),φ(x)⟩ = k(w,x)` → núcleo **positivo-definido** |
+
+A (4.23) é a que sustenta as outras: o texto assinala que a passagem de (4.18)
+para (4.19) *"hinges on the kernel being positive-definite"*. Verificada no
+espectro — Gram 60×60, autovalor mínimo `> −1e−9`.
+
+**Consequência para a RNF-01 do PRD, que estava errada.** Ela prescrevia
+`η = c/N` supondo `‖φ‖² = N`. A eq. (4.22) normaliza por `1/√N`, então
+`‖φ‖² = 1`, e com a média da (4.12) o passo efetivo é **exatamente `η`,
+independente de `N`**. A regra foi retirada. O que de fato limita `α` é a
+variância do gradiente de política — medido, e monótono em `α`.
+
+**Novo método:** `treinar_componente(bits, indice, alvo)`, que o Algoritmo 4.1
+exige (`v[i](S_code, A)` atualiza só o discriminador da ação). É o que justifica
+o **contador por componente** — um contador compartilhado degradaria a média
+ponderada de (4.9) para as ações menos visitadas.
+
+---
+
+## 0-bis. Implementado — e validado contra o Ramnet.jl (2026-08-15)
+
+As duas redes estão em `src/uavwnn/wnn/redes.py`, com **armazenamento esparso
+por dicionário**. A motivação não é elegância: o apêndice A da dissertação usa
+tuplas de **16, 32 e 64 bits**, e `2^64` posições por RAM não cabem em array
+denso. O `NTupleRegressor` de `ntuple.py` segue servindo a SPEC-01 e a SPEC-03,
+preso a `n <= 16`.
+
+Mapeamento por **partição** (`randperm(B)` fatiado), como o `:uniform_random` do
+Ramnet: cada bit lido exatamente uma vez, logo **C4 fica fechada pela
+estrutura**. Quando `B` não divide `n` a última tupla é mais curta — fiel ao
+`Iterators.partition` do Julia, e exatamente o caso que quebra o `NTNModel` em
+PyTorch (`ceil` para os nós, `floor` na `conv1d`).
+
+Teste diferencial contra `Ramnet.jl@faster_hashing`: **desvio zero** em 5
+configurações, cobrindo os dois papéis e `phi` em {0,50; 0,85; 1,00}. Fixtures
+congeladas em `tests/fixtures/diferencial_redes/`.
+
+Relatório: `reports/spec04-redes-dissertacao.md`.
+
+**Pendência nova, e é a que mais importa aqui:** a SPEC-01 escolheu `n = 12` e a
+SPEC-03 achou `n = 10` dominante, mas as duas rodaram sobre o armazenamento
+denso, que torna `n = 32` caro e `n = 64` impossível. Essa escolha pode ser
+consequência do armazenamento, não do problema. Revarrer com
+`n` em {8, 12, 16, 24, 32} antes de fixar a Etapa 1.
+
+---
+
+## 0. Revisão — o código do Katopodis resolve a C2, e ela estava mal formulada
+
+A implementação de referência é do **próprio autor**: `rkatopodis/RLWorktable.jl` (agentes) e `rkatopodis/Ramnet.jl` (núcleo). Atenção: os `AltDiscriminators` estão na branch **`faster_hashing`**, não na `master`. Ambos MIT.
+
+**A pendência C2 partia de uma premissa errada.** O PRD pedia "gradiente funcional **com** fator de esquecimento" — combinação que **não existe** no código dele. São **dois modelos distintos, para papéis distintos**:
+
+| papel | modelo | `predict` | `train!` | guarda |
+|---|---|---|---|---|
+| **ator** | `FunctionalDiscriminator` | `Σ vᵢ / N` — média simples | `v -= grad` | só **valor** |
+| **crítico** | `RegressionDiscriminator` | `Σ vᵢ / Σ (1−γ^cᵢ)/(1−γ)` | acumula valor e contador | **valor + contador** |
+
+O denominador do crítico é a soma da série geométrica dos pesos de esquecimento — é a eq. 4.10 da dissertação, implementada literalmente.
+
+### Três consequências para esta spec
+
+**1. Implementar dois modelos, não um.** O escopo muda de "um núcleo com esquecimento opcional" para dois tipos com interfaces próximas mas semânticas diferentes. O `NTupleRegressor` que a SPEC-01 já escreveu (média sobre RAMs, `v -= η(f−y)`, sem contador) **já é o `FunctionalDiscriminator`** — o ator está pronto em forma mínima.
+
+**2. O crítico custa o dobro por entrada.** Valor **e** contador por posição endereçada. A medição de T1 da SPEC-03 mediu só o ator; a coluna *ator + crítico* precisa desse fator, e o medidor já lê `bytes_por_entrada` do modelo em vez de assumir.
+
+**3. O esquecimento não é ajuste do ator.** Ele existe porque o crítico faz **regressão para o retorno `G`**, cujo alvo se desloca conforme a política melhora. No ator não há distribuição-alvo se movendo dessa forma, e por isso não há γ.
+
+### Ainda em aberto
+
+**C3 — estrutura de armazenamento.** A SPEC-03 já mediu, na configuração da SPEC-01: chaves ordenadas **133,9 KB** contra hash aberto **273,6 KB**. A ordenada ganha por 2× em memória; falta medir a cauda de latência (T2) para decidir, já que o argumento a favor do hash era previsibilidade.
+
+**A ocupação não satura** (elasticidade 0,194 contra o critério de 0,05 do RNF-08). A poda por esquecimento deixa de ser refinamento e vira requisito: medir `occ_ε` — entradas com `|v| > ε` — junto com `occ`.
+
+---
+
 ## 1. Objetivo
 
 Entregar a biblioteca do aproximador — a rede n-tuple com gradiente funcional, esquecimento, armazenamento esparso e múltiplas cabeças de saída — **validada fora do laço de RL**, com contratos de API, layout de memória e instrumentação de custo já no formato que a SPEC-03 consome.
@@ -73,6 +161,10 @@ Consequência de projeto, e é obrigatória: **a varredura de `N` da SPEC-06 var
 Para a perda quadrática `L = ½(y − f)²`, um passo sobre a mesma amostra dá `f' = f + c·(y − f)`. A recorrência converge se, e somente se, `|1 − c| < 1`, isto é `0 < c < 2`. Este é o limite de LMS clássico, `η‖φ‖² < 2`, com `‖φ(x)‖² = N`.
 
 O achado do protótipo bate exatamente: `η = 0,05` com `N = 48` dá `c = η·N = 2,4 > 2` — divergência para NaN não é acidente numérico, é a recorrência instável. A regra `c ≲ 0,5` é uma margem de 4× sobre a fronteira teórica, e existe porque em RL o alvo `y` também se move.
+
+**Esta análise sobrevive à correção da RNF-01 — só fica mais simples.** A fronteira LMS `0 < c < 2` vale nas duas convenções; o que muda é a relação entre `c` e a taxa exposta. Na convenção de **soma**, `c = η·N`. Na de **média**, que é a do artigo (eq. 4.12) e a que adotamos, `‖φ‖² = 1` e portanto **`c = η` diretamente**: a regra é `η ≲ 0,5`, sem divisão por `N`. O NaN medido continua explicado, como artefato da convenção de soma do protótipo.
+
+**E há um segundo limite, muito mais apertado, que não é este.** A fronteira LMS governa a **regressão do crítico**. A taxa do **ator** é limitada pela *variância do gradiente de política*, e isso foi medido: no bandido contextual o pior erro entre 5 sementes cresce monotonicamente com `α`, com divergência já em `α = 0,05` — **dez vezes abaixo** da fronteira LMS. Confundir os dois faria a busca de `α` da SPEC-06 começar uma ordem de grandeza alto demais. É a instabilidade de passo fixo que a dissertação nomeia no capítulo 6.
 
 **RNF-01 codificado.** Asserção em tempo de construção **e** em tempo de execução (ver T-04.5). O valor divergente medido vira caso de teste de regressão.
 
@@ -227,7 +319,7 @@ Implementar os três modos da §4.4 e comparar em um teste de não-estacionaried
 
 ### T-04.5 — Guarda de estabilidade (RNF-01)
 
-1. **Construção:** `assert c <= c_max`, com `c_max = 0,5` por omissão, mensagem citando o achado medido (`η = 0,05`, `N = 48` ⇒ `c = 2,4` ⇒ NaN) e a fronteira teórica `c < 2`.
+1. **Construção — reformulada.** A guarda `assert c <= c_max` com `c = η·N` pertencia à convenção de **soma**. Na convenção de **média** da eq. (4.12) o passo é independente de `N`, então não há `c` a limitar. A guarda que sobra é sobre o **passo efetivo**: `assert |α · Δ| <= passo_max` no momento da atualização, com `passo_max` configurável. O NaN medido no protótipo (`η = 0,05`, `N = 48`) foi artefato da soma e **não se reproduz** no modelo do artigo.
 2. **Execução:** verificação de finitude de `f` e do gradiente recebido, em modo `debug` sempre e em modo produção a cada `K` passos (`K` configurável, por omissão 1000) — o custo por passo é o que decide, e ele entra na medida de latência da SPEC-03.
 3. **Teste de regressão do NaN:** configuração `N = 48`, `c = 2,4` deve **falhar na construção**; forçando a guarda desligada, deve divergir em menos de `X` passos na regressão sintética. Congelar `X` medido.
 4. **Diagnóstico exportado:** `‖W‖∞` das entradas ocupadas e `max |Δf|` por passo, para a SPEC-05 conseguir distinguir "divergiu" de "não aprendeu".

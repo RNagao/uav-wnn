@@ -4,6 +4,33 @@
 **Alimenta:** `G1` (SPEC-06), `G3`/H6 (SPEC-09), toda tabela de desempenho de E2
 **Referência:** PRD §5.1, §5.2, §6.1, §6.4, RNF-06 · Lamenza §3, §5.1–5.3, §7.1–7.2, tab. 3.1 e 7.1
 
+
+## 0-bis. Esta spec passou a ser o único bloqueio estatístico (2026-08-15)
+
+Com a auditoria do artigo concluída (`specs/PLANO-TESTES.md`), o **teste A/A** é
+a lacuna mais antiga e agora a mais exposta do repositório. Todo intervalo de
+confiança já reportado pressupõe um procedimento cuja calibração **nunca foi
+verificada** — e a lista não é curta:
+
+| onde | o que depende do IC |
+|---|---|
+| SPEC-00 | a validação 9/9 contra a fig. 7.3, e `greedy` vs `smart` |
+| SPEC-03 | a comparação de custo pareada |
+| T-B2 | a replicação de §5.2.2 (que dá empate num regime e vitória no outro) |
+
+**Dois itens a acrescentar ao escopo**, ambos saídos desta rodada:
+
+- **T-02.A — teste A/A.** Dois braços do mesmo procedimento, sem diferença real;
+  a taxa de rejeição tem de bater o nominal. É o que valida o resto.
+- **T-02.B — cobertura nominal do bootstrap pareado** sob a distribuição de
+  retornos **real**, não gaussiana. Os retornos de episódio são censurados em
+  `max_episode_length` e fortemente assimétricos.
+
+A SPEC-06 já tem um eixo de varredura que depende disso: a busca de `α` precisa
+de múltiplas sementes, e comparar sementes é exatamente onde o IC pareado entra.
+
+---
+
 ---
 
 ## 0. Revisão após a SPEC-00 — os baselines já existem

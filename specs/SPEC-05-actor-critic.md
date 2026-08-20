@@ -6,6 +6,119 @@
 
 ---
 
+
+## 0-ter. A dissertação corrige o código do autor em dois pontos (2026-08-15)
+
+A §0-bis tratava o `ContinousFunctionalAC.jl` como referência. Com a leitura da
+**dissertação** — fonte primária — dois pontos dela **prevalecem sobre o código**:
+
+**1. `Σ` e `α` são constantes, não recozidas.** O apêndice A lista as duas como
+hiperparâmetros fixos (`Σ` = 0,5 em Mountain Car, 0,3 em Hopper). O recozimento
+existe só no Julia. Implementado desligado por padrão, e a **D6 do PRD foi
+corrigida** — ela prescrevia recozimento.
+
+**2. `Σ` é covariância, não desvio (P13).** A eq. (4.34) diz *"predefined
+**covariance** matrix"*, logo a amostragem correta é `√Σ·z`. O
+`ContinousActionPolicy.jl` amostra `Σ·z` mas usa `inv(Σ)` no gradiente — trata o
+mesmo número como desvio num lugar e variância no outro. **Seguimos o artigo**;
+`escala_como_desvio=True` reproduz o Julia. Com `Σ = 0,25` a diferença é **fator
+2 na exploração**, então a escolha tem de aparecer na tabela de hiperparâmetros.
+
+**Estado da implementação.** `src/uavwnn/rl/politica.py` e
+`src/uavwnn/rl/actor_critic.py`. As duas redes são **idênticas bit a bit** ao
+`Ramnet.jl` em 5 configurações (`tests/test_redes.py`), e as identidades do
+capítulo 4 estão testadas (`tests/test_identidades_artigo.py`).
+
+**O laço do Algoritmo 4.4 continua sem oráculo diferencial** — validá-lo exigiria
+rodar o agente Julia inteiro, amarrado aos tipos de ambiente e buffer do
+`RLWorktable.jl`. Há invariantes estruturais e dois testes de comportamento. **O
+relatório final precisa declarar isso**, e está registrado em
+`specs/PLANO-TESTES.md` §5.
+
+---
+
+## 0-bis. Implementado (2026-08-15)
+
+`src/uavwnn/rl/actor_critic.py` traz o **Algoritmo 4.4** transcrito do
+pseudocódigo da p. 48, e `src/uavwnn/rl/politica.py` a gaussiana de covariância
+predefinida das eqs. (4.34)/(4.35).
+
+Dois pontos que o pseudocódigo esconde e que o código do autor esclarece: a
+vantagem `delta = G - f_value(S_tau)` usa o valor **antes** do treino do
+crítico; e o crítico **acumula** `G` pela eq. (4.8), não faz um passo de
+gradiente para o alvo `G`.
+
+Recozimento de `alpha` e de `Sigma` existem no `ContinousFunctionalAC.jl` mas
+**não na dissertação** (apêndice A lista ambos constantes). Ficam desligados por
+padrão.
+
+**Divergência P13:** a eq. (4.34) diz "predefined **covariance** matrix", logo a
+amostragem correta é `sqrt(Sigma)*z`. O Julia amostra `Sigma*z` mas usa
+`inv(Sigma)` no gradiente. Seguimos o artigo; `escala_como_desvio=True`
+reproduz o Julia. Com `Sigma = 0,25` a diferença é fator 2 na exploração.
+
+**Achado que afeta a SPEC-06:** a instabilidade de passo fixo é mensurável. No
+bandido contextual, o pior erro entre 5 sementes cresce **monotonicamente** com
+`alpha` (0,044 em 0,002 -> 0,238 em 0,05), e em 0,05 uma semente diverge. A
+busca de `alpha` precisa de faixa larga e várias sementes; meu primeiro palpite
+era 25x grande demais.
+
+**Sem oráculo:** as duas redes são idênticas ao Ramnet.jl, mas o *laço* não foi
+validado diferencialmente — só por invariantes estruturais e dois testes de
+comportamento. O relatório final precisa declarar isso.
+
+Relatório: `reports/spec04-redes-dissertacao.md`.
+
+---
+
+## 0. Revisão — o algoritmo está no código do autor, e pode ser copiado
+
+`rkatopodis/RLWorktable.jl`, arquivo `src/Agents/WNN/PG/ContinousFunctionalAC.jl`. MIT. Deixa de ser reconstrução a partir do texto e passa a ser adaptação de código existente.
+
+### O algoritmo, verbatim
+
+**Actor-critic de `m` passos com retorno Monte Carlo dentro do buffer.** Não é TD(0):
+
+```
+se episódio terminou:            G = 0
+senão, com buffer cheio:         G = V(s_atual)          # bootstrap
+para cada transição, de trás para frente:
+    G  = r + γ·G
+    δ  = G − V(s)                                        # vantagem
+    atualiza ator  com δ
+    treina crítico por REGRESSÃO para G                  # não para o erro TD
+```
+
+O crítico é treinado por **regressão para o retorno `G`**, não para o erro TD. É isso que justifica o esquecimento nele: o alvo se desloca conforme a política melhora.
+
+### A política contínua, e o que ela não resolve
+
+`ContinousActionPolicy` emite um vetor em `R^AS` e amostra:
+
+```
+a = cov·randn(AS) + predict(f, obs)          # gaussiana isotrópica
+grad = inv(cov)·(pred − a)                   # gradiente da perda
+train!(f, obs, lr · grad · δ)                # escalado pela vantagem
+```
+
+**Katopodis não trata ação circular.** Para o Hopper — torques numa caixa — a gaussiana isotrópica basta. Para o nosso `θ ∈ [0, 2π)` não: a média linear de ângulos continua inválida.
+
+**A recomendação de normal projetada (C1) se mantém, e encaixa nativamente.** O `FunctionalDiscriminator{AS}` já é multi-saída: basta `AS = 3` — `u₁, u₂` para o rumo, `μ_s` para a velocidade —, aplicar `θ = atan2(z₂, z₁)` sobre a amostra, e o resto do laço fica idêntico. É o `d = 3` que esta spec já previa.
+
+### Detalhes de treino a copiar
+
+| Detalhe | Como no original |
+|---|---|
+| **Covariância da política** | **Recozida**, não aprendida: `(1−α)·start_cov + α·end_cov`, `α = update_count / cov_decay`. **Elimina o hiperparâmetro** que esta spec listava como risco da normal projetada |
+| **Taxa de aprendizado** | Recozida pela mesma forma linear |
+| **Escala do gradiente do ator** | Pela **vantagem `δ`**, não pelo retorno `G` |
+| **Particionamento das tuplas** | `:uniform_random` é o default |
+| **Crítico** | `RegressionDiscriminator` com γ; **ator** `FunctionalDiscriminator` sem γ (ver SPEC-04 §0) |
+
+> **Ressalva de leitura.** O default `end_learning_rate = 1e5` no construtor de `ContinousActionPolicy` é quase certamente um erro de digitação por `1e-5` — uma taxa final maior que a inicial contraria o propósito do recozimento. Não copiar sem verificar contra os experimentos da dissertação.
+
+---
+
 ## 1. Objetivo
 
 Entregar **duas políticas treináveis e intercambiáveis** sobre a mesma interface, com o mesmo algoritmo, a mesma observação e a mesma recompensa:

@@ -5,6 +5,50 @@
 
 ---
 
+
+## 0. Revisão pela dissertação — três eixos de varredura mudaram (2026-08-15)
+
+| eixo | como era | como fica | por que |
+|---|---|---|---|
+| tupla | `n ∈ {8, 10, 12}` | **`n/B ∈ {0,04; 0,06; 0,09; 0,12}`** | O que governa a generalização é a razão, não `n` — testado contra §3.2.4. A faixa cobre a do artigo (0,042 a 0,125) |
+| RAMs | `N ∈ {16, 48, 128}` livre | **`N = ⌈B/n⌉`, determinado** | O mapeamento é **partição**, como o `:uniform_random` do Ramnet. Deixa de ser eixo livre, e a cobertura de bits vira 1,0 por construção (**C4 fechada**) |
+| taxa `α` | não era eixo | **obrigatório, faixa larga, múltiplas sementes** | Ver abaixo |
+
+**A busca de `α` não é opcional, e é a mudança mais importante para esta spec.**
+Medido no bandido contextual, 5 sementes, 20 000 passos:
+
+| `α` | pior erro entre as sementes |
+|---|---|
+| 0,002 | **0,044** |
+| 0,010 | 0,072 |
+| 0,050 | 0,238 |
+
+**Monótono**, com uma semente divergindo em `α = 0,05`. Meu primeiro palpite era
+`α = 0,05` — **25× grande demais** —, e a curva resultante pareceria limitação do
+modelo. É a instabilidade de passo fixo que a dissertação nomeia no capítulo 6 ao
+sugerir TRPO/PPO.
+
+**Se o portão G1 não for atingido, a instabilidade de `α` é a primeira suspeita**,
+antes de resolução, tamanho de tupla ou variância da gaussiana. E a saída já está
+nomeada pelo próprio autor.
+
+**Predição do artigo a checar em `φ` (§5.2.3).** O texto apresenta `φ` como
+compromisso: 0 descarta o histórico, 1 ignora a não-estacionariedade. Efeito
+**monótono** na nossa varredura significaria que o problema não é
+suficientemente não-estacionário para o esquecimento importar — resultado a
+reportar, não bug.
+
+**Eixo retirado:** simples vs circular. O circular quebra a convenção de padding
+(sem padrão todo-zero). Fica como sub-experimento opcional para dimensões
+angulares. Ver **P15** e `reports/replica-katopodis-52.md`.
+
+**Ganho de escopo:** o Algoritmo 4.1 (SARSA) está implementado em
+`src/uavwnn/rl/sarsa.py` e aprende CartPole. Não é o algoritmo desta spec — a
+ação é contínua —, mas dá um segundo ponto de validação do núcleo n-tuple num
+laço de RL real, contra uma tarefa do capítulo 5.
+
+---
+
 ## 1. Objetivo
 
 Produzir os **números** e o **veredito de H1**: a política n-tuple Actor-Critic, sobre o problema de Lamenza inalterado e sem ruído, aprende? Quanto custa em tempo de conclusão, tamanho de modelo e latência, comparada — em pareamento estrito — a um Actor-Critic com MLP densa, e comparada aos alvos publicados por Lamenza?
@@ -281,7 +325,9 @@ Total: `4 + 3 + 3 + 3 + 2 = 15` pontos, `−4` já visitados ⇒ ~**11 pontos no
 
 **Segunda passada.** Após a descida, repetir os **dois eixos de maior efeito medido**. Se o ótimo não se mover, declarar estável. Se se mover, reportar a **interação** — e não afirmar independência dos eixos. A limitação da busca coordenada (não enxerga interação de ordem alta) fica **declarada no relatório**, não escondida.
 
-> **Confundimento `N` × `η` (RNF-01).** `‖φ(x)‖² = N` ⇒ o passo efetivo é `η·N`, e a regra codificada é `η = c/N` com `c ≲ 0,5`. Logo, **variar `N` com `η` fixo mede outra coisa**: mede taxa de aprendizado, não capacidade. Na varredura de `N`, `η` é recomputado por construção, e `c ∈ {0,1; 0,25; 0,5}` é varrido **separadamente** no ponto base, antes do eixo 3.
+> **~~Confundimento `N` × `η`~~ — DISSOLVIDO, e por isso a varredura fica mais simples.** A versão anterior avisava que `‖φ(x)‖² = N` faz o passo efetivo ser `η·N`, logo variar `N` com `η` fixo mediria taxa de aprendizado. Isso vale para a convenção de **soma**; a eq. (4.12) do artigo usa a **média**, e a eq. (4.22) normaliza o mapa por `1/√N`, de modo que `‖φ(x)‖² = 1`. **O passo efetivo é exatamente `η`, independente de `N`** (testado em `test_ator_usa_media_e_o_passo_independe_de_N`). Não há reparametrização a fazer.
+>
+> **O confundimento real é outro, e foi medido.** O que limita `α` é a variância do gradiente de política: o pior erro entre 5 sementes cresce **monotonicamente** com `α` (0,044 em 0,002 contra 0,238 em 0,05, com divergência em 0,05). Logo `α` é **eixo de primeira classe com múltiplas sementes**, não um parâmetro derivado de `N`.
 
 **Seleção** sempre pelo banco `val`, nunca pelo `test`.
 
@@ -373,7 +419,7 @@ Cada item **medido**, não implementado.
 | **`CT_succ` premia política que desiste** | `SR` sempre ao lado; `CT_cens` como métrica primária, que é também a convenção de Lamenza |
 | **Escala do alvo de valor sob a recompensa 7-2** (`V ≈ 100`) estoura o crítico n-tuple | normalização do alvo por `(1−γ)` decidida e registrada **antes** da campanha; é hiperparâmetro do aproximador, não desvio da §5.4 |
 | **Busca coordenada não vê interações** | segunda passada nos dois eixos de maior efeito; limitação declarada no relatório |
-| **`N` varrido com `η` fixo mede taxa de aprendizado, não capacidade** | `η = c/N` por construção (RNF-01); `c` varrido separadamente no ponto base |
+| ~~`N` varrido com `η` fixo mede taxa de aprendizado~~ **não se aplica** | A convenção de média da eq. (4.12) torna o passo independente de `N`. O risco real é **subestimar a variância de `α`**: mitigado varrendo `α` em faixa larga com múltiplas sementes |
 | **`(n, N)` selecionado em `B` da célula base não vale para `Na = 8`** | reverificar utilização de endereços (T-01.4) ao mudar de célula; prever o custo na campanha |
 | **Ocupação das LUTs não satura dentro de `B_max`** | RNF-08: curva obrigatória; se não saturar, "kilobytes" sai com a ressalva do horizonte |
 | **WNN perde no p99 por causa do hash** | medir a variante de LUT densa e reportar o par (RNF-10) |

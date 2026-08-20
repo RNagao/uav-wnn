@@ -209,11 +209,11 @@ RNF-06 tem três cláusulas. Cada uma vira uma checagem executável em `tools/ch
 |---|---|---|---|
 | 1 Introdução | contexto, lacuna, contribuições (as três: aproximador barato, custo como figura de mérito, fusão sobre o canal global) | — (PRD §1, §2) | — |
 | 2 Trabalhos relacionados | Lamenza; Katopodis; MADDPG; interseção de covariância (Julier & Uhlmann) | — | — |
-| 3.1 Fundamentação — rede n-tuple | `f_k(x) = ⟨W_k, φ(x)⟩` com `φ` binário esparso de `‖φ‖² = N`: **modelo linear sobre features binárias esparsas**, isto é, **tile coding com ladrilhamento aleatório**; herda as garantias de convergência de TD com aproximação linear. RNF-01 (`η = c/N`) sai como **consequência** de `‖φ‖² = N`, não como truque de engenharia. Fator de esquecimento e não-estacionariedade (RNF-04) | 04 (validação numérica), 01 (geometria) | figura de ladrilhamento; curva `d_obs × d_tuple` (SPEC-01 T-01.3) |
+| 3.1 Fundamentação — rede n-tuple | **Não escrever por analogia.** A dissertação *prova* o que precisamos, e nós *testamos* cada passo: a rede de regressão **é** um estimador de Nadaraya-Watson (3.22); a de gradiente funcional **é** máquina de núcleo, `f(x) = Σ_j α_j k(x,x_j)` (4.16); a atualização **é** um passo de gradiente funcional que se propaga pelo núcleo, `Δf(x) = αΔ·k(x_t,x)` (4.19); e o núcleo `k = 1 − δ/N` **é positivo-definido**, via o mapa explícito da (4.22) e a identidade `⟨φ(w),φ(x)⟩ = k(w,x)` da (4.23). É a (4.23) que sustenta as outras — o texto assinala que (4.18)→(4.19) *hinges on the kernel being positive-definite*. **A RNF-01 antiga (`η = c/N`) não entra: ela supunha `‖φ‖² = N`, e a (4.22) normaliza por `1/√N`.** Fator de esquecimento e não-estacionariedade (RNF-04) | `tests/test_identidades_artigo.py` (21 testes), `specs/PLANO-TESTES.md` | figura de ladrilhamento; curva `d_obs × d_tuple` (SPEC-01 T-01.3); espectro da matriz de Gram |
 | 3.2 Fundamentação — filtro de Kalman | KF linear; **KF com entrada de controle** (`x̂ + u·dt`) e por que a ação da política é informação disponível de graça; filtro de informação para fonte estática; NEES/NIS como teste de consistência | 07 | — |
 | 3.3 Fundamentação — interseção de covariância | por que o KF ingênuo diverge sob correlação desconhecida; CI como limite conservador | 07, 09 | — |
 | 4.1 Método — o problema reproduzido | MDP de Lamenza verbatim: observação eq. 5-1, ação contínua eq. 3-2, recompensa eq. 5-6, cenário tab. 7.1 | 00 | tabela de parâmetros do cenário |
-| 4.2 Método — codificador | esquema escolhido, `T`, cobertura de bits `N·n/B`, binning por slot | **01** | `tables/spec01-*`, figuras de geometria |
+| 4.2 Método — codificador | esquema escolhido, `T`, binning por slot. **A cobertura de bits deixou de ser número a reportar e passou a ser propriedade estrutural:** com o mapeamento por partição do `:uniform_random` ela é 1,0 por construção (achado C4 fechado). Mencionar o contraste com a amostragem por RAM, onde `N·n/B` podia ficar abaixo de 1 | **01** | `tables/spec01-*`, figuras de geometria |
 | 4.3 Método — aproximadores | n-tuple Actor-Critic; MLP AC pareada; parameter sharing | 04, 05 | — |
 | 4.4 Método — protocolo de custo | T1 (alocado/ocupado/**realizado** + mapeamento de tuplas), T2 (mediana/p99, decomposto, com e sem arcabouço), T3 (operações por tipo) | **03** | — |
 | 4.5 Método — protocolo de avaliação | 500 episódios pareados, bootstrap, sementes, hardware | **10 (esta)** | `manifest` agregado |
@@ -285,7 +285,7 @@ H3:
 | H1 | G1 | 06 (com 03) | tempo de conclusão pareado + T1 realizado + T3 (zero MACs fp) |
 | H2 | G2 | 08 | curvas de degradação WNN × MLP sobre σ; ICs separam? |
 | H3 | G2 | 08 | degrau 4 vs degrau 0, diferença pareada |
-| H4 | G2 | 08 | degrau 5 vs degrau 4 + inspeção de trajetórias |
+| ~~H4~~ | — | — | **RETIRADA por D13**: o mecanismo era o canal do sensor, fora do escopo. O degrau 5 permanece como ablação sem hipótese associada |
 | H5 | G3 | 09 | erro de estimativa 6c vs 6a + NEES/NIS de 6b |
 | H6 | G3 | 09 | tempo de conclusão vs heurística gulosa, `Na ≥ 2` |
 
@@ -412,6 +412,6 @@ Cinco entradas ao fim do projeto (semanas 1–4 e fechamento). É a única taref
 5. **Existe CI hospedado?** Se o repositório não for para uma forge com Actions, `make ci` roda por hook de `pre-push` local — mais frágil, porque é suprimível com `--no-verify`.
 6. **Modo estrito de HG-2.** Reprovar `make repro` quando o NEES/NIS não passou é o comportamento correto no fim, mas trava o trabalho do dia enquanto o filtro está sendo sintonizado. Proposta: estrito no `make ci` e na tag final, permissivo (só tarja) no `repro` do dia a dia. Confirmar.
 7. **Numeração das specs de fusão.** A SPEC-01 cita "o filtro de Kalman (SPEC-05)" e "a varredura com estimativa filtrada é da SPEC-06", enquanto o `specs/README.md` atribui a fusão local à SPEC-07 e a Etapa 2 à SPEC-08. O mapa da §T-10.7 seguiu o README. A divergência precisa ser resolvida numa das duas fontes, porque o `index.json` vai carregar o campo `spec` e ele tem que apontar para algo estável.
-8. **P3 (posição estimada vs distância/RSSI) afeta o capítulo 6 inteiro.** A recomendação do PRD é o caso linear. Se ficar aberta até a semana 3, o esqueleto da seção 3.2 (filtro de informação vs EKF/UKF) precisa ser reescrito tarde. Vale fechá-la por decisão na semana 1, mesmo sem experimento?
+8. ~~**P3** (posição estimada vs distância/RSSI)~~ **fechada por D13**: o canal do sensor saiu do escopo, e o capítulo 6 do relatório perde essa dependência. Texto antigo: A recomendação do PRD é o caso linear. Se ficar aberta até a semana 3, o esqueleto da seção 3.2 (filtro de informação vs EKF/UKF) precisa ser reescrito tarde. Vale fechá-la por decisão na semana 1, mesmo sem experimento?
 9. **Idioma de E2.** Português (disciplina) ou inglês (aproveitamento posterior como artigo)? Muda o esforço de redação e o reaproveitamento do texto de fundamentação.
 10. **O deck de 5 slides da semana 1 é apresentado a alguém?** Se houver um ponto de controle intermediário com o professor, ele deve virar marco explícito do cronograma — feedback na semana 2 vale muito mais que na semana 4.
