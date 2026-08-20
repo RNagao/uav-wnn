@@ -1,0 +1,283 @@
+{
+  "config": {
+    "largura_ator": 256,
+    "largura_critico": 512,
+    "n_acoes": 2,
+    "repeticoes": 8000,
+    "threads": 1,
+    "batch": 1,
+    "dtype": "fp32"
+  },
+  "celulas": {
+    "a_2-s_12": {
+      "num_drones": 2,
+      "num_sensores": 12,
+      "tamanho": {
+        "obs_dim": 27,
+        "params_ator": 73474,
+        "params_critico": 293377,
+        "bytes_ator_fp32": 293896,
+        "bytes_critico_fp32": 1173508,
+        "bytes_arquivo": 1472652,
+        "camadas_ator": [
+          27,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 36.5115,
+        "p99_us": 155.39335000000005,
+        "min_us": 34.269
+      },
+      "operacoes": {
+        "mult_fp": 72960,
+        "soma_fp": 73474,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 146948
+      }
+    },
+    "a_2-s_24": {
+      "num_drones": 2,
+      "num_sensores": 24,
+      "tamanho": {
+        "obs_dim": 27,
+        "params_ator": 73474,
+        "params_critico": 293377,
+        "bytes_ator_fp32": 293896,
+        "bytes_critico_fp32": 1173508,
+        "bytes_arquivo": 1472652,
+        "camadas_ator": [
+          27,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 36.5115,
+        "p99_us": 155.39335000000005,
+        "min_us": 34.269
+      },
+      "operacoes": {
+        "mult_fp": 72960,
+        "soma_fp": 73474,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 146948
+      }
+    },
+    "a_2-s_36": {
+      "num_drones": 2,
+      "num_sensores": 36,
+      "tamanho": {
+        "obs_dim": 27,
+        "params_ator": 73474,
+        "params_critico": 293377,
+        "bytes_ator_fp32": 293896,
+        "bytes_critico_fp32": 1173508,
+        "bytes_arquivo": 1472652,
+        "camadas_ator": [
+          27,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 36.5115,
+        "p99_us": 155.39335000000005,
+        "min_us": 34.269
+      },
+      "operacoes": {
+        "mult_fp": 72960,
+        "soma_fp": 73474,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 146948
+      }
+    },
+    "a_4-s_12": {
+      "num_drones": 4,
+      "num_sensores": 12,
+      "tamanho": {
+        "obs_dim": 31,
+        "params_ator": 74498,
+        "params_critico": 331265,
+        "bytes_ator_fp32": 297992,
+        "bytes_critico_fp32": 1325060,
+        "bytes_arquivo": 1628300,
+        "camadas_ator": [
+          31,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 34.994,
+        "p99_us": 115.09263000000006,
+        "min_us": 32.843
+      },
+      "operacoes": {
+        "mult_fp": 73984,
+        "soma_fp": 74498,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 148996
+      }
+    },
+    "a_4-s_24": {
+      "num_drones": 4,
+      "num_sensores": 24,
+      "tamanho": {
+        "obs_dim": 31,
+        "params_ator": 74498,
+        "params_critico": 331265,
+        "bytes_ator_fp32": 297992,
+        "bytes_critico_fp32": 1325060,
+        "bytes_arquivo": 1628300,
+        "camadas_ator": [
+          31,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 34.994,
+        "p99_us": 115.09263000000006,
+        "min_us": 32.843
+      },
+      "operacoes": {
+        "mult_fp": 73984,
+        "soma_fp": 74498,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 148996
+      }
+    },
+    "a_4-s_36": {
+      "num_drones": 4,
+      "num_sensores": 36,
+      "tamanho": {
+        "obs_dim": 31,
+        "params_ator": 74498,
+        "params_critico": 331265,
+        "bytes_ator_fp32": 297992,
+        "bytes_critico_fp32": 1325060,
+        "bytes_arquivo": 1628300,
+        "camadas_ator": [
+          31,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 34.994,
+        "p99_us": 115.09263000000006,
+        "min_us": 32.843
+      },
+      "operacoes": {
+        "mult_fp": 73984,
+        "soma_fp": 74498,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 148996
+      }
+    },
+    "a_8-s_12": {
+      "num_drones": 8,
+      "num_sensores": 12,
+      "tamanho": {
+        "obs_dim": 39,
+        "params_ator": 76546,
+        "params_critico": 431617,
+        "bytes_ator_fp32": 306184,
+        "bytes_critico_fp32": 1726468,
+        "bytes_arquivo": 2037900,
+        "camadas_ator": [
+          39,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 35.332,
+        "p99_us": 106.75109000000005,
+        "min_us": 33.743
+      },
+      "operacoes": {
+        "mult_fp": 76032,
+        "soma_fp": 76546,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 153092
+      }
+    },
+    "a_8-s_24": {
+      "num_drones": 8,
+      "num_sensores": 24,
+      "tamanho": {
+        "obs_dim": 39,
+        "params_ator": 76546,
+        "params_critico": 431617,
+        "bytes_ator_fp32": 306184,
+        "bytes_critico_fp32": 1726468,
+        "bytes_arquivo": 2037900,
+        "camadas_ator": [
+          39,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 35.332,
+        "p99_us": 106.75109000000005,
+        "min_us": 33.743
+      },
+      "operacoes": {
+        "mult_fp": 76032,
+        "soma_fp": 76546,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 153092
+      }
+    },
+    "a_8-s_36": {
+      "num_drones": 8,
+      "num_sensores": 36,
+      "tamanho": {
+        "obs_dim": 39,
+        "params_ator": 76546,
+        "params_critico": 431617,
+        "bytes_ator_fp32": 306184,
+        "bytes_critico_fp32": 1726468,
+        "bytes_arquivo": 2037900,
+        "camadas_ator": [
+          39,
+          256,
+          256,
+          2
+        ]
+      },
+      "latencia": {
+        "mediana_us": 35.332,
+        "p99_us": 106.75109000000005,
+        "min_us": 33.743
+      },
+      "operacoes": {
+        "mult_fp": 76032,
+        "soma_fp": 76546,
+        "comparacoes": 512,
+        "transcendental_fp": 2,
+        "total": 153092
+      }
+    }
+  }
+}

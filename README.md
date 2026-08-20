@@ -92,6 +92,136 @@ A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O err
 
 Como as features entram **sem tocar no cenário**, com os diagramas do fluxo: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 
+## Baseline MADDPG — como rodar
+
+O submodule de referência traz os **pesos publicados** por Lamenza: 9 checkpoints
+(`Na ∈ {2,4,8} × Ns ∈ {12,24,36}`, 45 MB), o código de treino e o harness de
+avaliação. **Não é preciso treinar nada** — retreinar seriam ~7 dias de GPU por
+célula.
+
+`torch` é um grupo **opcional**, porque são ~200 MB só para ler os
+`.cleanrl_model` (que são arquivos do `torch.save`):
+
+```bash
+uv sync --group baseline
+git submodule update --init --recursive        # se ainda não fez
+```
+
+### 1. Tamanho do modelo e tempo de inferência — segundos
+
+```bash
+uv run --group baseline python scripts/spec02_baseline_maddpg.py
+```
+
+Lê os `state_dict` e mede o forward. Não roda o ambiente.
+
+| `Na` | obs | params do ator | ator fp32 | mediana | mult. fp |
+|---|---|---|---|---|---|
+| 2 | 27 | 73 474 | 287,0 KB | 36,5 µs | 72 960 |
+| 4 | 31 | 74 498 | 291,0 KB | 35,0 µs | 73 984 |
+| 8 | 39 | 76 546 | 299,0 KB | 35,3 µs | 76 032 |
+
+### 2. Tempo de conclusão e trajetórias — ~4 min
+
+```bash
+uv run --group baseline python scripts/spec02_maddpg_rollout.py --episodios 200
+```
+
+Roda a política no ambiente de referência, com a configuração do `test.py`
+conferida parâmetro por parâmetro. Gera as 9 trajetórias em `reports/img/maddpg/`.
+
+### 3. Campanha com média e desvio — ~2 a 3 h
+
+```bash
+uv run --group baseline python scripts/spec02_maddpg_campanha.py
+```
+
+**100 runs × 200 episódios × 9 células.** A estrutura é o ponto:
+
+```
+1 episódio  →  um tempo de conclusão
+1 RUN       →  E = 200 episódios (o `total_runs` do test.py de Lamenza)
+1 campanha  →  R = 100 runs, e o reportado é média ± desvio SOBRE AS RUNS
+```
+
+Cada run é uma **réplica da campanha de avaliação dele**, então o desvio mede
+*quanto o número publicado variaria numa nova campanha* — não quanto um episódio
+varia, que é ~14× maior.
+
+**Em segundo plano**, porque são horas:
+
+```bash
+nohup uv run --group baseline python scripts/spec02_maddpg_campanha.py \
+  > /tmp/campanha.log 2>&1 &
+
+tail -f /tmp/campanha.log                                    # progresso e ETA
+for f in reports/maddpg/*.csv; do \
+  echo "$(basename $f): $(($(wc -l < $f)-1))/100"; done      # runs por célula
+```
+
+Pode interromper a qualquer momento — o CSV é gravado linha a linha, então você
+perde no máximo uma run, e o cache retoma de onde parou.
+
+**Variações:**
+
+```bash
+# rápido, mesmo formato: ~30 min
+uv run --group baseline python scripts/spec02_maddpg_campanha.py --runs 20
+
+# só as células que interessam (o padrão são as 9 da tab. 7.1)
+uv run --group baseline python scripts/spec02_maddpg_campanha.py --celulas 4:24,8:36
+
+# agrega o cache sem rodar nada — instantâneo
+uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo
+```
+
+Como biblioteca, recebendo o array de cenários direto:
+
+```python
+import sys; sys.path.insert(0, "scripts")
+from spec02_maddpg_campanha import campanha, CENARIOS_LAMENZA
+
+campanha()                              # as 9 de Lamenza, 100 runs
+campanha([(4, 24), (8, 36)], runs=30)   # subconjunto
+```
+
+Devolve `{(Na, Ns): {figura: (média, desvio)}}`, para encadear sem passar pelo CSV.
+
+### Resultado da campanha, 900 runs
+
+| célula | conclusão (s) | sucesso | separação (m) |
+|---|---|---|---|
+| `a_2-s_12` | 18,44 ± 0,71 | 0,9995 | 92,8 |
+| `a_2-s_24` | 30,32 ± 2,37 | 0,9944 | 100,8 |
+| `a_2-s_36` | 35,36 ± 2,19 | 0,9964 | 116,6 |
+| `a_4-s_12` | 10,07 ± 0,13 | 1,0000 | 80,1 |
+| `a_4-s_24` | 13,73 ± 0,15 | 1,0000 | 94,2 |
+| `a_4-s_36` | 16,13 ± 0,14 | 1,0000 | 95,1 |
+| `a_8-s_12` | **15,11 ± 0,47** | 0,9999 | 76,6 |
+| `a_8-s_24` | 9,65 ± 0,08 | 1,0000 | 73,7 |
+| `a_8-s_36` | 12,87 ± 0,16 | 1,0000 | 88,2 |
+
+**Validação 3/3 dentro de um desvio** contra os valores publicados (29,6 / 13,8 /
+9,7 em `Ns = 24`). Junto com a validação 9/9 do guloso, fecha o pipeline para
+política aprendida **e** para heurística.
+
+**Coordenação, com número:** o MADDPG separa os UAVs de 74 a 117 m; o `greedy`
+mediu **~0,1 m** contra 20 m de alcance de comunicação. Duas a três ordens de
+grandeza.
+
+### Três ressalvas
+
+1. **Não há checkpoint para `Na = 1`.** A Etapa 1 começa ali e não tem baseline
+   MADDPG; pedir `--celulas 1:12` recusa em voz alta.
+2. **A linha `Na = 2` é até 15× menos estável** que as outras (desvio entre runs
+   de 2,37 s contra 0,15 s). Comparar a nossa política ali exige mais sementes.
+3. **`a_8-s_12` é anômala** — 15,11 s, pior que células com mais sensores. Aquela
+   pasta foi retreinada em set/2024 depois de um treino interrompido; é
+   propriedade dos pesos publicados, não do nosso código.
+
+Relatórios: [`reports/spec02-baseline-maddpg.md`](reports/spec02-baseline-maddpg.md)
+e [`reports/spec02-baseline-maddpg-rollout.md`](reports/spec02-baseline-maddpg-rollout.md).
+
 ## Instalação
 
 Requer [uv](https://docs.astral.sh/uv/). O ambiente vem de um **submodule**:
@@ -110,12 +240,22 @@ uv run pytest -q                    # 18 testes, ~1 min
 | `spec00_visualizar.py` | **visualização 3D ao vivo** no navegador; `--diagnostico` testa o servidor sem navegador |
 | `spec00_validar_guloso.py` | reproduz a fig. 7.3 nas 9 células |
 | `spec00_budget.py` | custo de simulação por célula |
+| `spec01_estudo.py` | estudo de binarização; escolhe o codificador com evidência |
+| `spec03_custo.py` | harness de custo: T1 (tamanho) e T3 (operações) |
+| `spec04_diferencial.py` · `spec04_diferencial_redes.py` | testes diferenciais contra o `Ramnet.jl` do Katopodis |
+| `replica_katopodis_52.py` | replica §5.2.2 da dissertação: circular vs termômetro |
+| **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
+| **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
+| **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |
 
 ```bash
 uv run python scripts/spec00_demo.py --policy smart --plot traj.png
 uv run python scripts/spec00_demo.py --compare greedy-vs-smart.png
 uv run python scripts/spec00_demo.py --agents 2 --sensors 12 --estilo lamenza --plot path-a2s12.png
 uv run python scripts/spec00_visualizar.py --policy greedy
+
+# baseline MADDPG (ver a seção própria acima)
+uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo
 ```
 
 Um episódio em três linhas:
