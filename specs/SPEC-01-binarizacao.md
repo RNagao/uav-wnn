@@ -23,7 +23,7 @@ Os codificadores literais estão agora em `src/uavwnn/encoding/artigo.py`
    teto que a varredura de `T` deve usar como referência.
 2. **O eixo da tupla é `n/B`, não `n`.** As dimensões de observação do artigo
    estão no §5.1; `n/B` dele vai de 0,042 a 0,125, e o nosso `n/B = 0,060` fica
-   dentro. Ver **P11** no PRD — ela foi rebaixada de bloqueio para refinamento.
+   dentro. Ver **P14** no PRD — ela foi rebaixada de bloqueio para refinamento.
 3. **O circular quebra a convenção de padding.** Ele acende sempre `⌊R/2⌋`
    bits, logo **não existe padrão todo-zero**. A propriedade que dispensa o bit
    de validade não sobrevive a ele. As tarefas do artigo não têm slot vazio; a

@@ -46,7 +46,7 @@ O FATOR `k(s, ·)` DA EQ. (4.35) É IMPLÍCITO NA REDE
     Por isso `grad_log` devolve apenas o vetor `Σ⁻¹(a − f(s))`, e é
     `RedeGradienteFuncional.atualizar` quem aplica a base.
 
-DIVERGÊNCIA ENTRE O ARTIGO E O CÓDIGO DO AUTOR — pendência P10
+DIVERGÊNCIA ENTRE O ARTIGO E O CÓDIGO DO AUTOR — pendência P13
 
     | | amostragem | gradiente |
     |---|---|---|
@@ -93,7 +93,7 @@ class PoliticaGaussiana:
             raise ValueError(f"escala_covariancia={escala_covariancia} deve ser > 0")
         self.rede = rede
         self.escala = float(escala_covariancia)
-        # P10: se True, reproduz o `ContinousActionPolicy.jl` em vez do artigo.
+        # P13: se True, reproduz o `ContinousActionPolicy.jl` em vez do artigo.
         self.escala_como_desvio = escala_como_desvio
 
     @property
@@ -101,7 +101,7 @@ class PoliticaGaussiana:
         """Desvio-padrão da amostragem.
 
         Pelo artigo, `Σ` é **covariância** (eq. 4.34), então o desvio é `√Σ`.
-        Com `escala_como_desvio` usamos `Σ` direto, como faz o Julia (P10).
+        Com `escala_como_desvio` usamos `Σ` direto, como faz o Julia (P13).
         """
         return self.escala if self.escala_como_desvio else np.sqrt(self.escala)
 

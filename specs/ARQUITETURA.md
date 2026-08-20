@@ -111,6 +111,151 @@ Descobertas ao ler o código, e que a SPEC-01/SPEC-05 precisam respeitar:
 
 ## 3. Feature 2 — medição ruidosa e fusão
 
+### 3.0 CORTE DE ESCOPO — o ruído entra apenas no GPS do drone (D13)
+
+> **Esta seção foi escrita quando o canal do sensor era o primário. Ele saiu do
+> escopo.** O ruído da Etapa 2 incide **exclusivamente sobre o GPS do drone**.
+>
+> | o que era | estado |
+> |---|---|
+> | canal do sensor, relatório `z = p_i + b_i + v_t` | **fora do escopo** |
+> | filtro de informação (alvo estático) | **fora do escopo** |
+> | `R(d)` crescente com a distância | **fora do escopo** |
+> | H4 (busca ativa) | **retirada** — perdeu a causa física |
+> | T3, P3 | **fechadas por decisão**, não resolvidas |
+> | GPS do drone, `p̂_k = p_k + e_k` | **é o canal, e o único** |
+> | KF com **entrada de controle** | **permanece** — é onde vive o achado A3 |
+> | ranking computado sobre estimativa filtrada | **permanece** (§3.4) |
+> | interseção de covariância entre UAVs (Etapa 3) | **permanece** — H5 |
+>
+> **Por que o corte melhora o que sobra.** O canal do drone é o único cujo
+> modelo estava fechado — ruído branco, estado móvel, comando conhecido — e é
+> onde vive a medição de 18,8× do achado A3. O canal que sai dependia de uma
+> decisão de física nunca tomada (T3) e tinha ganho conjectural.
+>
+> **O que se perde, dito sem eufemismo:** a leitura de que *aproximar-se compra
+> informação*, e com ela a H4.
+>
+> **O que segue valendo desta seção:** §3.4 (o ranking sai da estimativa, não da
+> verdade), §3.5.1 (por que o canal próprio importa para a Etapa 3), §3.7 (a
+> álgebra do deslocamento comum) e §3.8 (as guardas). O material das §3.1 a §3.3
+> e §3.6 fica **arquivado abaixo**, porque é a primeira coisa a reaproveitar se o
+> escopo voltar a crescer — e porque a análise nele é boa.
+
+### 3.1 O modelo: o drone estima a própria posição e deriva tudo dela
+
+`p̂_k = p_k + e_k`, com `e_k ~ N(0, σ_own² I)` branco por leitura.
+
+O erro é **comum a todas as entradas válidas** da observação, porque toda entrada
+tem a forma `(p_k − p_i + S)/(2S)`: o mesmo `e/(2S)` soma a sensores e a
+vizinhos, e o padding `-1` não é tocado. Essa estrutura é o que torna a álgebra
+de §3.7 barata, e é o oposto da estrutura por slot que o canal do sensor teria.
+
+Estado **móvel** com comando **conhecido** — a ação da política é a entrada de
+controle. É por isso que o KF com entrada de controle faz sentido aqui e é onde o
+achado A3 mediu `12,54 m → 0,67 m` (18,8×).
+
+**A posição dos sensores permanece exata**, como no problema original. A única
+costura que o ruído exige é a de §3.4: o ranking dos sensores por distância passa
+a ser computado sobre `p̂_k`, nunca sobre `p_k`.
+
+
+### 3.4 O ranking é computado sobre as estimativas
+
+Consequência direta do modelo: o drone ordena e seleciona os `N*_s` sensores por `|p̂_k − p̃_i|`, com **ambas** as posições estimadas. Nunca pela verdade.
+
+Isto não é detalhe. **Medido**, com ruído só na posição própria, 2400 decisões amostradas:
+
+| | σ=1 m | σ=3 m | σ=5 m | σ=10 m |
+|---|---|---|---|---|
+| `Ns=12` — muda o sensor mais próximo | 3,3 % | 8,6 % | 14,8 % | 26,3 % |
+| `Ns=12` — muda os membros do top-12 | 0 % | 0 % | 0 % | 0 % |
+| `Ns=36` — muda o sensor mais próximo | 6,1 % | 17,1 % | 24,3 % | **42,9 %** |
+| `Ns=36` — muda os membros do top-12 | 17,5 % | 44,3 % | 64,1 % | **83,0 %** |
+
+Herdar o ranking verdadeiro devolveria, por outra porta, a maior parte do canal global que a Etapa 2 existe para fechar.
+
+**Refinamento estrutural.** A **seleção** só é ambígua enquanto `n_não_visitados > N*_s = 12`. Como a célula base das Etapas 1–2 é `Ns = 12`, ali só a **ordenação** está em jogo — e ela se resolve pós-processando a saída do pai: aplicar os deslocamentos e reordenar os 12 slots pela própria norma. A recomputação completa da seleção fica restrita à Etapa 3, como função pura com teste bit-exato em `σ = 0`.
+
+**A opção de herdar o ranking verdadeiro fica como ablação**, não descarte: a diferença entre as duas mede quanto vale o "oráculo de ranking" — isto é, quanto do resultado publicado vem de a política enxergar o estado verdadeiro.
+
+### 3.5 Um bloco só, e o que isso simplifica
+
+Com o canal do sensor fora do escopo (D13), a Etapa 2 tem **um bloco**: ruído no
+GPS do drone, KF com entrada de controle, varredura `σ_own × T` = 12
+configurações. As antigas §3.5 e §3.5.1 existiam para justificar a separação em
+2a/2b e para explicar por que o canal próprio permanecia apesar de secundário —
+as duas perguntas desapareceram com o corte.
+
+Três consequências que valem registrar:
+
+1. **A atribuição fica trivial.** A razão original de separar os blocos era que
+   os dois canais têm estruturas opostas — o do drone é deslocamento **comum** a
+   todas as entradas, o do sensor é **por slot** — e ligá-los juntos tornaria
+   qualquer degradação inatribuível. Com um canal só, não há o que atribuir.
+
+2. **`σ_own` passa de fixado por decreto a varrido.** Antes ele era mantido
+   constante para não confundir a varredura do canal do sensor. Agora é o eixo.
+
+3. **A Etapa 3 não perde nada.** A interseção de covariância (H5) funde as
+   estimativas de **posição própria** que os vizinhos transmitem, e é construída
+   sobre o degrau 4. Se o canal próprio tivesse saído em vez do do sensor, a H5
+   ficaria sem objeto — drones transmitiriam posições exatas e não haveria erro
+   correlacionado a fundir. O corte foi na metade certa.
+
+
+### 3.7 A álgebra que barateia a implementação
+
+Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`. Logo:
+
+- erro na posição **própria** `e_k` ⇒ **deslocamento comum** `+e_k/(2S)` em todas as entradas válidas;
+- erro na posição do **sensor** `e_i` ⇒ deslocamento `−e_i/(2S)` **só na entrada daquele sensor**;
+- o padding `-1` nunca é tocado.
+
+Verificado numericamente para o canal próprio. A escala em unidades de observação é `σ/(2S)`: com `S = 100 m`, `σ = 5 m` desloca **0,025** — comparável direto à largura do bin do termômetro. É a regra *bin ≈ σ* em unidades da entrada real.
+
+### 3.8 Guardas desta costura
+
+| Guarda | O que garante |
+|---|---|
+| `σ = 0` ⇒ observação **bit-idêntica** à do pai | a subclasse não introduz diferença por si |
+| Deslocamentos medidos == previstos; padding intacto | a álgebra da §3.7 vale na implementação |
+| Posições verdadeiras no `Simulator` inalteradas | o ruído não vazou para a física (RF-04) |
+| Tempo de conclusão com `σ = 0` == fig. 7.3 | a corrupção desligada não muda o baseline |
+| `P_i` decai como `R/k` sob `R` constante | o filtro de informação está correto |
+| **NEES do filtro ingênuo estoura; do filtro com piso, não** | o viés está sendo tratado (§3.3) |
+
+---
+
+## 4. O que muda nas specs
+
+| Spec | Mudança |
+|---|---|
+| **SPEC-00** | Concluída. Ambiente é o de referência; escopo vira carregar/configurar/semear + validação contra a fig. 7.3 |
+| **SPEC-01** | Faixa da entrada é `[-0,5; 1,5]` e não `[-200, 200]` m; **bit de validade cai**; padding `-1` é sentinela natural; varredura passa a ser sobre o par `(T, N)` por causa da cobertura de bits (C4) |
+| **SPEC-02** | Baselines saem do `heuristics.py` de referência, verbatim — guloso, `smart` e aleatório. Não reimplementar |
+| **SPEC-04/05** | Inalteradas no essencial; ganham a restrição de que a entrada já vem normalizada |
+| **SPEC-07** | Ponto de inserção passa a ser **subclasse do ambiente**, não `StateView`. A álgebra do deslocamento comum simplifica a implementação e dá guardas fortes |
+| **SPEC-08/09** | Inalteradas; herdam as ressalvas de comparação da §4 do relatório de parâmetros |
+
+---
+
+## 5. O que **não** entra por aqui
+
+- **Sinalização entre agentes** (mensagem de reivindicação): mudaria o protocolo, que é do ambiente. Fora de escopo (PRD D5).
+- **`detection_range` separado do `communication_range`**: exigiria alterar o mecanismo de coleta. Descartado — seria modificar o problema para caber no método.
+- **Mobilidade com inércia**: é configuração do simulador dentro do `reset()` de referência. Só entraria por subclasse do `reset()`, o que é mais invasivo que sobrescrever a observação. Fica como trabalho futuro declarado.
+
+
+---
+
+## 3-ARQUIVO. Canal do sensor — FORA DO ESCOPO desde D13
+
+*Preservado por ser a primeira coisa a reaproveitar se o escopo crescer. **Nada
+aqui está em execução**, e a afirmação de que "o canal primário é o sensor" está
+revogada. A análise foi mantida porque é boa e porque a decisão pode ser
+revisitada.*
+
 ### 3.1 O modelo: o drone recebe a posição suja do sensor e a filtra
 
 O canal **primário** é a **posição do sensor**, não o GPS do drone. A cada época de decisão o drone recebe um relatório corrompido da posição de cada sensor que enxerga, e o refina recursivamente. Tudo que ele deriva daí — inclusive **o ranking dos sensores** — passa a ser computado sobre a estimativa filtrada, nunca sobre a verdade.
@@ -155,47 +300,6 @@ Mais barato e numericamente mais estável que a forma de covariância para estad
 
 **Uma armadilha desenhada de propósito.** Se o filtro ignorar o viés `b_i`, ele converge para `p_i + b_i` **com `P → 0`** — isto é, fica arbitrariamente confiante num valor errado. O NEES vai estourar. Esta é uma predição falsificável e o melhor material que a Etapa 2 tem para a disciplina: o filtro ingênuo passa em toda inspeção visual e **só a validação de consistência o denuncia**. A correção é limitar `P` inferiormente por `σ_b²`, e a diferença entre as duas versões é resultado a reportar.
 
-### 3.4 O ranking é computado sobre as estimativas
-
-Consequência direta do modelo: o drone ordena e seleciona os `N*_s` sensores por `|p̂_k − p̃_i|`, com **ambas** as posições estimadas. Nunca pela verdade.
-
-Isto não é detalhe. **Medido**, com ruído só na posição própria, 2400 decisões amostradas:
-
-| | σ=1 m | σ=3 m | σ=5 m | σ=10 m |
-|---|---|---|---|---|
-| `Ns=12` — muda o sensor mais próximo | 3,3 % | 8,6 % | 14,8 % | 26,3 % |
-| `Ns=12` — muda os membros do top-12 | 0 % | 0 % | 0 % | 0 % |
-| `Ns=36` — muda o sensor mais próximo | 6,1 % | 17,1 % | 24,3 % | **42,9 %** |
-| `Ns=36` — muda os membros do top-12 | 17,5 % | 44,3 % | 64,1 % | **83,0 %** |
-
-Herdar o ranking verdadeiro devolveria, por outra porta, a maior parte do canal global que a Etapa 2 existe para fechar.
-
-**Refinamento estrutural.** A **seleção** só é ambígua enquanto `n_não_visitados > N*_s = 12`. Como a célula base das Etapas 1–2 é `Ns = 12`, ali só a **ordenação** está em jogo — e ela se resolve pós-processando a saída do pai: aplicar os deslocamentos e reordenar os 12 slots pela própria norma. A recomputação completa da seleção fica restrita à Etapa 3, como função pura com teste bit-exato em `σ = 0`.
-
-**A opção de herdar o ranking verdadeiro fica como ablação**, não descarte: a diferença entre as duas mede quanto vale o "oráculo de ranking" — isto é, quanto do resultado publicado vem de a política enxergar o estado verdadeiro.
-
-### 3.5 Os dois canais entram em blocos separados
-
-**A Etapa 2 roda em dois blocos**, um canal por vez, porque as estruturas são opostas — o do drone é deslocamento **comum**, o do sensor é **por slot** — e ligá-los juntos torna qualquer degradação inatribuível.
-
-| Bloco | Ruído | Filtro | Hipóteses | Bloqueado? |
-|---|---|---|---|---|
-| **2a** | só GPS do drone | KF + entrada de controle | H2, H3 | não |
-| **2b** | + canal do sensor | filtro de informação | H4 | sim, por **T3** |
-
-O bloco 2a **varre** `σ_own` e mede o valor a usar em 2b — não o fixamos por decreto. E ele não depende da física do canal do sensor, que segue em discussão (T3), então pode começar imediatamente.
-
-### 3.5.1 Por que o canal do GPS próprio permanece
-
-O erro de posição própria **continua existindo**, com `σ_own` fixo num valor declarado e filtrado por **KF com entrada de controle** (a ação que a política acabou de tomar). Ele **não** entra na varredura experimental — a varredura é toda do canal do sensor.
-
-Isto custa **um módulo a mais, não uma campanha maior**: a grade permanece `σ_sensor × T` = 12 configurações, a mesma que teria sem este canal. O custo é escrever o KF e validar sua consistência, trabalho da SPEC-07, que roda em paralelo.
-
-Duas razões para mantê-lo:
-
-1. **O achado A3 depende dele.** KF com entrada de controle dando 18,8× de redução, e o KF de velocidade constante ficando *pior* que a medida crua, é sobre a posição própria — o estado se move e o comando é conhecido. Para alvo estático não há comando a injetar.
-2. **A Etapa 3 perde o objeto sem ele.** O que um drone transmite por broadcast é a estimativa da **própria** posição. Se ela for exata, o broadcast é exato, não há erro correlacionado a fundir, e a **interseção de covariância deixa de ter razão de existir** — a H5 desaparece junto.
-
 ### 3.6 Como os dois canais compõem, e por que isso limita o ganho
 
 A observação é relativa, então o erro do que a política vê é `e_k − e_i`:
@@ -211,45 +315,3 @@ Filtrar um canal só melhora a percepção até o piso do outro. Com `σ_sensor 
 *Os dois erros entram na mesma diferença relativa, então compõem em quadratura. Reduzir o GPS catorze vezes move o que a política enxerga apenas duas. **O resultado medido no GPS não é o resultado percebido pela política** — são grandezas diferentes, e o relatório precisa dizer qual está reportando.*
 
 Contrapartida favorável: os dois canais têm naturezas de estimação **opostas** — estático sem controle contra móvel com controle —, e tê-los lado a lado é o contraste de livro-texto que a disciplina pede.
-
-### 3.7 A álgebra que barateia a implementação
-
-Toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`. Logo:
-
-- erro na posição **própria** `e_k` ⇒ **deslocamento comum** `+e_k/(2S)` em todas as entradas válidas;
-- erro na posição do **sensor** `e_i` ⇒ deslocamento `−e_i/(2S)` **só na entrada daquele sensor**;
-- o padding `-1` nunca é tocado.
-
-Verificado numericamente para o canal próprio. A escala em unidades de observação é `σ/(2S)`: com `S = 100 m`, `σ = 5 m` desloca **0,025** — comparável direto à largura do bin do termômetro. É a regra *bin ≈ σ* em unidades da entrada real.
-
-### 3.8 Guardas desta costura
-
-| Guarda | O que garante |
-|---|---|
-| `σ = 0` ⇒ observação **bit-idêntica** à do pai | a subclasse não introduz diferença por si |
-| Deslocamentos medidos == previstos; padding intacto | a álgebra da §3.7 vale na implementação |
-| Posições verdadeiras no `Simulator` inalteradas | o ruído não vazou para a física (RF-04) |
-| Tempo de conclusão com `σ = 0` == fig. 7.3 | a corrupção desligada não muda o baseline |
-| `P_i` decai como `R/k` sob `R` constante | o filtro de informação está correto |
-| **NEES do filtro ingênuo estoura; do filtro com piso, não** | o viés está sendo tratado (§3.3) |
-
----
-
-## 4. O que muda nas specs
-
-| Spec | Mudança |
-|---|---|
-| **SPEC-00** | Concluída. Ambiente é o de referência; escopo vira carregar/configurar/semear + validação contra a fig. 7.3 |
-| **SPEC-01** | Faixa da entrada é `[-0,5; 1,5]` e não `[-200, 200]` m; **bit de validade cai**; padding `-1` é sentinela natural; varredura passa a ser sobre o par `(T, N)` por causa da cobertura de bits (C4) |
-| **SPEC-02** | Baselines saem do `heuristics.py` de referência, verbatim — guloso, `smart` e aleatório. Não reimplementar |
-| **SPEC-04/05** | Inalteradas no essencial; ganham a restrição de que a entrada já vem normalizada |
-| **SPEC-07** | Ponto de inserção passa a ser **subclasse do ambiente**, não `StateView`. A álgebra do deslocamento comum simplifica a implementação e dá guardas fortes |
-| **SPEC-08/09** | Inalteradas; herdam as ressalvas de comparação da §4 do relatório de parâmetros |
-
----
-
-## 5. O que **não** entra por aqui
-
-- **Sinalização entre agentes** (mensagem de reivindicação): mudaria o protocolo, que é do ambiente. Fora de escopo (PRD D5).
-- **`detection_range` separado do `communication_range`**: exigiria alterar o mecanismo de coleta. Descartado — seria modificar o problema para caber no método.
-- **Mobilidade com inércia**: é configuração do simulador dentro do `reset()` de referência. Só entraria por subclasse do `reset()`, o que é mais invasivo que sobrescrever a observação. Fica como trabalho futuro declarado.

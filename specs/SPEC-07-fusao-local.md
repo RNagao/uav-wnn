@@ -27,7 +27,41 @@ O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos �
 
 **(c) Guardas fortes e baratas.** Com `σ = 0` a subclasse devolve observação **bit-idêntica** ao pai (verificado). E o tempo de conclusão com `σ = 0` tem de continuar reproduzindo a fig. 7.3, que a SPEC-00 já travou em 9/9 células.
 
-### O modelo de ruído mudou: o canal primário é o SENSOR
+## 0-CORTE. O ruído entra apenas no GPS do drone (D13, 2026-08-15)
+
+> **Decisão de escopo.** O canal do sensor saiu. Com ele saem: o bloco 2b, o
+> filtro de informação, a hipótese **H4** e as pendências **T3** e **P3**.
+>
+> | item | estado |
+> |---|---|
+> | GPS do drone, `p̂_k = p_k + e_k` | **é o canal, e o único** |
+> | KF com **entrada de controle** | permanece — é onde vive o achado A3 (18,8×) |
+> | ranking sobre a estimativa filtrada | permanece |
+> | NEES/NIS | permanece |
+> | interseção de covariância entre UAVs (H5) | permanece — Etapa 3 |
+> | canal do sensor, `z = p_i + b_i + v_t` | **fora** |
+> | filtro de informação (alvo estático) | **fora** |
+> | `R(d)` crescente com a distância | **fora** |
+> | H4 (busca ativa) | **retirada** — perdeu a causa física, não só o experimento |
+> | T3, P3 | **fechadas por decisão**, não resolvidas |
+>
+> **O que o corte ganha.** O canal do drone é o único com modelo fechado — ruído
+> branco, estado móvel, comando conhecido — e é onde a medição de 18,8× existe. O
+> que sai dependia de uma decisão de física nunca tomada (T3) e tinha ganho
+> conjectural.
+>
+> **O que o corte custa.** A H4 perde a causa física: com ruído só na posição
+> própria, a covariância converge para regime estacionário e não há incerteza
+> *por sensor* a reduzir, logo aproximar-se não compra informação. O degrau 5 da
+> escada continua como ablação, sem hipótese forte associada.
+>
+> **Trechos abaixo que tratam do canal do sensor estão revogados.** Foram
+> mantidos porque a análise é boa e é a primeira coisa a reaproveitar se o escopo
+> crescer. Nada deles está em execução.
+
+---
+
+### ~~O modelo de ruído mudou: o canal primário é o SENSOR~~ — REVOGADO por D13
 
 Esta spec supunha o GPS do drone como canal principal. **Inverteu-se.** O desenho agora é: o drone recebe, a cada época, um relatório corrompido da posição de cada sensor e o refina recursivamente; **tudo que ele deriva daí, inclusive o ranking, é computado sobre a estimativa filtrada.** Detalhe completo em `specs/ARQUITETURA.md` §3.
 

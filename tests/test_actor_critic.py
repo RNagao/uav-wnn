@@ -36,7 +36,7 @@ def _agente(sigma=0.25, alpha=0.02, m=1, gamma=1.0, phi=1.0, saidas=1, seed=0):
 def test_sigma_e_covariancia_nao_desvio():
     """A eq. (4.34) diz "predefined **covariance** matrix", então o desvio da
     amostragem é `√Σ`. O `ContinousActionPolicy.jl` amostra com Σ direto —
-    divergência registrada como P10, disponível via `escala_como_desvio`."""
+    divergência registrada como P13, disponível via `escala_como_desvio`."""
     rede = RedeGradienteFuncional(B, TUPLA, n_saidas=1, seed=0)
     artigo = PoliticaGaussiana(rede, escala_covariancia=0.25)
     julia = PoliticaGaussiana(rede, escala_covariancia=0.25, escala_como_desvio=True)

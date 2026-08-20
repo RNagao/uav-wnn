@@ -88,7 +88,7 @@ O ponto de projeto: **se a correlação não for construída de propósito e par
 | **4** | KF + entrada de controle | **KF (Etapa 2)** | broadcast cru | medida crua |
 | **6a** | KF local isolado, **sem troca de estimativas** | KF | trilha local de `j`, atualizada com o broadcast tratado como **medida** com `R₀` conservador **fixo** (o `P_j` transmitido é **ignorado**) | filtro de informação local |
 | **6b** | **KF ingênuo entre UAVs** | KF | funde a estimativa de `j` usando o `P_j` transmitido como se fosse independente: `P⁻¹ ← P⁻¹ + P_j⁻¹` | idem entre UAVs |
-| **6c** | **interseção de covariância** | KF | `CI(trilha, estimativa recebida)` | `CI` entre estimativas do mesmo sensor |
+| **6c** | **interseção de covariância** | KF | `CI(trilha, estimativa recebida)` | — *(a coluna do canal do sensor caiu com D13)* |
 
 Notas que fecham a definição:
 

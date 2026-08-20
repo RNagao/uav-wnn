@@ -40,7 +40,7 @@ reportar, não bug.
 
 **Eixo retirado:** simples vs circular. O circular quebra a convenção de padding
 (sem padrão todo-zero). Fica como sub-experimento opcional para dimensões
-angulares. Ver **P12** e `reports/replica-katopodis-52.md`.
+angulares. Ver **P15** e `reports/replica-katopodis-52.md`.
 
 **Ganho de escopo:** o Algoritmo 4.1 (SARSA) está implementado em
 `src/uavwnn/rl/sarsa.py` e aprende CartPole. Não é o algoritmo desta spec — a

@@ -19,8 +19,8 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 | **04** | [Núcleo n-tuple esparso](SPEC-04-ntuple.md) | modelo | 1 | 01 | 2 d | **implementada** — duas redes, desvio zero contra o `Ramnet.jl`; **C2 e C4 fechadas** |
 | **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | **Algoritmo 4.4 implementado**; falta o MLP AC pareado |
 | **06** | [Etapa 1 — réplicas 1a/1b e varreduras → **G1**](SPEC-06-etapa1.md) | experimento | 1 | 00, 02, 03, 05 | 4 d | revisada (P1 fechada; guloso validado) |
-| **07** | [Ruído, KF com entrada de controle, NEES/NIS](SPEC-07-fusao-local.md) | fusão | 2a | 00 | 3 d | revisada (canal do sensor virou primário) |
-| **08** | [Etapa 2 — blocos 2a e 2b → **G2**](SPEC-08-etapa2.md) | experimento | 2a, 2b | 06, 07 | 3 d | revisada (dois blocos; 2b bloqueado por T3) |
+| **07** | [Ruído, KF com entrada de controle, NEES/NIS](SPEC-07-fusao-local.md) | fusão | 2 | 00 | 3 d | **escopo cortado (D13)**: só GPS do drone |
+| **08** | [Etapa 2 — ruído no GPS do drone → **G2**](SPEC-08-etapa2.md) | experimento | 2 | 06, 07 | 3 d | **um bloco só (D13)**; T3 fechada por decisão |
 | **09** | [Etapa 3 — multiagente e interseção de covariância → **G3**](SPEC-09-etapa3.md) | fusão + experimento | 3 | 08 | 4 d | revisada (padding `-1`; P1 fechada) |
 | **10** | [Reprodutibilidade, relatório e slides](SPEC-10-entrega.md) | entrega | — | contínua | contínua | escrita, em revisão |
 
@@ -41,7 +41,7 @@ Todas as specs foram escritas e passaram por uma revisão cruzada; os achados qu
 | [`rkatopodis/RLWorktable.jl`](https://github.com/rkatopodis/RLWorktable.jl) + [`Ramnet.jl`](https://github.com/rkatopodis/Ramnet.jl) (branch **`faster_hashing`**) | **a dissertação implementada** — Algoritmo 4.4 literal. MIT |
 | [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) (PyTorch + Ray RLlib PPO) | **o capítulo 6** — o trabalho futuro, não o trabalho |
 
-Onde o código do autor e a dissertação divergem, **a dissertação prevalece** (P10, e o recozimento de `Σ`/`α`). [`PLANO-TESTES.md`](PLANO-TESTES.md) audita equação por equação e diz o que continua sem oráculo.
+Onde o código do autor e a dissertação divergem, **a dissertação prevalece** (P13, e o recozimento de `Σ`/`α`). [`PLANO-TESTES.md`](PLANO-TESTES.md) audita equação por equação e diz o que continua sem oráculo.
 
 **[`ARQUITETURA.md`](ARQUITETURA.md)** define como as duas features do trabalho — trocar o MADDPG pela rede sem peso, e acrescentar ruído gaussiano na posição dos drones — se encaixam **sem tocar** no código do cenário, que vive num submodule. Leitura obrigatória antes da SPEC-04.
 

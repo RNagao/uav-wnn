@@ -335,7 +335,7 @@ def test_tupla_maior_generaliza_pior():
     positions in all neurons that weren't accessed during training. In a
     situation such as this, the model is unable to generalize." — §3.2.4
 
-    Este teste é o que dá conteúdo empírico à P11: a dissertação usa `n` de 16
+    Este teste é o que dá conteúdo empírico à P14: a dissertação usa `n` de 16
     a 64, mas com `B` muito maior (CartPole: 4 obs × 128 = 512 bits). O que
     governa a generalização é a razão `n/B`, não `n` sozinho — e é por isso que
     copiar o `n` dela sem olhar o nosso `B` seria erro.

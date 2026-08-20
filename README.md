@@ -27,7 +27,7 @@ O simulador está fixado em **`gradysim==0.6.11`**: o `environment.py` de refer�
 | SPEC-02, 07 | revisadas; **próximas**, rodam em paralelo |
 | SPEC-04 a 06, 08 a 10 | revisadas |
 
-**Bloqueio único:** a pendência **T3** — a física do ruído no sensor — decide se a H4 tem mecanismo. Ela trava o bloco 2b e nada mais.
+**Escopo do ruído (D13):** apenas o **GPS do drone**. O canal do sensor saiu, e com ele o antigo bloco 2b, o filtro de informação, a hipótese H4 e as pendências T3 e P3. O conteúdo de fusão permanece: KF com entrada de controle (Etapa 2) e interseção de covariância entre UAVs (Etapa 3).
 
 ## Resultados medidos
 
@@ -85,11 +85,10 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | Etapa | Configuração | Dificuldade nova | Hipóteses | Portão |
 |---|---|---|---|---|
 | 1 | 1 UAV, sem ruído | aproximação de função sobre entrada binarizada | H1 | G1 |
-| **2a** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
-| **2b** | 1 UAV, + ruído no **canal do sensor** | filtro de informação; ranking sobre estimativas | H4 | G2 |
+| **2** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
 | 3 | `Na` UAVs, com ruído | coordenação e erros correlacionados | H5, H6 | G3 |
 
-A Etapa 2 roda em dois blocos porque os canais têm estruturas opostas — o do drone é deslocamento **comum** a todas as entradas da observação, o do sensor é **por slot** — e ligá-los juntos tornaria qualquer degradação inatribuível.
+A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O erro é deslocamento **comum** a todas as entradas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)` — estrutura que a álgebra do filtro aproveita. A posição dos sensores permanece exata; a única costura é que o ranking por distância passa a sair da estimativa filtrada, nunca da verdade.
 
 Como as features entram **sem tocar no cenário**, com os diagramas do fluxo: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 

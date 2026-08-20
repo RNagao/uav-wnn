@@ -139,7 +139,7 @@ passo fixo do SGD. Logo:
 
 ### Nova
 
-- **P10 — Σ é covariância ou desvio-padrão?** A eq. (4.34) diz *"predefined
+- **P13 — Σ é covariância ou desvio-padrão?** A eq. (4.34) diz *"predefined
   **covariance** matrix"*, logo a amostragem é `√Σ·z`. O
   `ContinousActionPolicy.jl` amostra `Σ·z` mas usa `inv(Σ)` no gradiente —
   trata o mesmo número como desvio num lugar e variância no outro. **Seguimos o
@@ -147,7 +147,7 @@ passo fixo do SGD. Logo:
   diferença é fator 2 na exploração, então precisa aparecer na tabela de
   hiperparâmetros. *Resolvida em recomendação; falta aval.*
 
-- **P11 — o regime de `n` foi escolhido pelo problema ou pelo armazenamento?**
+- **P14 — o regime de `n` foi escolhido pelo problema ou pelo armazenamento?**
   O apêndice A da dissertação usa `n ∈ {16, 32, 64}`. Nós escolhemos `n = 12`
   (SPEC-01) e achamos `n = 10` dominante (SPEC-03) — **mas as duas rodaram
   sobre armazenamento denso**, que aloca `2ⁿ` por RAM e torna `n = 32` caro e
@@ -172,9 +172,9 @@ erro entre 5 sementes cresce monotonicamente com α (0,044 em α=0,002 contra
 larga e várias sementes. Se o Algoritmo 4.4 não passar o portão G1, a
 instabilidade é a primeira suspeita — e a saída já está nomeada pelo autor.
 
-### Correção — P11 era menos grave do que eu disse (2026-08-15)
+### Correção — P14 era menos grave do que eu disse (2026-08-15)
 
-Registrei a P11 como "a de maior impacto no momento", supondo que o nosso
+Registrei a P14 como "a de maior impacto no momento", supondo que o nosso
 `n = 12` fosse artefato do armazenamento denso diante dos `n ∈ {16, 32, 64}` do
 apêndice A. **Ao normalizar por `B` isso não se sustenta.**
 
@@ -199,5 +199,71 @@ A diferença real é a **decomposição**: o artigo usa resolução alta (32–1
 tupla grande; nós, resolução baixa (`T = 8`) com tupla pequena. Chegamos ao
 mesmo regime por outro caminho.
 
-**P11 rebaixada de bloqueio para refinamento.** A varredura continua valendo,
+**P14 rebaixada de bloqueio para refinamento.** A varredura continua valendo,
 mas o eixo é `n/B`, e o achado esperado é ajuste fino, não correção de erro.
+
+---
+
+## Adendo — 2026-08-15 (b): corte de escopo, o ruído só no GPS do drone (D13)
+
+O canal do sensor saiu do escopo. Isto **fecha três pendências sem resolvê-las**
+e **retira uma hipótese**.
+
+### Fechadas por decisão, não por resposta
+
+| ID | era | por que fecha |
+|---|---|---|
+| **T3** | Qual é a física do ruído no sensor — GPS próprio (viés fixo dominante) ou localização por rádio (branco, crescente com a distância)? | Sem o canal, a pergunta não tem consequência. **É o primeiro item a reabrir se o escopo crescer**, porque a resposta determina se a H4 tem mecanismo |
+| **P3** | O sensor transmite posição estimada (linear → filtro de informação) ou distância/RSSI (não linear → EKF/UKF)? | Idem. Fica emparelhada com a T3 |
+| **P9** | Parâmetros do canal do sensor: `σ_b`, `σ_0` e `κ` de `R(d) = (σ_0 + κ·d)²` | Não há canal a parametrizar |
+
+Também cai a **C5** como preocupação ativa (o filtro de informação não tinha o
+que fundir porque ouvir = coletar): o mecanismo que a contornava — reinterpretar
+o canal global — sai junto com o canal.
+
+### Hipótese retirada
+
+**H4** — *"uma política que enxerga a própria covariância aprende busca ativa"*.
+Não é adiamento, é retirada: o mecanismo era `R(d)` crescente com a distância,
+que faz **aproximar-se comprar informação**. Com ruído só na posição própria a
+covariância converge para regime estacionário e não existe incerteza *por sensor*
+a reduzir. **A hipótese perde a causa física, não só o experimento.**
+
+O degrau 5 da escada (política que enxerga o próprio `P`) permanece como
+**ablação sem hipótese forte associada** — a pergunta fica sendo "ajuda?" em vez
+de "produz busca ativa?".
+
+### O que o corte NÃO toca
+
+O conteúdo de Fusão de Dados estava em três lugares e dois permanecem:
+
+- **KF com entrada de controle** (Etapa 2) — onde vive o achado medido A3, `12,54
+  m → 0,67 m`, 18,8×. É o único canal cujo modelo estava fechado.
+- **Interseção de covariância entre UAVs** (Etapa 3, **H5**) — funde as
+  estimativas de posição **própria** que os vizinhos transmitem
+  (`⟨k, t, x̂_k, P_k⟩`), construída sobre o degrau 4. Indiferente ao canal do
+  sensor.
+- **NEES/NIS** como validação de consistência.
+
+Nota: se o corte tivesse sido na outra metade — tirar o GPS próprio e manter o
+sensor —, a **H5 ficaria sem objeto**, porque os drones transmitiriam posições
+exatas e não haveria erro correlacionado a fundir. O corte foi na metade certa.
+
+### Renumeração
+
+Ao registrar as pendências novas da rodada anterior eu reutilizei o **P10**, que
+já estava em uso (`σ_own`, fechada por construção). Corrigido:
+
+| era | agora | assunto |
+|---|---|---|
+| P10 | **P13** | `Σ` é covariância ou desvio-padrão (artigo vs código do autor) |
+| P11 | **P14** | revarrer o regime de tupla no eixo `n/B` |
+| P12 | **P15** | replicar §5.2.2 com orçamento cheio |
+
+- **P15 — replicar §5.2.2 com orçamento cheio?** Nossa replicação parcial dá
+  **empate** na configuração que o artigo declara para CartPole (`R=128, n=64`:
+  0,96×, IC cruza zero) e **vitória do circular** em baixa resolução (`R=32,
+  n=16`: 1,68×, IC95% [+39,6; +56,1], 20 de 20 sementes). Orçamento ~1/50 do
+  original. **Não é bloqueio** — o codificador de produção é o quantil, por
+  outras razões —, mas se o relatório citar §5.2.2 como fundamento, a ressalva
+  precisa vir junto. Ver `reports/replica-katopodis-52.md`.

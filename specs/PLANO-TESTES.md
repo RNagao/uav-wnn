@@ -97,9 +97,9 @@ Três coisas que só apareceram por escrever estes testes:
 
 ---
 
-## 3. Fidelidade e o regime de `n` (pendência P11)
+## 3. Fidelidade e o regime de `n` (pendência P14)
 
-Os três testes de §3.2.4 dão conteúdo empírico à P11. Medido com `B = 96`,
+Os três testes de §3.2.4 dão conteúdo empírico à P14. Medido com `B = 96`,
 120 amostras de treino, fração de consultas novas que endereçam **só** posições
 nunca escritas — o "unable to generalize" do texto:
 
@@ -113,7 +113,7 @@ nunca escritas — o "unable to generalize" do texto:
 Monótono, como o texto prevê. E o caso degenerado de RAM única memoriza os 25
 treinos exatamente e devolve o padrão para > 95 % do que não viu.
 
-**A consequência para P11 é que copiar o `n` da dissertação seria erro** — mas
+**A consequência para P14 é que copiar o `n` da dissertação seria erro** — mas
 também que o nosso `n` não é o problema que eu supus. As dimensões de observação
 estão no §5.1: CartPole 4, Lunar Lander 8, Mountain Car 2, Hopper 12 (3 juntas ×
 posição e velocidade 2-D). Com `B = dim × resolução`:
@@ -129,7 +129,7 @@ posição e velocidade 2-D). Com `B = dim × resolução`:
 Faixa do artigo: `n/B ∈ [0,042; 0,125]` e `N ∈ [8; 24]`. **Estamos dentro das
 duas**, e quase exatamente sobre o Lunar Lander (`n/B = 0,062`, `N = 16`).
 
-Isso **enfraquece a P11 como eu a formulei**. O `n = 12` não é obviamente
+Isso **enfraquece a P14 como eu a formulei**. O `n = 12` não é obviamente
 artefato do armazenamento denso: normalizado por `B`, está no mesmo regime do
 artigo. O que difere é a decomposição — eles usam resolução alta (32–128) com
 tupla grande; nós, resolução baixa (`T = 8`) com tupla pequena. Chegamos ao

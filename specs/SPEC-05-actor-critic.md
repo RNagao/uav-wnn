@@ -17,7 +17,7 @@ hiperparâmetros fixos (`Σ` = 0,5 em Mountain Car, 0,3 em Hopper). O recoziment
 existe só no Julia. Implementado desligado por padrão, e a **D6 do PRD foi
 corrigida** — ela prescrevia recozimento.
 
-**2. `Σ` é covariância, não desvio (P10).** A eq. (4.34) diz *"predefined
+**2. `Σ` é covariância, não desvio (P13).** A eq. (4.34) diz *"predefined
 **covariance** matrix"*, logo a amostragem correta é `√Σ·z`. O
 `ContinousActionPolicy.jl` amostra `Σ·z` mas usa `inv(Σ)` no gradiente — trata o
 mesmo número como desvio num lugar e variância no outro. **Seguimos o artigo**;
@@ -52,7 +52,7 @@ Recozimento de `alpha` e de `Sigma` existem no `ContinousFunctionalAC.jl` mas
 **não na dissertação** (apêndice A lista ambos constantes). Ficam desligados por
 padrão.
 
-**Divergência P10:** a eq. (4.34) diz "predefined **covariance** matrix", logo a
+**Divergência P13:** a eq. (4.34) diz "predefined **covariance** matrix", logo a
 amostragem correta é `sqrt(Sigma)*z`. O Julia amostra `Sigma*z` mas usa
 `inv(Sigma)` no gradiente. Seguimos o artigo; `escala_como_desvio=True`
 reproduz o Julia. Com `Sigma = 0,25` a diferença é fator 2 na exploração.

@@ -285,7 +285,7 @@ H3:
 | H1 | G1 | 06 (com 03) | tempo de conclusão pareado + T1 realizado + T3 (zero MACs fp) |
 | H2 | G2 | 08 | curvas de degradação WNN × MLP sobre σ; ICs separam? |
 | H3 | G2 | 08 | degrau 4 vs degrau 0, diferença pareada |
-| H4 | G2 | 08 | degrau 5 vs degrau 4 + inspeção de trajetórias |
+| ~~H4~~ | — | — | **RETIRADA por D13**: o mecanismo era o canal do sensor, fora do escopo. O degrau 5 permanece como ablação sem hipótese associada |
 | H5 | G3 | 09 | erro de estimativa 6c vs 6a + NEES/NIS de 6b |
 | H6 | G3 | 09 | tempo de conclusão vs heurística gulosa, `Na ≥ 2` |
 
@@ -412,6 +412,6 @@ Cinco entradas ao fim do projeto (semanas 1–4 e fechamento). É a única taref
 5. **Existe CI hospedado?** Se o repositório não for para uma forge com Actions, `make ci` roda por hook de `pre-push` local — mais frágil, porque é suprimível com `--no-verify`.
 6. **Modo estrito de HG-2.** Reprovar `make repro` quando o NEES/NIS não passou é o comportamento correto no fim, mas trava o trabalho do dia enquanto o filtro está sendo sintonizado. Proposta: estrito no `make ci` e na tag final, permissivo (só tarja) no `repro` do dia a dia. Confirmar.
 7. **Numeração das specs de fusão.** A SPEC-01 cita "o filtro de Kalman (SPEC-05)" e "a varredura com estimativa filtrada é da SPEC-06", enquanto o `specs/README.md` atribui a fusão local à SPEC-07 e a Etapa 2 à SPEC-08. O mapa da §T-10.7 seguiu o README. A divergência precisa ser resolvida numa das duas fontes, porque o `index.json` vai carregar o campo `spec` e ele tem que apontar para algo estável.
-8. **P3 (posição estimada vs distância/RSSI) afeta o capítulo 6 inteiro.** A recomendação do PRD é o caso linear. Se ficar aberta até a semana 3, o esqueleto da seção 3.2 (filtro de informação vs EKF/UKF) precisa ser reescrito tarde. Vale fechá-la por decisão na semana 1, mesmo sem experimento?
+8. ~~**P3** (posição estimada vs distância/RSSI)~~ **fechada por D13**: o canal do sensor saiu do escopo, e o capítulo 6 do relatório perde essa dependência. Texto antigo: A recomendação do PRD é o caso linear. Se ficar aberta até a semana 3, o esqueleto da seção 3.2 (filtro de informação vs EKF/UKF) precisa ser reescrito tarde. Vale fechá-la por decisão na semana 1, mesmo sem experimento?
 9. **Idioma de E2.** Português (disciplina) ou inglês (aproveitamento posterior como artigo)? Muda o esforço de redação e o reaproveitamento do texto de fundamentação.
 10. **O deck de 5 slides da semana 1 é apresentado a alguém?** Se houver um ponto de controle intermediário com o professor, ele deve virar marco explícito do cronograma — feedback na semana 2 vale muito mais que na semana 4.

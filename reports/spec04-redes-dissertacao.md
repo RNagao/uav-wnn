@@ -163,7 +163,7 @@ Isto é exatamente o que a dissertação aponta no capítulo 6:
 
 ---
 
-## 5. Divergência entre o artigo e o código do autor (P10)
+## 5. Divergência entre o artigo e o código do autor (P13)
 
 | | amostragem | gradiente |
 |---|---|---|
@@ -196,7 +196,7 @@ que a inicial contraria o propósito do recozimento.
 | **C2** — esquecimento com gradiente funcional | **fechada.** São duas redes; ambas implementadas e validadas contra o oráculo. |
 | **C4** — cobertura de bits | **fechada pela estrutura.** A partição lê cada bit uma vez. |
 | **C1** — ação circular | **segue aberta.** A dissertação usa gaussiana sem tratamento de wrap-around; o `CircularEncoder` do PyTorch resolve entrada circular, não ação. A normal projetada continua de pé. |
-| **P10** — Σ como covariância ou desvio | **nova**, resolvida em recomendação (seguir o artigo), registrada. |
+| **P13** — Σ como covariância ou desvio | **nova**, resolvida em recomendação (seguir o artigo), registrada. |
 
 ## 7. A pendência nova que mais me incomoda
 
