@@ -171,3 +171,33 @@ erro entre 5 sementes cresce monotonicamente com α (0,044 em α=0,002 contra
 0,238 em α=0,05), e em 0,05 uma semente diverge. A busca de α precisa de faixa
 larga e várias sementes. Se o Algoritmo 4.4 não passar o portão G1, a
 instabilidade é a primeira suspeita — e a saída já está nomeada pelo autor.
+
+### Correção — P11 era menos grave do que eu disse (2026-08-15)
+
+Registrei a P11 como "a de maior impacto no momento", supondo que o nosso
+`n = 12` fosse artefato do armazenamento denso diante dos `n ∈ {16, 32, 64}` do
+apêndice A. **Ao normalizar por `B` isso não se sustenta.**
+
+As dimensões de observação estão no §5.1 da dissertação (CartPole 4, Lunar
+Lander 8, Mountain Car 2, Hopper 12), e `B = dim × resolução`:
+
+| tarefa | `B` | `n` | `n/B` | `N` |
+|---|---|---|---|---|
+| CartPole | 512 | 64 | 0,125 | 8 |
+| Lunar Lander | 1024 | 64 | 0,062 | 16 |
+| Mountain Car | 256 | 32 | 0,125 | 8 |
+| Hopper | 384 | 16 | 0,042 | 24 |
+| **nosso** | **200** | **12** | **0,060** | **17** |
+
+**Estamos dentro da faixa do artigo em `n/B` e em `N`**, praticamente sobre o
+Lunar Lander. O que governa a generalização é a razão, não `n` sozinho — e os
+testes de §3.2.4 em `tests/test_identidades_artigo.py` mostram por quê: a
+fração de consultas sem resposta cresce monotonicamente com a tupla **relativa
+à entrada**.
+
+A diferença real é a **decomposição**: o artigo usa resolução alta (32–128) com
+tupla grande; nós, resolução baixa (`T = 8`) com tupla pequena. Chegamos ao
+mesmo regime por outro caminho.
+
+**P11 rebaixada de bloqueio para refinamento.** A varredura continua valendo,
+mas o eixo é `n/B`, e o achado esperado é ajuste fino, não correção de erro.
