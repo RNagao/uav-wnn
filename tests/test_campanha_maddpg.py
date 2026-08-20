@@ -183,3 +183,71 @@ def test_separacao_usa_o_menor_comprimento_comum():
     T = np.array([np.zeros((5, 2)), np.ones((3, 2))], dtype=object)
     T = [np.zeros((5, 2)), np.ones((3, 2))]
     assert separacao(T, 2) == pytest.approx(np.sqrt(2))
+
+
+# --- o array de cenários -------------------------------------------------
+
+
+def test_cenarios_lamenza_sao_as_nove_celulas():
+    """A grade da tab. 7.1: `Na ∈ {2,4,8} × Ns ∈ {12,24,36}`.
+
+    São as mesmas células da fig. 7.3 e as mesmas para as quais o submodule
+    publica checkpoints — não uma escolha nossa.
+    """
+    from spec02_maddpg_campanha import CENARIOS_LAMENZA as C
+
+    assert len(C) == 9
+    assert {na for na, _ in C} == {2, 4, 8}
+    assert {ns for _, ns in C} == {12, 24, 36}
+    assert len(set(C)) == 9, "sem duplicatas"
+    assert 1 not in {na for na, _ in C}, "não há checkpoint para Na = 1"
+
+
+def test_celulas_vazio_devolve_o_padrao_de_lamenza():
+    from spec02_maddpg_campanha import CENARIOS_LAMENZA, analisar_celulas
+
+    assert analisar_celulas("") == CENARIOS_LAMENZA
+    assert analisar_celulas("   ") == CENARIOS_LAMENZA
+
+
+def test_celulas_aceita_subconjunto_e_preserva_a_ordem():
+    """A ordem importa: quem pede `8:36,2:12` quer rodar a célula cara primeiro."""
+    from spec02_maddpg_campanha import analisar_celulas
+
+    assert analisar_celulas("4:24,8:36") == [(4, 24), (8, 36)]
+    assert analisar_celulas("8:36,2:12") == [(8, 36), (2, 12)]
+    assert analisar_celulas(" 4:24 , 8:36 ") == [(4, 24), (8, 36)]
+
+
+@pytest.mark.parametrize("entrada,pedaco", [
+    ("abc", "esperado 'Na:Ns'"),
+    ("4-24", "esperado 'Na:Ns'"),
+    ("0:12", ">= 1"),
+    ("4:0", ">= 1"),
+    ("4:24,4:24", "repetida"),
+])
+def test_celulas_invalidas_falham_com_mensagem(entrada, pedaco):
+    """Recusar alto em vez de adivinhar. Uma célula repetida faria o resumo
+    contar as runs dela em dobro."""
+    from spec02_maddpg_campanha import analisar_celulas
+
+    with pytest.raises(SystemExit) as e:
+        analisar_celulas(entrada)
+    assert pedaco in str(e.value)
+
+
+def test_campanha_e_chamavel_como_biblioteca():
+    """`campanha()` existe para encadear com outra análise sem passar pelo CSV.
+
+    Aqui só verificamos a assinatura e o padrão do array — rodar de verdade
+    exige torch e submodule, e isso está nos testes de nível 2.
+    """
+    import inspect
+
+    from spec02_maddpg_campanha import CENARIOS_LAMENZA, campanha
+
+    sig = inspect.signature(campanha)
+    assert sig.parameters["cenarios"].default is None, "None -> CENARIOS_LAMENZA"
+    assert sig.parameters["runs"].default == 100
+    assert sig.parameters["episodios"].default == EPISODIOS_LAMENZA
+    assert list(CENARIOS_LAMENZA)  # o padrão não é vazio

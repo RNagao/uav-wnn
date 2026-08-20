@@ -31,12 +31,35 @@ Ao reiniciar, as runs já presentes são lidas e puladas; só as que faltam roda
 CSV guarda `episodios`, e o script **recusa** reaproveitar um cache com `E`
 diferente do pedido — média sobre runs de tamanhos distintos não significa nada.
 
+CENÁRIOS
+
+`CENARIOS_LAMENZA` é o padrão: as 9 células `(num_drones, num_sensores)` da
+tab. 7.1, as mesmas da fig. 7.3 e as mesmas para as quais o submodule publica
+checkpoints. Dá para pedir um subconjunto ou outra ordem.
+
+Da linha de comando:
+
     uv run --group baseline python scripts/spec02_maddpg_campanha.py
     uv run --group baseline python scripts/spec02_maddpg_campanha.py --runs 10
-    uv run --group baseline python scripts/spec02_maddpg_campanha.py --celulas 4:24
+    uv run --group baseline python scripts/spec02_maddpg_campanha.py --celulas 4:24,8:36
     uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo
 
-CUSTO: ~1 h 50 para 100 runs × 200 episódios × 9 células num núcleo. Rode em
+Como biblioteca, recebendo o array direto:
+
+    import sys; sys.path.insert(0, "scripts")
+    from spec02_maddpg_campanha import campanha, CENARIOS_LAMENZA
+
+    campanha()                                    # as 9 de Lamenza, 100 runs
+    campanha([(4, 24), (8, 36)], runs=30)         # subconjunto
+    campanha(CENARIOS_LAMENZA, runs=100)          # explícito, mesmo do padrão
+
+`campanha()` devolve o resumo por cenário — `{(Na, Ns): {figura: (média, desvio)}}`
+— então dá para encadear com outra análise sem passar pelo CSV.
+
+**Pedir uma célula sem checkpoint recusa em voz alta** em vez de cair para a
+vizinha. Não há checkpoint para `Na = 1`, que é a armadilha mais provável aqui.
+
+CUSTO: ~2–3 h para 100 runs × 200 episódios × 9 células num núcleo. Rode em
 segundo plano; o cache torna a interrupção barata.
 """
 
@@ -57,6 +80,22 @@ from uavwnn.refenv import LAMENZA_003, run_episode  # noqa: E402
 
 # `total_runs` do `test.py` do submodule.
 EPISODIOS_LAMENZA = 200
+
+CENARIOS_LAMENZA: list[tuple[int, int]] = [
+    (2, 12), (2, 24), (2, 36),
+    (4, 12), (4, 24), (4, 36),
+    (8, 12), (8, 24), (8, 36),
+]
+"""A grade do trabalho de referência: `(num_drones, num_sensores)`.
+
+São as 9 células da tab. 7.1 de Lamenza, as mesmas da fig. 7.3 e as mesmas para
+as quais o submodule publica checkpoints. É o padrão de `--celulas`, e o valor
+que `campanha()` usa quando não recebe `cenarios`.
+
+**Não há checkpoint para `Na = 1`**, então a Etapa 1 do nosso plano não tem
+baseline MADDPG. Pedir `1:12` falha com mensagem, e é o comportamento certo:
+melhor recusar que devolver silenciosamente uma célula vizinha.
+"""
 
 COLUNAS = [
     "run", "num_drones", "num_sensores", "episodios", "seed_inicial",
@@ -192,48 +231,79 @@ def resumir(linhas: list[dict]) -> dict[str, tuple[float, float]]:
     return out
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--runs", type=int, default=100)
-    ap.add_argument("--episodios", type=int, default=EPISODIOS_LAMENZA,
-                    help=f"por run; {EPISODIOS_LAMENZA} é o do test.py de Lamenza")
-    ap.add_argument("--celulas", default="", help="ex. '4:24,8:36'; vazio = as 9")
-    ap.add_argument("--dir-saida", default="reports/maddpg")
-    ap.add_argument("--so-resumo", action="store_true",
-                    help="não roda nada; só resume os CSVs existentes")
-    a = ap.parse_args()
+def analisar_celulas(texto: str) -> list[tuple[int, int]]:
+    """`'4:24,8:36'` -> `[(4, 24), (8, 36)]`. Vazio devolve `CENARIOS_LAMENZA`.
 
-    disponiveis = {(na, ns): p for na, ns, p in checkpoints()}
-    if not disponiveis and not a.so_resumo:
+    Valida a forma e recusa duplicatas — pedir a mesma célula duas vezes faria
+    o resumo contar as runs dela em dobro.
+    """
+    if not texto.strip():
+        return list(CENARIOS_LAMENZA)
+    fora: list[tuple[int, int]] = []
+    for item in texto.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            na_txt, ns_txt = item.split(":")
+            na, ns = int(na_txt), int(ns_txt)
+        except ValueError:
+            sys.exit(f"célula inválida: {item!r}; esperado 'Na:Ns', ex. '4:24'")
+        if na < 1 or ns < 1:
+            sys.exit(f"célula inválida: {item!r}; Na e Ns devem ser >= 1")
+        if (na, ns) in fora:
+            sys.exit(f"célula repetida: {item!r}")
+        fora.append((na, ns))
+    return fora
+
+
+def campanha(
+    cenarios: list[tuple[int, int]] | None = None,
+    runs: int = 100,
+    episodios: int = EPISODIOS_LAMENZA,
+    dir_saida: str | Path = "reports/maddpg",
+    so_resumo: bool = False,
+    verboso: bool = True,
+) -> dict[tuple[int, int], dict]:
+    """Roda a campanha e devolve o resumo por cenário. Reusável de fora.
+
+        from spec02_maddpg_campanha import campanha, CENARIOS_LAMENZA
+        campanha([(4, 24), (8, 36)], runs=30)
+        campanha()                       # as 9 células de Lamenza, 100 runs
+
+    O cache vale igual: chamar de novo com mais `runs` só roda o que falta.
+    """
+    cenarios = list(CENARIOS_LAMENZA) if cenarios is None else list(cenarios)
+    return _executar(cenarios, runs, episodios, Path(dir_saida), so_resumo, verboso)
+
+
+def _executar(cenarios, runs, episodios, dir_saida: Path, so_resumo, verboso):
+    """Miolo da campanha. `main()` e `campanha()` só preparam os argumentos."""
+    fala = print if verboso else (lambda *_a, **_k: None)
+
+    disponiveis = {(na, ns): c for na, ns, c in checkpoints()}
+    if not disponiveis and not so_resumo:
         sys.exit("nenhum checkpoint; git submodule update --init --recursive")
 
-    if a.celulas:
-        pedidas = []
-        for item in a.celulas.split(","):
-            na, ns = (int(x) for x in item.split(":"))
-            pedidas.append((na, ns))
-    else:
-        pedidas = sorted(disponiveis) or sorted(
-            (int(p.stem.split("-")[0][2:]), int(p.stem.split("-")[1][1:]))
-            for p in Path(a.dir_saida).glob("campanha-a*s*.csv")
-        )
-
-    dir_saida = Path(a.dir_saida)
     dir_saida.mkdir(parents=True, exist_ok=True)
     resumos: dict[tuple[int, int], dict] = {}
+    contagens: dict[tuple[int, int], int] = {}
 
-    for na, ns in pedidas:
+    for na, ns in cenarios:
         arquivo = caminho_csv(dir_saida, na, ns)
-        feitas = ler_cache(arquivo, a.episodios)
-        faltam = [r for r in range(a.runs) if r not in feitas]
+        feitas = ler_cache(arquivo, episodios)
+        faltam = [r for r in range(runs) if r not in feitas]
 
-        print(f"\n=== a_{na}-s_{ns} · {a.runs} runs × {a.episodios} episódios ===")
-        print(f"  cache: {len(feitas)} runs em {arquivo.name}"
-              f"{'' if not faltam else f'; faltam {len(faltam)}'}")
+        fala(f"\n=== a_{na}-s_{ns} · {runs} runs × {episodios} episódios ===")
+        fala(f"  cache: {len(feitas)} runs em {arquivo.name}"
+             f"{'' if not faltam else f'; faltam {len(faltam)}'}")
 
-        if faltam and not a.so_resumo:
+        if faltam and not so_resumo:
             if (na, ns) not in disponiveis:
-                print(f"  SEM CHECKPOINT para a_{na}-s_{ns}; pulando")
+                # Recusar em voz alta, não cair para uma célula vizinha. Não há
+                # checkpoint para `Na = 1`, e é a armadilha mais provável aqui.
+                fala(f"  SEM CHECKPOINT para a_{na}-s_{ns}; pulando "
+                     f"(publicadas: {sorted(disponiveis)})")
                 continue
             cfg = LAMENZA_003(na, ns, phase="eval")
             politica = carregar_ator(disponiveis[(na, ns)], cfg.observation_size)
@@ -242,60 +312,79 @@ def main() -> int:
 
             t0 = time.perf_counter()
             for i, r in enumerate(faltam, 1):
-                linha = rodar_uma(cfg, politica, custo, ops, r, a.episodios)
+                linha = rodar_uma(cfg, politica, custo, ops, r, episodios)
                 escrever_linha(arquivo, linha)
                 feitas[r] = {k: str(v) for k, v in linha.items()}
                 if i == 1 or i % 10 == 0 or i == len(faltam):
-                    decorrido = time.perf_counter() - t0
-                    resta = decorrido / i * (len(faltam) - i)
-                    print(f"    run {r:>3} · {linha['completion_time_medio']:>6.2f}s "
-                          f"· {linha['wall_s']:>5.1f}s "
-                          f"· {i}/{len(faltam)}, resta ~{resta/60:.0f} min")
+                    resta = (time.perf_counter() - t0) / i * (len(faltam) - i)
+                    fala(f"    run {r:>3} · {linha['completion_time_medio']:>6.2f}s "
+                         f"· {linha['wall_s']:>5.1f}s "
+                         f"· {i}/{len(faltam)}, resta ~{resta/60:.0f} min")
 
-        if feitas:
-            linhas = [feitas[r] for r in sorted(feitas) if r < a.runs]
-            resumos[(na, ns)] = resumir(linhas)
+        usaveis = [feitas[r] for r in sorted(feitas) if r < runs]
+        if usaveis:
+            resumos[(na, ns)] = resumir(usaveis)
+            contagens[(na, ns)] = len(usaveis)
 
     if not resumos:
-        print("\nnada a resumir")
-        return 1
+        fala("\nnada a resumir")
+        return resumos
 
     # ------------------------------------------------------------------ resumo
-    print("\n" + "=" * 96)
-    nota_ep = ("o número do test.py de Lamenza" if a.episodios == EPISODIOS_LAMENZA
-               else f"ATENÇÃO: Lamenza usa {EPISODIOS_LAMENZA}")
-    print(f"RESUMO — média ± desvio SOBRE AS RUNS (cada run = {a.episodios} "
-          f"episódios; {nota_ep})")
-    print("=" * 96)
-    print(f"{'célula':>9} {'runs':>5} {'conclusão (s)':>19} {'sucesso':>16} "
-          f"{'separação (m)':>18} {'latência (µs)':>17}")
+    nota = ("o número do test.py de Lamenza" if episodios == EPISODIOS_LAMENZA
+            else f"ATENÇÃO: Lamenza usa {EPISODIOS_LAMENZA}")
+    fala("\n" + "=" * 96)
+    fala(f"RESUMO — média ± desvio SOBRE AS RUNS "
+         f"(cada run = {episodios} episódios; {nota})")
+    fala("=" * 96)
+    fala(f"{'célula':>9} {'runs':>5} {'conclusão (s)':>19} {'sucesso':>16} "
+         f"{'separação (m)':>18} {'latência (µs)':>17}")
+
+    def par(r, c, casas=2):
+        if c not in r:
+            return "—"
+        m, s = r[c]
+        return f"{m:.{casas}f} ± {s:.{casas}f}"
+
     for (na, ns), r in resumos.items():
-        n = len([1 for x in Path(caminho_csv(Path(a.dir_saida), na, ns))
-                 .read_text().splitlines()[1:] if x.strip()])
-        def par(c, casas=2):
-            if c not in r:
-                return "—"
-            m, s = r[c]
-            return f"{m:.{casas}f} ± {s:.{casas}f}"
-        print(f"{f'a_{na}-s_{ns}':>9} {min(n, a.runs):>5} "
-              f"{par('completion_time_medio'):>19} "
-              f"{par('taxa_sucesso', 4):>16} "
-              f"{par('separacao_media_m', 1):>18} "
-              f"{par('latencia_mediana_us', 1):>17}")
+        fala(f"{f'a_{na}-s_{ns}':>9} {contagens[(na, ns)]:>5} "
+             f"{par(r, 'completion_time_medio'):>19} "
+             f"{par(r, 'taxa_sucesso', 4):>16} "
+             f"{par(r, 'separacao_media_m', 1):>18} "
+             f"{par(r, 'latencia_mediana_us', 1):>17}")
 
-    print(f"\n{'célula':>9} {'params ator':>12} {'ator fp32':>12} {'mult. fp':>10}")
-    for (na, ns) in resumos:
-        with open(caminho_csv(Path(a.dir_saida), na, ns), newline="") as f:
+    fala(f"\n{'célula':>9} {'params ator':>12} {'ator fp32':>12} {'mult. fp':>10}")
+    for na, ns in resumos:
+        with open(caminho_csv(dir_saida, na, ns), newline="") as f:
             primeira = next(csv.DictReader(f))
-        print(f"{f'a_{na}-s_{ns}':>9} {int(primeira['params_ator']):>12} "
-              f"{int(primeira['bytes_ator_fp32'])/1024:>9.1f} KB "
-              f"{int(primeira['mult_fp']):>10}")
+        fala(f"{f'a_{na}-s_{ns}':>9} {int(primeira['params_ator']):>12} "
+             f"{int(primeira['bytes_ator_fp32'])/1024:>9.1f} KB "
+             f"{int(primeira['mult_fp']):>10}")
 
-    print("\nO desvio acima é ENTRE RUNS, não entre episódios: mede quanto o valor")
-    print("publicado variaria numa nova campanha. O desvio entre episódios está na")
-    print("coluna `completion_time_std_episodios` do CSV, e é muito maior.")
-    print(f"\nCSVs: {a.dir_saida}/campanha-a*s*.csv")
-    return 0
+    fala("\nO desvio acima é ENTRE RUNS, não entre episódios: mede quanto o valor")
+    fala("publicado variaria numa nova campanha. O desvio entre episódios está na")
+    fala("coluna `completion_time_std_episodios` do CSV, e é muito maior.")
+    fala(f"\nCSVs: {dir_saida}/campanha-a*s*.csv")
+    return resumos
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--runs", type=int, default=100)
+    ap.add_argument("--episodios", type=int, default=EPISODIOS_LAMENZA,
+                    help=f"por run; {EPISODIOS_LAMENZA} é o do test.py de Lamenza")
+    ap.add_argument(
+        "--celulas", default="",
+        help="lista 'Na:Ns' separada por vírgula, ex. '4:24,8:36'. "
+             "Vazio = CENARIOS_LAMENZA (as 9 células da tab. 7.1)")
+    ap.add_argument("--dir-saida", default="reports/maddpg")
+    ap.add_argument("--so-resumo", action="store_true",
+                    help="não roda nada; só resume os CSVs existentes")
+    a = ap.parse_args()
+
+    resumos = _executar(analisar_celulas(a.celulas), a.runs, a.episodios,
+                        Path(a.dir_saida), a.so_resumo, verboso=True)
+    return 0 if resumos else 1
 
 
 if __name__ == "__main__":
