@@ -30,7 +30,7 @@ O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos �
 ## 0-CORTE. O ruído entra apenas no GPS do drone (D13, 2026-08-15)
 
 > **Decisão de escopo.** O canal do sensor saiu. Com ele saem: o bloco 2b, o
-> filtro de informação, a hipótese **H4** e as pendências **T3** e **P3**.
+> filtro de informação, a hipótese **H4** e as pendências **TS3** e **P3**.
 >
 > | item | estado |
 > |---|---|
@@ -43,11 +43,11 @@ O mesmo `e/(2S)` soma a **todas** as entradas válidas — sensores e vizinhos �
 > | filtro de informação (alvo estático) | **fora** |
 > | `R(d)` crescente com a distância | **fora** |
 > | H4 (busca ativa) | **retirada** — perdeu a causa física, não só o experimento |
-> | T3, P3 | **fechadas por decisão**, não resolvidas |
+> | TS3, P3 | **fechadas por decisão**, não resolvidas |
 >
 > **O que o corte ganha.** O canal do drone é o único com modelo fechado — ruído
 > branco, estado móvel, comando conhecido — e é onde a medição de 18,8× existe. O
-> que sai dependia de uma decisão de física nunca tomada (T3) e tinha ganho
+> que sai dependia de uma decisão de física nunca tomada (TS3) e tinha ganho
 > conjectural.
 >
 > **O que o corte custa.** A H4 perde a causa física: com ruído só na posição
@@ -119,7 +119,7 @@ E o achado que dá substância à proposta (PRD §1, A3; PLANO §9.4): o KF de v
 
 ## 3. Escopo
 
-**Dentro:** os três modelos de corrupção (GPS próprio, posição de sensor por enlace local, atraso de broadcast); o KF de 2 estados com entrada de controle; o filtro de informação para estado constante; os degraus 2 (passa-baixa) e 3 (KF-VC) da escada, porque são **referências que precisam ser sintonizadas com o mesmo rigor da proposta**; a composição de covariância para coordenadas relativas; NEES/NIS e brancura da inovação; sintonia de `Q` e `R`; o teste do invariante RF-04; a contagem de operações do filtro e sua integração ao harness da SPEC-03.
+**Dentro (revisto por D13):** o modelo de corrupção do **GPS próprio** (`p̂_k = p_k + e_k`) e o do **atraso de broadcast** — este último porque a Etapa 3 precisa dele para a interseção de covariância; o **KF de 2 estados com entrada de controle**; os degraus 0–5 da escada; NEES/NIS. ~~Corrupção da posição de sensor por enlace local~~ e ~~filtro de informação para estado constante~~ **saíram do escopo**: a posição dos sensores permanece exata, como no problema original.
 
 **Fora:** interseção de covariância e fusão entre UAVs (SPEC-09; aqui só se provisiona a API de mensagens atrasadas); canais de covariância na observação, degrau 5 (codificação é da SPEC-01/SPEC-08; aqui entrega-se apenas `P` como saída documentada); qualquer experimento com política treinada (SPEC-08); o caso **não linear** de descoberta por distância/RSSI com trilateração (P3 — ver §9).
 

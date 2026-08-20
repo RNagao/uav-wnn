@@ -213,7 +213,7 @@ RNF-06 tem três cláusulas. Cada uma vira uma checagem executável em `tools/ch
 | 3.2 Fundamentação — filtro de Kalman | KF linear; **KF com entrada de controle** (`x̂ + u·dt`) e por que a ação da política é informação disponível de graça; filtro de informação para fonte estática; NEES/NIS como teste de consistência | 07 | — |
 | 3.3 Fundamentação — interseção de covariância | por que o KF ingênuo diverge sob correlação desconhecida; CI como limite conservador | 07, 09 | — |
 | 4.1 Método — o problema reproduzido | MDP de Lamenza verbatim: observação eq. 5-1, ação contínua eq. 3-2, recompensa eq. 5-6, cenário tab. 7.1 | 00 | tabela de parâmetros do cenário |
-| 4.2 Método — codificador | esquema escolhido, `T`, cobertura de bits `N·n/B`, binning por slot | **01** | `tables/spec01-*`, figuras de geometria |
+| 4.2 Método — codificador | esquema escolhido, `T`, binning por slot. **A cobertura de bits deixou de ser número a reportar e passou a ser propriedade estrutural:** com o mapeamento por partição do `:uniform_random` ela é 1,0 por construção (achado C4 fechado). Mencionar o contraste com a amostragem por RAM, onde `N·n/B` podia ficar abaixo de 1 | **01** | `tables/spec01-*`, figuras de geometria |
 | 4.3 Método — aproximadores | n-tuple Actor-Critic; MLP AC pareada; parameter sharing | 04, 05 | — |
 | 4.4 Método — protocolo de custo | T1 (alocado/ocupado/**realizado** + mapeamento de tuplas), T2 (mediana/p99, decomposto, com e sem arcabouço), T3 (operações por tipo) | **03** | — |
 | 4.5 Método — protocolo de avaliação | 500 episódios pareados, bootstrap, sementes, hardware | **10 (esta)** | `manifest` agregado |

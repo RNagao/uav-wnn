@@ -20,6 +20,13 @@ Consolidação das ~90 perguntas em aberto espalhadas pelo PRD e pelas 11 specs.
 
 ---
 
+> **Namespace, para evitar uma confusão real.** `T1`, `T2` e `T3` são as
+> **figuras de mérito de custo** do PRD §5.5 — tamanho, latência e contagem de
+> operações — e aparecem no código, em `src/uavwnn/custo/`. As pendências da
+> Classe B usam o prefixo **`TS`** (de *tese*) justamente para não colidir: antes
+> desta correção, "T3 fechada por decisão" (pendência) convivia com "T3
+> sobrevive" (métrica medida na SPEC-03) no mesmo repositório.
+
 ## Classe A — Bloqueiam a reprodução (informação externa que falta)
 
 Todas dependem do repositório público `Project-GrADyS/gradys-data-collection`, branch `dissertation`, ou do autor. **A latência de uma resposta humana é de dias**, então o pedido tem que sair no dia 1 e o trabalho segue parametrizado enquanto isso.
@@ -43,9 +50,9 @@ Todas dependem do repositório público `Project-GrADyS/gradys-data-collection`,
 | ID | Pendência | Impacto |
 |---|---|---|
 | ~~**T1**~~ | ~~"modelo menor" → "aproximador sem multiplicação"?~~ | **FECHADA POR MEDIÇÃO, com resposta negativa.** Não são os ~12–15 KB estimados: medido, a WNN é **133,9 KB** (chaves ordenadas) contra **7,6 KB** da MLP pareada — **17,5×** — e ainda 5× menos precisa na clonagem (5,6° contra 1,1°). A estimativa errou uma ordem de grandeza porque partia de um protótipo de **2 variáveis de entrada**; a observação real tem 25. A alegação de tamanho **cai**. Sobra, medido: **zero multiplicações em ponto flutuante no aproximador**, e vantagem de ciclos **condicional ao alvo** — 1,6× em x86, 4,1× em Cortex-M4F, **19,9× em Cortex-M0 sem FPU**. Ver `reports/spec03-custo.md` |
-| **T4** | **A barra da H6 mudou.** O baseline da fig. 7.3 (`greedy`) **não coordena** — separação média entre UAVs de 0,1 m contra alcance de 20 m. A `smart` do mesmo `heuristics.py` coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. Uma heurística sem treino empata com 32 dias de GPU. Decidir: reformular a H6 em torno da `smart`, ou dividir em H6a (bater `greedy`) e H6b (bater `smart`)? Ver `reports/spec00-parametros.md` §9 |
-| **T3** | **Qual é a física do ruído no sensor?** Decide se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância e é dominado por **viés fixo** — o canal vira piso irredutível e a busca ativa perde a causa. Se o drone **localiza o sensor por rádio**, o erro é branco e cresce com a distância, a filtragem tem função e aproximar-se compra informação — ao custo de um alcance de detecção maior que o de coleta, declarado na §5.4. **Bloqueia o bloco 2b; não bloqueia 2a** |
-| **T2** | **Recalibrar o que a fusão pode prometer** | A observação é **relativa**, então `σ_rel = √(σ_a² + σ_s²)`. Se o levantamento dos sensores tiver ~5 m irredutíveis, o 18,8× medido no GPS vira **~2,2×** no que a política enxerga. O achado A3 é sobre a posição própria, não sobre a entrada da política |
+| **TS4** | **A barra da H6 mudou.** O baseline da fig. 7.3 (`greedy`) **não coordena** — separação média entre UAVs de 0,1 m contra alcance de 20 m. A `smart` do mesmo `heuristics.py` coordena lendo só a observação e fica a **5–17 % do MADDPG publicado**, superando-o com 2 agentes. Uma heurística sem treino empata com 32 dias de GPU. Decidir: reformular a H6 em torno da `smart`, ou dividir em H6a (bater `greedy`) e H6b (bater `smart`)? Ver `reports/spec00-parametros.md` §9 |
+| **TS3** | **Qual é a física do ruído no sensor?** Decide se a H4 tem mecanismo. Se o sensor **transmite o próprio GPS**, o erro é dele, não depende da distância e é dominado por **viés fixo** — o canal vira piso irredutível e a busca ativa perde a causa. Se o drone **localiza o sensor por rádio**, o erro é branco e cresce com a distância, a filtragem tem função e aproximar-se compra informação — ao custo de um alcance de detecção maior que o de coleta, declarado na §5.4. **Bloqueia o bloco 2b; não bloqueia 2a** |
+| **TS2** | **Recalibrar o que a fusão pode prometer** | A observação é **relativa**, então `σ_rel = √(σ_a² + σ_s²)`. Se o levantamento dos sensores tiver ~5 m irredutíveis, o 18,8× medido no GPS vira **~2,2×** no que a política enxerga. O achado A3 é sobre a posição própria, não sobre a entrada da política |
 
 **Impacto agregado:** nenhuma das duas mata o projeto. Ambas mudam o que o relatório pode afirmar. Adiar as duas é o cenário caro: significa descobrir na redação que a manchete não se sustenta.
 
@@ -213,7 +220,7 @@ e **retira uma hipótese**.
 
 | ID | era | por que fecha |
 |---|---|---|
-| **T3** | Qual é a física do ruído no sensor — GPS próprio (viés fixo dominante) ou localização por rádio (branco, crescente com a distância)? | Sem o canal, a pergunta não tem consequência. **É o primeiro item a reabrir se o escopo crescer**, porque a resposta determina se a H4 tem mecanismo |
+| **TS3** | Qual é a física do ruído no sensor — GPS próprio (viés fixo dominante) ou localização por rádio (branco, crescente com a distância)? | Sem o canal, a pergunta não tem consequência. **É o primeiro item a reabrir se o escopo crescer**, porque a resposta determina se a H4 tem mecanismo |
 | **P3** | O sensor transmite posição estimada (linear → filtro de informação) ou distância/RSSI (não linear → EKF/UKF)? | Idem. Fica emparelhada com a T3 |
 | **P9** | Parâmetros do canal do sensor: `σ_b`, `σ_0` e `κ` de `R(d) = (σ_0 + κ·d)²` | Não há canal a parametrizar |
 

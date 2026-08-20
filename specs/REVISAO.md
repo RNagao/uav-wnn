@@ -20,7 +20,7 @@
 > | **F.1** — sementes de treino | **aberto** (E1) |
 > | **G.1** — cobertura de bits na SPEC-01 | **aplicado** |
 >
-> Achados novos, posteriores a esta revisão. **Atualizado por D13 (2026-08-15):** o ruído passa a incidir apenas no GPS do drone, o que **fecha T3, P3 e P9 por decisão** (não por resposta) e **retira a H4**. Ver o adendo em `PENDENCIAS.md`.
+> Achados novos, posteriores a esta revisão. **Atualizado por D13 (2026-08-15):** o ruído passa a incidir apenas no GPS do drone, o que **fecha TS3, P3 e P9 por decisão** (não por resposta) e **retira a H4**. Ver o adendo em `PENDENCIAS.md`.
 
 ---
 

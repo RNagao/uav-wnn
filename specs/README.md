@@ -20,7 +20,7 @@ Decomposição do PRD (`../PRD.md`) em unidades de trabalho pequenas, cada uma c
 | **05** | [n-tuple Actor-Critic + MLP AC pareado](SPEC-05-actor-critic.md) | modelo | 1 | 04 | 3 d | **Algoritmo 4.4 implementado**; falta o MLP AC pareado |
 | **06** | [Etapa 1 — réplicas 1a/1b e varreduras → **G1**](SPEC-06-etapa1.md) | experimento | 1 | 00, 02, 03, 05 | 4 d | revisada (P1 fechada; guloso validado) |
 | **07** | [Ruído, KF com entrada de controle, NEES/NIS](SPEC-07-fusao-local.md) | fusão | 2 | 00 | 3 d | **escopo cortado (D13)**: só GPS do drone |
-| **08** | [Etapa 2 — ruído no GPS do drone → **G2**](SPEC-08-etapa2.md) | experimento | 2 | 06, 07 | 3 d | **um bloco só (D13)**; T3 fechada por decisão |
+| **08** | [Etapa 2 — ruído no GPS do drone → **G2**](SPEC-08-etapa2.md) | experimento | 2 | 06, 07 | 3 d | **um bloco só (D13)**; TS3 fechada por decisão |
 | **09** | [Etapa 3 — multiagente e interseção de covariância → **G3**](SPEC-09-etapa3.md) | fusão + experimento | 3 | 08 | 4 d | revisada (padding `-1`; P1 fechada) |
 | **10** | [Reprodutibilidade, relatório e slides](SPEC-10-entrega.md) | entrega | — | contínua | contínua | escrita, em revisão |
 
@@ -77,7 +77,7 @@ SPEC-02, 03 e 07 não dependem umas das outras nem da SPEC-01: rodam em paralelo
 
 | Portão | Spec | Critério |
 |---|---|---|
-| **G0** | 01 | Codificador escolhido com evidência medida; `(n, N)` pré-selecionados |
+| **G0** | 01 | Codificador escolhido com evidência medida; `(T, n/B)` pré-selecionados. **`N` deixou de ser eixo**: com o mapeamento por partição vale `N = ⌈B/n⌉`, determinado |
 | **G1** | 06 | Réplica 1a vs os 100 % publicados; 1b dentro do IC do guloso; tabela de custo completa; veredito de H1 |
-| **G2** | 08 | Por bloco: NEES/NIS no intervalo qui-quadrado; degrau 4 indistinguível do 0 e superior a 2 e 3. O bloco **2b** depende de **T3** |
+| **G2** | 08 | NEES/NIS no intervalo qui-quadrado; degrau 4 indistinguível do 0 e superior a 2 e 3. **Um bloco só (D13)** — a dependência de T3 caiu com o canal do sensor |
 | **G3** | 09 | 6c supera 6a com NEES/NIS consistente; 6b demonstravelmente inconsistente; vereditos de H5 e H6 |

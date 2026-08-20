@@ -336,7 +336,7 @@ Aqui, e só aqui, o problema é estendido. O capítulo do relatório é separado
 
 Custo medido: **~5 h de um núcleo** a 2 M passos por corrida, paralelizando trivialmente.
 
-**O que o corte ganha.** O canal do drone é o único cujo modelo estava **fechado** — ruído branco, estado móvel, comando conhecido — e é exatamente onde vive o achado medido A3 (`12,54 m → 0,67 m`, 18,8×). O bloco que sai era o que dependia de uma decisão de física não tomada (T3) e cujo ganho era conjectural. O projeto fica mais estreito e inteiramente apoiado em medição.
+**O que o corte ganha.** O canal do drone é o único cujo modelo estava **fechado** — ruído branco, estado móvel, comando conhecido — e é exatamente onde vive o achado medido A3 (`12,54 m → 0,67 m`, 18,8×). O bloco que sai era o que dependia de uma decisão de física não tomada (TS3) e cujo ganho era conjectural. O projeto fica mais estreito e inteiramente apoiado em medição.
 
 **O que o corte custa, dito sem eufemismo.** A H4 perde a causa física, não só o experimento — ver a tabela de hipóteses. Some também a leitura mais bonita do trabalho, a de que *aproximar-se compra informação*.
 
@@ -346,7 +346,7 @@ Custo medido: **~5 h de um núcleo** a 2 M passos por corrida, paralelizando tri
 
 **A posição dos sensores continua exata**, como no problema original de Lamenza. O que o drone estima é a **própria** posição; e o dado derivado que isso afeta — o ranking dos sensores por distância — passa a ser computado sobre a estimativa filtrada da posição própria, nunca sobre a verdade. É a única costura que o ruído exige. Desenho em [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md) §3.
 
-> **~~T3~~ — FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era a física do canal do sensor: GPS próprio do sensor (erro dominado por viés fixo, canal vira piso irredutível) ou localização por rádio (erro branco crescente com a distância, filtragem tem função). **Com o canal fora do escopo, a pergunta deixa de ter consequência.** Fica registrada porque é o primeiro item a reabrir se o escopo voltar a crescer — e porque a resposta determinaria se a H4 tem mecanismo.
+> **~~TS3~~ — FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era a física do canal do sensor: GPS próprio do sensor (erro dominado por viés fixo, canal vira piso irredutível) ou localização por rádio (erro branco crescente com a distância, filtragem tem função). **Com o canal fora do escopo, a pergunta deixa de ter consequência.** Fica registrada porque é o primeiro item a reabrir se o escopo voltar a crescer — e porque a resposta determinaria se a H4 tem mecanismo.
 
 **Escada de ablação:**
 
@@ -450,7 +450,7 @@ uav-wnn/
 │   │   └── rewards.py             # eq. 5-6 e eq. 7-2, verbatim
 │   ├── fusion/                    # ETAPA 2+ — extensão, isolada do núcleo
 │   │   ├── noise.py               # GPS, enlace local, atraso de broadcast
-│   │   ├── kalman.py              # KF com entrada de controle; filtro de informação
+│   │   ├── kalman.py              # KF com entrada de controle (só isto, D13)
 │   │   ├── ci.py                  # interseção de covariância
 │   │   └── consistency.py         # NEES / NIS
 │   ├── train/runner.py
@@ -481,6 +481,15 @@ A execução é decomposta em specs pequenas, com escopo fechado e critério de 
 | **2** | SPEC-04, 05, 06 | Núcleo n-tuple · Actor-Critic e MLP pareado · Etapa 1 (réplicas 1a/1b, varreduras, tabela de custo da §5.5) | **G1** e veredito de H1 |
 | **3** | SPEC-08 | Ruído no GPS do drone; KF com entrada de controle; NEES/NIS; escada 0–5; varredura `σ_own × T` | **G2**, H2 e H3 |
 | **4** | SPEC-09 + fechamento | Multiagente 3a/3b; degraus 6a/6b/6c; interseção de covariância; relatório e slides | **G3**; `make repro` verde; E2 e E3 |
+
+> **Estado real, 2026-08-15 — a numeração de semanas já não descreve a ordem em que as coisas saíram.** Concluídas: SPEC-00 (ambiente), SPEC-01 (**G0** fechado), SPEC-03 (T1 e T3 medidos, T2 pendente), SPEC-04 (as duas redes, desvio zero contra o `Ramnet.jl`) e a metade da SPEC-05 (Algoritmo 4.4 implementado; falta a MLP AC pareada). **Pendente e bloqueando:** a SPEC-02, cujo teste A/A é o último item estatístico de que todo IC já reportado depende.
+>
+> **O corte D13 devolveu folga à semana 4**, que perdeu o bloco 2b. Duas destinações honestas, em ordem de prioridade:
+>
+> 1. **SPEC-02 completa, com teste A/A e calibração do bootstrap pareado.** É dívida, não escopo novo: a validação 9/9 da SPEC-00, o `greedy` vs `smart` e a comparação de custo da SPEC-03 todos pressupõem um procedimento de intervalo nunca verificado.
+> 2. **T2 (latência)** da SPEC-03, que ficou pendente da estrutura de armazenamento — e a estrutura agora existe, esparsa e validada.
+>
+> Não usar a folga para reabrir o canal do sensor pela porta de trás: o corte foi uma decisão, e revertê-lo informalmente seria pior que nunca tê-lo feito.
 
 **A SPEC-00 saiu antes do prazo e mais barata que o previsto** — o ambiente veio pronto do repositório de referência em vez de ser escrito. Isso liberou a semana 1 para quatro specs em paralelo.
 
@@ -542,7 +551,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 | **D9** | **Fusão local (Etapa 2) antes do multiagente (Etapa 3)** | A varredura σ × T é o experimento mais caro e roda muito mais barato com 1 UAV. E a regra *bin ≈ σ* precisa estar fixada antes de o multiagente entrar |
 | **D10** | Etapa 3 tem sub-passo **3a sem ruído** obrigatório | Sem ele, degradação por coordenação e por incerteza ficam confundidas |
 | **D11** | **Tamanho do modelo e tempo de inferência são figuras de mérito de primeira classe**, medidas em toda etapa e reportadas junto com tempo de conclusão e taxa de sucesso | São o conteúdo de H1 e a única contribuição que independe de a política ser boa: mesmo com desempenho apenas comparável, o par (tamanho, aritmética) é resultado. Protocolo em §5.5 |
-| **D13** | **O ruído entra apenas no GPS do drone.** O canal do sensor sai do escopo, e com ele o bloco 2b, o filtro de informação, a H4, a T3 e a P3 | O canal do drone é o único com modelo fechado (ruído branco, estado móvel, comando conhecido) e é onde vive o achado medido A3 (18,8×). O canal do sensor dependia de uma decisão de física não tomada (T3) e tinha ganho conjectural. **Custo aceito:** a H4 perde a causa física, não só o experimento. **O que se preserva:** KF com entrada de controle, interseção de covariância entre UAVs (H5) e validação NEES/NIS — o conteúdo de fusão permanece |
+| **D13** | **O ruído entra apenas no GPS do drone.** O canal do sensor sai do escopo, e com ele o bloco 2b, o filtro de informação, a H4, a T3 e a P3 | O canal do drone é o único com modelo fechado (ruído branco, estado móvel, comando conhecido) e é onde vive o achado medido A3 (18,8×). O canal do sensor dependia de uma decisão de física não tomada (TS3) e tinha ganho conjectural. **Custo aceito:** a H4 perde a causa física, não só o experimento. **O que se preserva:** KF com entrada de controle, interseção de covariância entre UAVs (H5) e validação NEES/NIS — o conteúdo de fusão permanece |
 | **D12** | O tamanho reportado é o **realizado**, com mapeamento de tuplas contabilizado, e a razão é dada contra **ambas** as referências | Reportar só a LUT ocupada contra o ator do MADDPG seria escolher o numerador e o denominador convenientes |
 
 ### Pendências
@@ -550,7 +559,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 - **P1** — Confirmar `communication_range` no repositório `Project-GrADyS/gradys-data-collection` (branch `dissertation`). Não consta nas tabelas 7.1/7.2. **Bloqueia a comparação numérica com os resultados publicados**, então é a primeira tarefa da semana 1.
 - **P2** — Medir o orçamento real de simulação e validar `update_rate = 0,1` contra 0,01 com 8 UAVs.
 - **P4** — Extrair do repositório público a **arquitetura do ator do MADDPG** (largura e profundidade das camadas). Sem ela, a razão de tamanho contra a referência de Lamenza não passa de estimativa (§5.5). O padrão do CleanRL, base declarada da implementação dele, é 256×256.
-- ~~**P3**~~ — **FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era se o sensor transmite posição estimada (caso linear → filtro de informação) ou distância/RSSI (caso não linear → EKF/UKF e trilateração). Com o canal do sensor fora do escopo, a pergunta não tem consequência. Fica registrada junto com a **T3** como o par a reabrir se o escopo crescer.
+- ~~**P3**~~ — **FECHADA pelo corte de escopo (D13), não resolvida.** A pergunta era se o sensor transmite posição estimada (caso linear → filtro de informação) ou distância/RSSI (caso não linear → EKF/UKF e trilateração). Com o canal do sensor fora do escopo, a pergunta não tem consequência. Fica registrada junto com a **TS3** como o par a reabrir se o escopo crescer.
 
 - **P13** — **`Σ` é covariância ou desvio-padrão?** A eq. (4.34) diz *"predefined **covariance** matrix"*, logo a amostragem correta é `√Σ·z`. O `ContinousActionPolicy.jl` do autor amostra `Σ·z` mas usa `inv(Σ)` no gradiente — trata o mesmo número como desvio num lugar e variância no outro. **Seguimos o artigo**; `PoliticaGaussiana(..., escala_como_desvio=True)` reproduz o Julia. Com `Σ = 0,25` a diferença é **fator 2 na exploração**, então a escolha tem de aparecer na tabela de hiperparâmetros do relatório. *Resolvida em recomendação; falta aval.*
 
@@ -565,7 +574,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 | Etapa | Pronta quando |
 |---|---|
 | **1** | Réplica 1a com taxa de sucesso reportada contra os 100 % publicados; 1b com tempo de conclusão vs guloso, em pelo menos `Na ∈ {1, 2, 4}`; **tabela de custo completa da §5.5** (T1 alocado/ocupado/realizado com mapeamento de tuplas, curva de ocupação, T2 mediana e p99 decomposto, T3 contagem de operações), contra as duas referências; veredito para H1 |
-| **2** | NEES/NIS de cada canal no intervalo qui-quadrado; degraus 0–5 com IC nos dois regimes de treino; varredura σ × T reportada; vereditos para H2, H3, H4 |
+| **2** | NEES/NIS do canal do GPS próprio no intervalo qui-quadrado; degraus 0–5 com IC nos dois regimes de treino; varredura `σ_own` × T reportada; vereditos para H2, H3, H4 |
 | **3** | 3a medido como referência; degraus 1, 4, 6a/6b/6c medidos; vereditos para H5 e H6 |
 
 **Global:**
@@ -575,7 +584,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 3. A tabela de desvios (§5.4) reflete exatamente o que foi executado.
 4. A tabela de custo segue o protocolo da §5.5 integralmente: tamanho **realizado** (não só ocupado), mapeamento de tuplas contabilizado, p99 além da mediana, contagem de operações por tipo, e — nas Etapas 2–3 — T1/T2 recalculados com o filtro embutido.
 5. As razões de tamanho e latência são reportadas contra **ambas** as referências (MLP pareada e ator do MADDPG), com a configuração `T, n, N, Na` que as gerou.
-6. Cada hipótese H1–H6 tem veredito escrito — confirmada, refutada ou inconclusiva — **com o número que o sustenta**. Hipótese refutada é resultado, não fracasso.
+6. Cada hipótese **em vigor** — H1, H2, H3, H5, H6 — tem veredito escrito, confirmada, refutada ou inconclusiva, **com o número que o sustenta**. A **H4 foi retirada** por D13 e entra no relatório como hipótese *abandonada com justificativa*, não como inconclusiva: registrar que o mecanismo saiu do escopo é diferente de tê-la testado sem resultado. Hipótese refutada é resultado, não fracasso.
 7. E2 e E3 entregues.
 
 ---

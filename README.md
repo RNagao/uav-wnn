@@ -27,7 +27,7 @@ O simulador está fixado em **`gradysim==0.6.11`**: o `environment.py` de refer�
 | SPEC-02, 07 | revisadas; **próximas**, rodam em paralelo |
 | SPEC-04 a 06, 08 a 10 | revisadas |
 
-**Escopo do ruído (D13):** apenas o **GPS do drone**. O canal do sensor saiu, e com ele o antigo bloco 2b, o filtro de informação, a hipótese H4 e as pendências T3 e P3. O conteúdo de fusão permanece: KF com entrada de controle (Etapa 2) e interseção de covariância entre UAVs (Etapa 3).
+**Escopo do ruído (D13):** apenas o **GPS do drone**. O canal do sensor saiu, e com ele o antigo bloco 2b, o filtro de informação, a hipótese H4 e as pendências TS3 e P3. O conteúdo de fusão permanece: KF com entrada de controle (Etapa 2) e interseção de covariância entre UAVs (Etapa 3).
 
 ## Resultados medidos
 

@@ -17,21 +17,17 @@ flowchart LR
         T["p_i sensores<br/>p_k drone<br/>física intocada"]
     end
 
-    CS["Relatório do sensor<br/>z = p_i + b_i + v_t<br/>R(d) cresce com a distância"]
-    CG["GPS do drone<br/>ẑ = p_k + e_k<br/>σ fixo, fora da varredura"]
-    FI["Filtro de informação<br/>Ω ← Ω + R(d)⁻¹<br/>alvo estático, sem controle"]
+    CG["GPS do drone<br/>ẑ = p_k + e_k<br/>σ_own VARRIDO"]
     KF["Kalman + entrada de controle<br/>p̃⁻ = p̃ + u·dt<br/>alvo móvel, comando conhecido"]
-    OBS["Ranking sobre as estimativas<br/>montagem relativa e normalizada<br/>termômetro → bits"]
-    POL["Rede n-tuple Actor-Critic<br/>u = rumo, velocidade"]
+    OBS["Ranking sobre a estimativa própria<br/>montagem relativa e normalizada<br/>termômetro quantil → bits"]
+    POL["Rede n-tuple Actor-Critic<br/>Algoritmo 4.4<br/>u = rumo, velocidade"]
     MET["Métricas<br/>só avaliação"]
 
-    T -->|verdade| CS
-    T -->|verdade| CG
+    T -->|"verdade: p_k"| CG
+    T -->|"verdade: p_i, exata"| OBS
     T -.->|nunca chega à política| MET
-    CS --> FI
     CG --> KF
-    FI --> OBS
-    KF --> OBS
+    KF -->|"p̂_k estimada"| OBS
     OBS --> POL
     POL -->|"env.step(u) move o drone"| ENV
     POL -->|"a mesma ação vira comando"| KF
@@ -41,14 +37,37 @@ flowchart LR
     classDef est stroke:#3E9A90,stroke-width:1.5px
     classDef ctrl stroke:#B0637C,stroke-width:1.5px
     class T,MET truth
-    class CS,CG noise
-    class FI,KF est
+    class CG noise
+    class KF est
     class POL ctrl
 ```
 
-A verdade sai do ambiente por dois caminhos e **nunca por um terceiro**: corrompida nos dois canais de medição, e — tracejada — direto para as métricas. Não existe seta da caixa do ambiente para a política, e é isso que torna RF-04 uma propriedade da **estrutura** em vez de uma promessa.
+**Um canal de ruído, não dois** (D13). O GPS do drone é corrompido e filtrado; a
+posição dos sensores chega **exata**, como no problema original. A seta
+`T --> OBS` é isso: o ambiente entrega `p_i` sem corrupção, e o que o drone não
+sabe com precisão é **onde ele mesmo está**.
 
-O laço de realimentação fecha **duas vezes**: a ação move o drone no simulador *e* entra na predição do Kalman como comando conhecido. É o que faz o filtro acompanhar as viradas bruscas de rumo — e o que o KF de velocidade constante não tem.
+Essa assimetria é o ponto da Etapa 2. Como toda entrada da observação tem a forma
+`(p_k − p_i + S)/(2S)`, o erro de posição própria vira um **deslocamento comum a
+todas as entradas válidas** — inclusive as dos vizinhos —, e não um erro por
+slot. É essa estrutura que a §3.7 explora para baratear o filtro, e é o oposto do
+que o canal do sensor teria produzido.
+
+A verdade sai do ambiente por dois caminhos e **nunca por um terceiro**: por `CG`
+(corrompida) e — tracejada — direto para as métricas. Não existe seta da caixa do
+ambiente para a política; é isso que torna RF-04 uma propriedade da **estrutura**
+em vez de uma promessa. A seta `T --> OBS` não a viola: ela carrega apenas `p_i`,
+que o problema original já entrega exato.
+
+O laço de realimentação fecha **duas vezes**: a ação move o drone no simulador *e*
+entra na predição do Kalman como comando conhecido. É o que faz o filtro
+acompanhar as viradas bruscas de rumo — e o que o KF de velocidade constante não
+tem.
+
+Na **Etapa 3** entra a única caixa nova: cada UAV transmite `⟨k, t, x̂_k, P_k⟩` e
+os vizinhos fundem por **interseção de covariância** (H5). É fusão entre
+estimativas de posição própria, construída sobre este mesmo `KF` — e portanto
+indiferente ao canal que saiu do escopo.
 
 Nenhuma costura está **dentro** do ambiente. A física — movimento, alcance de comunicação, coleta, recompensa, terminação — permanece exatamente a de Lamenza em todas as etapas.
 
@@ -122,7 +141,7 @@ Descobertas ao ler o código, e que a SPEC-01/SPEC-05 precisam respeitar:
 > | filtro de informação (alvo estático) | **fora do escopo** |
 > | `R(d)` crescente com a distância | **fora do escopo** |
 > | H4 (busca ativa) | **retirada** — perdeu a causa física |
-> | T3, P3 | **fechadas por decisão**, não resolvidas |
+> | TS3, P3 | **fechadas por decisão**, não resolvidas |
 > | GPS do drone, `p̂_k = p_k + e_k` | **é o canal, e o único** |
 > | KF com **entrada de controle** | **permanece** — é onde vive o achado A3 |
 > | ranking computado sobre estimativa filtrada | **permanece** (§3.4) |
@@ -131,7 +150,7 @@ Descobertas ao ler o código, e que a SPEC-01/SPEC-05 precisam respeitar:
 > **Por que o corte melhora o que sobra.** O canal do drone é o único cujo
 > modelo estava fechado — ruído branco, estado móvel, comando conhecido — e é
 > onde vive a medição de 18,8× do achado A3. O canal que sai dependia de uma
-> decisão de física nunca tomada (T3) e tinha ganho conjectural.
+> decisão de física nunca tomada (TS3) e tinha ganho conjectural.
 >
 > **O que se perde, dito sem eufemismo:** a leitura de que *aproximar-se compra
 > informação*, e com ela a H4.
