@@ -1,0 +1,187 @@
+"""Métricas por episódio, censura e imputação — SPEC-02 T-02.5.
+
+O PROBLEMA QUE NÃO PODE FICAR IMPLÍCITO
+
+Qual é o tempo de conclusão de um episódio que **falhou**?
+
+Com `max_seconds_stalled = 30 s`, a caminhada aleatória falha na esmagadora
+maioria dos episódios. Duas saídas ingênuas, e as duas quebram:
+
+- **Média só sobre os que concluíram** é média sobre os cenários mais fáceis —
+  viés de sobrevivência que faz o piso parecer bom.
+- **Imputar o instante da poda** *premia* uma política que trava cedo: falhar
+  rápido daria tempo baixo.
+
+DECISÃO D-02.2 — imputação em `max_episode_length`
+
+    t_conc_pen = t_conc                se sucesso
+                 max_episode_length    caso contrário   (= 500 s, tab. 7.1)
+
+É monótona nas duas dimensões que importam: falhar é sempre pior que concluir, e
+concluir mais cedo é sempre melhor. Não é manipulável por travar cedo, e é um
+escalar único sobre o qual o bootstrap opera sem tratamento especial. É o análogo
+do escore **PAR-1** de competições com limite de tempo; a variante PAR-2
+(`2 × max_episode_length`) fica registrada e não usada.
+
+**A primária sozinha esconde o mecanismo**, então `resumir_episodios` devolve
+sempre o conjunto: `t_conc_pen`, `taxa_sucesso`, `t_conc_sucesso` (com `n`
+explícito e o aviso preso), mediana e p90.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Iterable, Sequence
+
+import numpy as np
+
+MAX_EPISODE_LENGTH = 500.0
+"""Tab. 7.1 de Lamenza. É o valor da imputação de D-02.2."""
+
+
+@dataclass(frozen=True)
+class MetricasEpisodio:
+    """Um episódio, um método, uma célula. Grão de `episodios.parquet`."""
+
+    idx_episodio: int
+    seed_cenario: int
+    sucesso: bool
+    n_visitados: int
+    n_sensores: int
+    t_conc_s: float           # NaN se falhou
+    t_fim_s: float
+    motivo_fim: str           # sucesso | stalled | timeout
+    n_decisoes: int
+    dist_por_agente_m: list[float] = field(default_factory=list)
+    visitas_por_agente: list[int] = field(default_factory=list)
+    coletas_redundantes: int = 0
+    lb1_s: float = float("nan")
+    t_plan_s: float = float("nan")
+
+    @property
+    def t_conc_pen_s(self) -> float:
+        """D-02.2. **A métrica primária.**"""
+        return float(self.t_conc_s) if self.sucesso else MAX_EPISODE_LENGTH
+
+    @property
+    def gini_visitas(self) -> float:
+        """Desigualdade na divisão de trabalho entre agentes.
+
+        0 = perfeitamente dividido, 1 = um agente fez tudo. É o número que
+        sustenta a leitura de coordenação de H6 — o `greedy` voa em formação, e
+        isso aparece aqui além de aparecer na separação média.
+        """
+        return gini(self.visitas_por_agente)
+
+
+def gini(x: Sequence[float]) -> float:
+    """Coeficiente de Gini. `nan` para amostra vazia ou soma nula."""
+    v = np.sort(np.asarray(x, dtype=float))
+    n = v.size
+    if n == 0 or v.sum() == 0:
+        return float("nan")
+    if n == 1:
+        return 0.0
+    indices = np.arange(1, n + 1)
+    return float((2 * (indices * v).sum()) / (n * v.sum()) - (n + 1) / n)
+
+
+def lb1(
+    pos_sensores: np.ndarray,
+    pos_agentes: np.ndarray,
+    communication_range: float,
+    v_max: float,
+) -> float:
+    """LB-1 — limite inferior **válido**, T-02.4d.
+
+        T ≥ max_i  min_k  (‖p_i − p_k⁰‖ − communication_range)₊ / v_max
+
+    Todo sensor precisa ficar a menos de `communication_range` de algum agente, e
+    nenhum agente anda mais rápido que `v_max`. É frouxo — ignora que um agente
+    não pode estar em dois lugares — mas é **válido**, custa microssegundos e vai
+    para a tabela como coluna própria.
+
+    **Um resultado abaixo de LB-1 é bug, não descoberta**, e o harness assere
+    isso.
+    """
+    s = np.atleast_2d(np.asarray(pos_sensores, float))
+    a = np.atleast_2d(np.asarray(pos_agentes, float))
+    if s.size == 0 or a.size == 0:
+        return 0.0
+    # (n_sensores, n_agentes)
+    d = np.linalg.norm(s[:, None, :] - a[None, :, :], axis=2)
+    alcance = np.maximum(0.0, d - communication_range)
+    return float(alcance.min(axis=1).max() / v_max)
+
+
+@dataclass(frozen=True)
+class Resumo:
+    """Agregado de um método numa célula. Grão de `agregado.csv`."""
+
+    n_ep: int
+    taxa_sucesso: float
+    n_sucesso: int
+    media_t_conc_pen: float
+    mediana_t_conc_pen: float
+    p90_t_conc_pen: float
+    media_t_conc_sucesso: float
+    """Média só sobre os bem-sucedidos.
+
+    **AVISO PRESO À MÉTRICA:** inválida para comparar métodos com taxas de
+    sucesso diferentes — é média sobre os cenários que cada um conseguiu, e não
+    sobre os mesmos cenários. Existe porque é a leitura mais provável da fig. 7.3
+    de Lamenza, não porque seja comparável.
+    """
+    media_lb1: float
+
+    def como_linha(self) -> dict:
+        return {
+            "n_ep": self.n_ep, "taxa_sucesso": self.taxa_sucesso,
+            "n_sucesso": self.n_sucesso,
+            "media_t_conc_pen": self.media_t_conc_pen,
+            "mediana": self.mediana_t_conc_pen, "p90": self.p90_t_conc_pen,
+            "media_t_conc_sucesso": self.media_t_conc_sucesso,
+            "media_lb1": self.media_lb1,
+        }
+
+
+def resumir_episodios(eps: Iterable[MetricasEpisodio]) -> Resumo:
+    """Agrega, devolvendo o conjunto inteiro — a primária nunca sozinha."""
+    lista = list(eps)
+    if not lista:
+        raise ValueError("nenhum episódio")
+    pen = np.array([e.t_conc_pen_s for e in lista], float)
+    ok = np.array([e.sucesso for e in lista], bool)
+    conc = np.array([e.t_conc_s for e in lista], float)[ok]
+    lb = np.array([e.lb1_s for e in lista], float)
+    return Resumo(
+        n_ep=len(lista),
+        taxa_sucesso=float(ok.mean()),
+        n_sucesso=int(ok.sum()),
+        media_t_conc_pen=float(pen.mean()),
+        mediana_t_conc_pen=float(np.median(pen)),
+        p90_t_conc_pen=float(np.percentile(pen, 90)),
+        media_t_conc_sucesso=float(conc.mean()) if conc.size else float("nan"),
+        media_lb1=float(np.nanmean(lb)) if lb.size else float("nan"),
+    )
+
+
+def sucesso_comum(*conjuntos: Sequence[MetricasEpisodio]) -> np.ndarray:
+    """Máscara dos episódios em que **todos** os métodos tiveram sucesso.
+
+    Base do subconjunto `sucesso_comum` das comparações: média sem viés de
+    sobrevivência, porque restringe aos mesmos cenários.
+
+    **Degenera para vazio** quando a caminhada aleatória entra na comparação, e
+    nesse caso a T-02.5 manda não reportar — daí devolver a máscara em vez de já
+    agregar, para o chamador poder checar `mask.sum()`.
+    """
+    if not conjuntos:
+        return np.zeros(0, bool)
+    n = len(conjuntos[0])
+    if any(len(c) != n for c in conjuntos):
+        raise ValueError("pareamento exige mesmo número de episódios")
+    m = np.ones(n, bool)
+    for c in conjuntos:
+        m &= np.array([e.sucesso for e in c], bool)
+    return m
