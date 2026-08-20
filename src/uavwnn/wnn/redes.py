@@ -1,31 +1,69 @@
-"""As duas redes n-tuple da dissertação do Katopodis (2022).
+"""As duas redes n-tuple da dissertação de Katopodis (2022).
 
-A dissertação define **dois modelos distintos**, não um só — e a leitura do
-capítulo 4 fecha a pendência C2, que perguntava como conciliar gradiente
-funcional *com* esquecimento. A resposta é que não se concilia: são redes
-diferentes, com papéis diferentes no Algoritmo 4.4.
+FONTE PRIMÁRIA
+    Rafael Fontella Katopodis. *Reinforcement Learning with Weightless Neural
+    Networks*. Dissertação de mestrado, PESC/COPPE-UFRJ, janeiro de 2022, 87 p.
+    Arquivo local: `tmp/947841_compressed.pdf`.
 
-| papel | seção | modelo | guarda | esquecimento |
-|---|---|---|---|---|
-| ator | §4.3.1 | `RedeGradienteFuncional` | só valor | não |
-| crítico | §4.2.1 | `RedeRegressaoEsquecimento` | valor + contador | sim (φ) |
+    Números de página abaixo são os **impressos** na dissertação. Para achar a
+    página no PDF, some 11 (a numeração impressa começa depois da capa e do
+    material pré-textual). Ex.: Algoritmo 4.4 está na p. 48 impressa = p. 59 do
+    PDF.
 
-O motivo fica claro no laço de treino: o crítico é regredido para o retorno
-`G`, cujo alvo se desloca conforme a política melhora — é a distribuição
-mutável que o fator de esquecimento existe para acompanhar. O ator não tem
-alvo se movendo assim.
+MAPA DAS SEÇÕES QUE ESTE MÓDULO IMPLEMENTA
 
-**Armazenamento esparso, por dicionário.** Não é detalhe de implementação: as
-tabelas do apêndice A da dissertação usam tuplas de **16, 32 e 64 bits**, e
-`2^64` posições por RAM não cabem em array denso. O `NTupleRegressor` denso de
-`ntuple.py` continua servindo a SPEC-01 e a SPEC-03, mas fica preso a `n ≲ 16`;
-estas classes não.
+    §3.2.1  p.22  Redes discriminadoras; fig. 3.1 (neurônio RAM de 1 bit),
+                  fig. 3.2 (multidiscriminador / WiSARD)
+    §3.2.2  p.23  A rede de regressão n-tuple (NTRN) — eqs. (3.15) a (3.22)
+    §3.2.4  p.27  Resolução, tamanho de tupla e o compromisso
+                  complexidade/generalização
+    §4.2.1  p.34  Rede de regressão **com esquecimento** — eqs. (4.8) a (4.10);
+                  fig. 4.2 (p.35) ilustra a estimativa de densidade ponderada
+    §4.2.2  p.35  SARSA de m passos; fig. 4.3 (p.36) mostra as DUAS formas de
+                  modelar saída vetorial
+    §4.3.1  p.38  Rede inspirada em **gradiente funcional** — eqs. (4.11) a
+                  (4.25)
 
-**Mapeamento por partição.** `randperm(B)` fatiado em `⌈B/n⌉` tuplas, como o
-`:uniform_random` do Ramnet.jl. Cada bit é lido **exatamente uma vez**, então a
-cobertura é 1,0 por construção — o achado C4 resolvido pela estrutura em vez de
-por verificação. Quando `B` não é múltiplo de `n`, a última tupla é mais curta,
-e isso é fiel: o Julia usa `Iterators.partition`, que também devolve resto.
+DUAS REDES, NÃO UMA — e é isto que fecha a pendência C2
+
+    O PRD pedia "gradiente funcional **com** esquecimento". Essa combinação não
+    existe na dissertação: são modelos distintos, para papéis distintos no
+    Algoritmo 4.4 (p. 48).
+
+    | papel   | seção  | classe aqui                  | guarda           | φ   |
+    |---------|--------|------------------------------|------------------|-----|
+    | ator    | §4.3.1 | `RedeGradienteFuncional`     | só valor         | não |
+    | crítico | §4.2.1 | `RedeRegressaoEsquecimento`   | valor + contador | sim |
+
+    O porquê está no laço do Algoritmo 4.4: o crítico recebe o retorno `G`,
+    cujo alvo se desloca conforme a política melhora. É a distribuição mutável
+    que o fator de esquecimento existe para acompanhar (§4.1.1, p.31, "The
+    assumption of a fixed joint distribution"). O ator não tem alvo se movendo
+    assim.
+
+ARMAZENAMENTO ESPARSO — não é preferência de estilo
+
+    O apêndice A usa tuplas de **16, 32 e 64 bits**. `2^64` posições por RAM não
+    cabem em array denso. O `NTupleRegressor` de `ntuple.py` é denso e serve à
+    SPEC-01/SPEC-03, mas fica preso a `n ≲ 16`; estas classes não.
+
+    O `Ramnet.jl` do autor usa `Dict{UInt, ...}` por nó, com o mesmo teto de 64
+    (`max_tuple_size = (UInt == UInt32) ? 32 : 64`).
+
+MAPEAMENTO POR PARTIÇÃO
+
+    `randperm(B)` fatiado em `⌈B/n⌉` tuplas — o `:uniform_random` do
+    `Ramnet.jl`. Cada bit é lido **exatamente uma vez**, então a cobertura é 1,0
+    por construção (fecha o nosso achado C4). Quando `B` não é múltiplo de `n` a
+    última tupla é mais curta, e isso é fiel: o Julia usa `Iterators.partition`,
+    que também devolve resto.
+
+VALIDAÇÃO
+
+    `tests/test_redes.py`         — desvio **zero** contra `Ramnet.jl` em 5
+                                    configurações (dois papéis, φ ∈ {0,5; 0,85; 1,0})
+    `tests/test_identidades_artigo.py` — as identidades do texto: (3.17)-(3.22),
+                                    (4.13), (4.16)-(4.23), §3.2.4
 """
 
 from __future__ import annotations
@@ -34,16 +72,33 @@ import numpy as np
 from numpy.typing import NDArray
 
 MAX_TUPLA = 64
-"""Mesmo teto do Ramnet.jl (`max_tuple_size` em 64 bits). Endereços vivem em
-`uint64`, então `n > 64` não é representável."""
+"""Teto do tamanho de tupla.
+
+Mesmo do `Ramnet.jl` (`max_tuple_size = (UInt == UInt32) ? 32 : 64`). O limite é
+de representação: endereços vivem em `uint64`, então `n > 64` não cabe. As
+tabelas do apêndice A vão até 64 exatamente por isso.
+"""
 
 
 def mapeamento_particionado(
     n_bits: int, tamanho_tupla: int, seed: int = 0
 ) -> list[NDArray[np.int64]]:
-    """Partição dos bits em `⌈B/n⌉` tuplas — o `:uniform_random` do Ramnet.
+    """Partição dos `B` bits em `⌈B/n⌉` tuplas.
 
-    Devolve lista, e não matriz, porque a última tupla pode ser mais curta.
+    Implementa o esquema `:uniform_random` do `Ramnet.jl`
+    (`Partitioners/RandomPartitioner.jl`): sorteia uma permutação de `1..B` e a
+    fatia em blocos de `n`. A dissertação descreve o sorteio das tuplas em
+    §3.2.1 (p.22) sem nomear o esquema; o código do autor fixa este.
+
+    **Cada bit é lido exatamente uma vez.** É o que dá cobertura 1,0 e o que
+    torna `N = ⌈B/n⌉` determinado em vez de hiperparâmetro livre — diferente da
+    amostragem por RAM do `NTupleRegressor`, que pode deixar bits sem leitura.
+
+    Devolve **lista**, não matriz, porque a última tupla pode ser mais curta
+    (mesma semântica do `Iterators.partition` do Julia). O `NTNModel` em PyTorch
+    do repositório `anbubus` erra exatamente aqui: conta os nós com `ceil` mas a
+    `conv1d` de endereçamento produz `floor`, e as duas discordam quando `B` não
+    é múltiplo de `n`.
     """
     if tamanho_tupla < 1:
         raise ValueError(f"tamanho_tupla={tamanho_tupla} deve ser >= 1")
@@ -57,11 +112,16 @@ def mapeamento_particionado(
 
 
 class _RedeNTupla:
-    """Endereçamento comum às duas redes.
+    """Endereçamento comum às duas redes — §3.2.1 (p.22), fig. 3.1 e 3.2.
 
-    O endereço de cada RAM é o inteiro cujos bits são os bits da entrada lidos
-    por aquela tupla, com peso `2^k` na posição `k` — a mesma convenção do
-    `encode` do Ramnet (`value += bit << (i-1)`).
+    Um discriminador é um conjunto de `N` neurônios RAM. Cada neurônio `i` lê um
+    subconjunto fixo de `n` bits da entrada binária e usa esses bits como
+    **endereço** numa tabela própria. Na notação da dissertação, `τ[i](x)` é "the
+    address that `x` indexes in neuron `i`" (§3.2.2, p.23).
+
+    A composição do endereço segue a convenção do `encode` do `Ramnet.jl`
+    (`Encoders/RawBitsEncoder.jl`): `value += bit << (i-1)`, isto é, o `k`-ésimo
+    bit da tupla pesa `2^k`.
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
@@ -71,6 +131,8 @@ class _RedeNTupla:
         self.n_saidas = n_saidas
         self.mapeamento = mapeamento_particionado(n_bits, tamanho_tupla, seed)
         self.n_ram = len(self.mapeamento)
+        # Potências de 2 por tupla. Uma lista, e não um vetor único, porque a
+        # última tupla pode ser mais curta que as outras.
         self._potencias = [
             (np.uint64(1) << np.arange(len(t), dtype=np.uint64))
             for t in self.mapeamento
@@ -78,11 +140,22 @@ class _RedeNTupla:
 
     @property
     def cobertura(self) -> float:
-        """Fração dos bits de entrada lida por alguma RAM. Sempre 1,0 aqui."""
+        """Fração dos bits de entrada que alguma RAM lê.
+
+        Sempre 1,0 aqui, por a partição ser exaustiva. Existe como propriedade
+        porque o achado C4 do projeto era justamente que a amostragem por RAM do
+        `NTupleRegressor` podia deixar bits sem leitura, e o valor precisa ser
+        inspecionável nos dois casos.
+        """
         return len(np.unique(np.concatenate(self.mapeamento))) / self.n_bits
 
     def enderecos(self, bits: NDArray[np.bool_]) -> NDArray[np.uint64]:
-        """(M, n_bits) -> (M, n_ram)."""
+        """`τ[i](x)` para cada RAM — §3.2.2 (p.23). `(M, B) -> (M, N)`.
+
+        `uint64` e não `int64` porque com `n = 64` o bit mais significativo pesa
+        `2^63`, que estoura o inteiro com sinal. É o mesmo motivo de o
+        `Ramnet.jl` usar `UInt` nas chaves dos dicionários.
+        """
         if bits.ndim == 1:
             bits = bits[None, :]
         saida = np.empty((bits.shape[0], self.n_ram), dtype=np.uint64)
@@ -91,37 +164,116 @@ class _RedeNTupla:
         return saida
 
     def entradas_ocupadas(self) -> int:
+        """Posições de memória efetivamente escritas, somadas sobre as RAMs.
+
+        Alimenta a figura de mérito T1 do PRD §5.5 — o **ocupado**, que é
+        conteúdo de informação, distinto do **alocado** (`N × 2^n`) e do
+        **realizado** (o footprint da estrutura de dados). Ver
+        `src/uavwnn/custo/memoria.py`.
+        """
         return sum(len(m) for m in self.memoria)
 
     def reiniciar(self) -> None:
+        """Equivalente ao `reset!` do `Ramnet.jl` (`empty!(node.memory)`).
+
+        Posição ausente vale zero, então esvaziar os dicionários devolve a rede
+        ao estado inicial `v[i]_0(x) = 0 ∀x`, que é a condição inicial que
+        §4.3.1 (p.38) declara explicitamente.
+        """
         for m in self.memoria:
             m.clear()
 
 
 class RedeGradienteFuncional(_RedeNTupla):
-    """Ator — §4.3.1, eqs. (4.11) e (4.12).
+    """O **ator** — §4.3.1, p.38. "Functional gradient-inspired n-tuple network".
 
-        v[i]_t(x) = v[i]_{t-1}(x) + α_t · Δ_t,      i = 1..N        (4.11)
-        f(x)      = (1/N) Σ_i v[i](x)                               (4.12)
+    EQUAÇÕES IMPLEMENTADAS
 
-    onde `Δ_t = −∂c/∂z |_{f(x)}` é o negativo do gradiente da perda em relação
-    à *predição*. Posições nunca escritas valem zero, então a média é sempre
-    sobre `N` — não sobre as visitadas.
+        v[i]_t(x_t) = v[i]_{t-1}(x_t) + α_t Δ_t,   i = 1..N          (4.11)
 
-    **Média, não soma.** A eq. (4.12) traz o `1/N` explicitamente. É a
-    convenção que desacopla a taxa de aprendizado de `N`: com `Δ = −(f − y)`, a
-    variação da saída num passo é exatamente `−α(f − y)`, seja qual for `N`.
+        f_t(x) = (1/N) Σ_i v[i]_t(x)                                 (4.12)
+
+        Δ_t = −∂c(x_t, y_t, z)/∂z  avaliado em  z = f_{t-1}(x_t)
+
+    onde `c` é uma função de perda diferenciável. Diferente da rede de regressão
+    de §3.2.2, este modelo **exige a escolha de uma métrica de erro**: "the new
+    model requires the choice of an error metric, not having one implicitly"
+    (§4.3.1, p.38).
+
+    O QUE AS POSIÇÕES GUARDAM
+
+        Só o valor. "the memory positions do not need to store access counters.
+        They hold only values, that are either scalars or vectors, depending on
+        the dimensionality of the target function" (§4.3.1, p.38).
+
+        Consequência de custo: metade dos bytes por entrada em relação ao
+        crítico. A contabilidade de T1 precisa das duas colunas.
+
+    MÉDIA, NÃO SOMA — e isto tem consequência direta na taxa de aprendizado
+
+        A eq. (4.12) traz o `1/N` **explícito**. Com `Δ = −η(f − y)`, a variação
+        da saída num passo é exatamente `−η(f − y)`, **independente de `N`**
+        (testado em `test_ator_usa_media_e_o_passo_independe_de_N`).
+
+        Isto é o que permite varrer `N` sem confundir capacidade com passo, e é
+        onde o `EmbeddingBag(mode='sum')` do repositório `anbubus` divergiu do
+        artigo. A RNF-01 antiga do nosso PRD prescrevia `η = c/N` supondo
+        `‖φ‖² = N`; a eq. (4.22) normaliza o mapa por `1/√N`, então `‖φ‖² = 1` e
+        não há divisão por `N` a fazer. Regra retirada.
+
+    POR QUE ISTO É UMA MÁQUINA DE NÚCLEO — §4.3.1, p.39-41
+
+        v[i]_t(x) = Σ_j α_j Δ_j M[i]_j(x)                            (4.13)
+        M[i]_j(x) = ⟦τ[i](x) = τ[i](x_j)⟧                            (4.14)
+        Σ_i M[i]_t(x) = N·k(x, x_t),  k = 1 − δ(x,x_t)/N              (4.15)
+        f_t(x) = Σ_j α_j Δ_j k(x, x_j)                                (4.16)
+
+        A eq. (4.16) é a diferença essencial em relação à rede de regressão:
+        aqui é **soma de funções de base**, sem normalização; lá (3.22) é
+        **média ponderada** de núcleo. É o que permite a este modelo representar
+        funções que o outro não representa.
+
+        v[i]_t(x) = v[i]_{t-1}(x) + α_t Δ_t M[i]_t(x)                 (4.17)
+        f_t(x) = f_{t-1}(x) + α_t Δ_t k(x_t, x)                       (4.19)
+
+        A (4.19) é a forma precisa da generalização: uma atualização em `x_t`
+        muda a saída em **qualquer** outro ponto proporcionalmente ao núcleo. E
+        ela tem a forma de um passo de descida de gradiente funcional, o que é
+        a conclusão do §4.3.1: "the system implicitly implements a kernel
+        machine that learns according to functional gradient descent".
+
+        A passagem de (4.18) para (4.19) depende de o núcleo ser
+        positivo-definido — o texto diz que "hinges on" isso. A prova vem do
+        mapa de características explícito (4.22) e da identidade
+        `⟨φ(w), φ(x)⟩ = k(w,x)` (4.23). Tudo isso está testado em
+        `tests/test_identidades_artigo.py`.
+
+    SEM FATOR DE ESQUECIMENTO
+
+        Não é omissão: o esquecimento é do modelo de §4.2.1, e a combinação
+        "gradiente funcional com esquecimento" não existe na dissertação. Ver o
+        docstring do módulo (pendência C2).
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
                  seed: int = 0) -> None:
         super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
+        # Um dicionário por RAM, espelhando `FunctionalNode{D}` do Ramnet.jl:
+        #     struct FunctionalNode{D}; memory::Dict{UInt,Vector{Float64}}
+        # Posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
         self.memoria: list[dict[int, NDArray[np.float64]]] = [
             {} for _ in range(self.n_ram)
         ]
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
-        """(M, n_bits) -> (M, n_saidas)."""
+        """Eq. (4.12): `f(x) = (1/N) Σ_i v[i](x)`. `(M, B) -> (M, d)`.
+
+        A divisão é por `N = n_ram`, **não** pelo número de posições visitadas.
+        Posições nunca escritas contribuem com zero e ainda assim entram no
+        denominador — é o que a (4.12) diz, e é o que o
+        `predict(d::FunctionalDiscriminator, ...)` do Ramnet.jl faz
+        (`d.cum_weight ./ length(d.nodes)`).
+        """
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
         for m, linha in enumerate(end):
@@ -132,17 +284,28 @@ class RedeGradienteFuncional(_RedeNTupla):
         return saida / self.n_ram
 
     def atualizar(self, bits: NDArray[np.bool_], passo: NDArray[np.float64]) -> None:
-        """Soma `passo` (já escalado por α) a todas as `N` posições endereçadas.
+        """Eq. (4.11) crua: soma `passo` às `N` posições endereçadas por `x`.
 
-        É a eq. (4.11) crua. O chamador é quem monta `α_t · Δ_t` — no
-        Algoritmo 4.4 esse termo é `α · δ · ∇_f ln f(A|S)`, e não o gradiente de
-        uma perda supervisionada.
+        `passo` é o termo `α_t Δ_t` inteiro, já escalado — quem o monta é o
+        chamador, porque **o que ele é depende do algoritmo**:
+
+        - regressão supervisionada: `α_t Δ_t = −η(f − y)`, ver `treinar` abaixo
+        - Algoritmo 4.4 (p.48): `α · δ · ∇_f ln f(A|S)`, com `δ` a vantagem da
+          eq. (4.36) e o gradiente da política vindo da (4.35)
+
+        A mesma separação existe no Ramnet.jl: `train!(f, x, grad)` faz
+        `value .+= -grad` e não sabe de onde `grad` veio; quem calcula é o
+        `ContinousActionPolicy.update!`.
+
+        As posições **não** endereçadas ficam intactas — é o conteúdo da eq.
+        (4.17), que unifica os dois casos pelo indicador `M[i]_t`.
         """
         passo = np.atleast_1d(np.asarray(passo, dtype=np.float64))
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             v = self.memoria[i].get(chave)
             if v is None:
+                # Primeira escrita nesta posição: v_0 = 0, logo v_1 = passo.
                 self.memoria[i][chave] = passo.copy()
             else:
                 v += passo
@@ -150,11 +313,18 @@ class RedeGradienteFuncional(_RedeNTupla):
     def treinar(self, bits: NDArray[np.bool_], alvo: NDArray[np.float64],
                 eta: float = 0.1, epocas: int = 1,
                 rng: np.random.Generator | None = None) -> None:
-        """Regressão supervisionada com perda quadrática — `Δ = −(f − y)`.
+        """Regressão supervisionada com perda quadrática.
 
-        Existe para permitir os proxies da SPEC-01 e o teste diferencial contra
-        o `NTupleRegressor` denso. O Algoritmo 4.4 não passa por aqui: ele usa
-        `atualizar` diretamente.
+        Instancia a eq. (4.11) com `c(x,y,z) = ½(z − y)²`, logo
+        `Δ_t = −∂c/∂z = −(f − y)` e o passo é `−η(f − y)`.
+
+        **O Algoritmo 4.4 não passa por aqui** — ele chama `atualizar`
+        diretamente, com o gradiente da política. Este método existe para os
+        proxies de clonagem da SPEC-01 e para o teste diferencial contra o
+        `NTupleRegressor` denso.
+
+        A ordem de visita é uma permutação por época, como o `epochs` do
+        `FunctionalOptimizer` do Ramnet.jl.
         """
         alvo = np.asarray(alvo, dtype=np.float64)
         if alvo.ndim == 1:
@@ -163,51 +333,110 @@ class RedeGradienteFuncional(_RedeNTupla):
         for _ in range(epocas):
             for m in rng.permutation(len(bits)):
                 x = bits[m:m + 1]
+                # f_{t-1}(x_t): a predição ANTES da atualização, como a (4.11)
+                # exige — Δ_t é avaliado em f_{t-1}, não em f_t.
                 f = self.prever(x)[0]
                 self.atualizar(x, -eta * (f - alvo[m]))
 
 
 class RedeRegressaoEsquecimento(_RedeNTupla):
-    """Crítico — §4.2.1, eqs. (4.8), (4.9) e (4.10).
+    """O **crítico** — §4.2.1, p.34. "Forgetting n-tuple regression network".
 
-        v[i]_{t+1}(x) = φ · v[i]_t(x) + y_{t+1}                      (4.8)
-        c[i]_{t+1}(x) = c[i]_t(x) + 1
+    EQUAÇÕES IMPLEMENTADAS
 
-        f(x) = Σ_i v[i](x) / Σ_i s[i](x)     se Σ s ≠ 0, senão 0     (4.9)
+        v[i]_{t+1}(x_{t+1}) = φ · v[i]_t(x_{t+1}) + y_{t+1}           (4.8)
+        c[i]_{t+1}(x_{t+1}) = c[i]_t(x_{t+1}) + 1
 
-        s[i](x) = (1 − φ^c[i](x)) / (1 − φ)  se c > 0 e φ ≠ 1        (4.10)
-                = c[i](x)                    caso contrário
+        f_t(x) = Σ_i v[i]_t(x) / Σ_i s[i]_t(x)   se Σ s ≠ 0, senão 0  (4.9)
 
-    O denominador é **soma de pesos**, não de contadores: com esquecimento as
-    observações passadas contribuem menos, e a média precisa ser ponderada. A
-    forma fechada é a soma dos primeiros termos de uma série geométrica, que é
-    o que (4.10) diz.
+        s[i]_t(x) = (1 − φ^c[i]_t(x)) / (1 − φ)  se c > 0 e φ ≠ 1     (4.10)
+                  = c[i]_t(x)                    caso contrário
 
-    Com `φ = 1` a rede degenera na regressão n-tuple original — média simples
-    sobre as observações —, e (4.10) cai no ramo `c[i](x)` para evitar a divisão
-    por zero de `(1 − 1^c)/(1 − 1)`.
+    A arquitetura é a mesma da rede de regressão original de §3.2.2 (p.23) —
+    "consisting of a RAM discriminator where memory positions store a value and
+    a counter". O que muda são a regra de atualização e a função de saída.
+
+    POR QUE O DENOMINADOR NÃO É A SOMA DOS CONTADORES
+
+        Na rede original a saída é `Σ V / Σ C` (eq. 3.16), uma média simples: o
+        denominador conta quantas observações contribuíram. Com esquecimento as
+        observações têm **pesos diferentes**, então a média tem de ser ponderada
+        e o denominador passa a ser a **soma dos pesos**. A eq. (4.10) é a forma
+        fechada dessa soma — os primeiros `c` termos de uma série geométrica de
+        razão `φ`. Nas palavras do texto: "Fortunately, this is easily
+        obtainable, since it is simply the sum of the first terms of a geometric
+        series".
+
+        Errar aqui produz números plausíveis: somar contadores em vez de pesos,
+        ou aplicar `φ` na ordem trocada, dá saídas na escala certa e erradas. É
+        por isso que este modelo é validado contra o `Ramnet.jl` com três
+        valores de `φ`, não só por propriedades.
+
+    OS DOIS EXTREMOS DE `φ` — §5.2.3, p.58
+
+        "[φ] ranges from 0, where only the most recent observation to address a
+        position influence it, to 1, where all samples to address a position
+        influence its content equally and the system behaves exactly as an
+        n-tuple regression network."
+
+        `φ = 1` cai no ramo `c[i](x)` da (4.10). Não é conveniência numérica: é
+        o que evita a divisão por zero de `(1 − 1^c)/(1 − 1)` **e** o que faz a
+        rede degenerar exatamente na (3.16). Ambos testados.
+
+        O apêndice A usa `φ = 0,85` em todas as quatro tarefas.
+
+    POR QUE ESTA REDE EXISTE — §4.1.1, p.31
+
+        A rede original supõe distribuição conjunta fixa ("The assumption of a
+        fixed joint distribution"). Em RL o alvo se desloca: o crítico é
+        alimentado com retornos que mudam conforme a política melhora. A fig. 4.2
+        (p.35) ilustra o efeito — estimativa de densidade em que amostras antigas
+        têm peso multiplicado por 0,1 a cada lote novo, o que permite acompanhar
+        a distribuição subjacente.
+
+    CUSTO: O DOBRO POR ENTRADA
+
+        Valor **e** contador por posição, ambos vetores de dimensão `d`. O ator
+        guarda só o valor. A tabela de T1 precisa das duas colunas — reportar só
+        o ator subestimaria o modelo completo por ~2×.
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
                  phi: float = 1.0, seed: int = 0) -> None:
+        # §4.2.1: "the forgetting factor, denoted by φ and defined in the [0,1]
+        # interval".
         if not 0.0 <= phi <= 1.0:
             raise ValueError(f"phi={phi} fora de [0, 1]")
         super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
         self.phi = float(phi)
-        # valor e contador por posição — é o que dobra a memória do crítico em
-        # relação à do ator, e o que a contabilidade de T1 precisa refletir.
+        # Espelha `RegressionNodeMemoryElement{D}` do Ramnet.jl, que guarda
+        # `count::Vector{Int}` e `value::Vector{Float64}` — ambos de comprimento
+        # D. O contador é POR COMPONENTE, e isso não é detalhe: o Algoritmo 4.1
+        # (p.37) atualiza só `v[i](S_code, A)`, a componente da ação tomada, e um
+        # contador compartilhado degradaria a média ponderada da (4.9) para as
+        # ações menos visitadas. Ver `treinar_componente`.
         self.memoria: list[dict[int, tuple[NDArray, NDArray]]] = [
             {} for _ in range(self.n_ram)
         ]
 
     def _pesos(self, contador: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Eq. (4.10), vetorizada e com o ramo de `φ = 1` tratado."""
+        """Eq. (4.10): o peso acumulado de uma posição, dado seu contador.
+
+        Soma dos `c` primeiros termos da série geométrica de razão `φ`. O ramo
+        `φ = 1` devolve o próprio contador, recuperando a (3.16).
+        """
         if self.phi == 1.0:
             return contador
         return (1.0 - self.phi ** contador) / (1.0 - self.phi)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
-        """(M, n_bits) -> (M, n_saidas). Zero onde nenhuma posição foi escrita."""
+        """Eq. (4.9): `f(x) = Σ_i v[i](x) / Σ_i s[i](x)`. `(M, B) -> (M, d)`.
+
+        O ramo `Σ s = 0 → 0` é explícito na equação, não uma salvaguarda nossa.
+        Ele cobre o caso em que nenhuma das `N` posições endereçadas foi escrita
+        — situação comum no início do treino e, com tuplas grandes, também para
+        entradas novas (§3.2.4, p.27: "the model is unable to generalize").
+        """
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
         for m, linha in enumerate(end):
@@ -223,30 +452,51 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         return saida
 
     def treinar(self, bits: NDArray[np.bool_], alvo: NDArray[np.float64]) -> None:
-        """Eq. (4.8), uma amostra. Multiplica pelo esquecimento, depois soma."""
+        """Eq. (4.8), aplicada a **todas** as componentes da saída.
+
+        A ordem importa e é a do texto: "when a memory position is to be
+        updated, its content is **first** multiplied by the forgetting factor and
+        **then** incremented by the value associated with a new observation".
+        Inverter as duas daria peso errado à observação nova.
+
+        Para atualizar uma componente só — o que o Algoritmo 4.1 exige — use
+        `treinar_componente`.
+        """
         alvo = np.atleast_1d(np.asarray(alvo, dtype=np.float64))
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             item = self.memoria[i].get(chave)
             if item is None:
+                # Posição virgem: v_0 = 0 e c_0 = 0, logo (4.8) dá
+                # v_1 = φ·0 + y = y  e  c_1 = 1.
                 self.memoria[i][chave] = (alvo.astype(np.float64).copy(),
                                           np.ones(self.n_saidas))
             else:
                 v, c = item
-                v *= self.phi
-                v += alvo
+                v *= self.phi          # primeiro o esquecimento...
+                v += alvo              # ...depois a observação nova
                 c += 1.0
 
     def treinar_componente(self, bits: NDArray[np.bool_], indice: int,
                            alvo: float) -> None:
-        """Eq. (4.8) aplicada a **uma** componente da saída.
+        """Eq. (4.8) aplicada a **uma** componente — o que o Algoritmo 4.1 pede.
 
-        É o que o Algoritmo 4.1 exige: `v[i](S_code, A) ← φ v[i](S_code, A) + G`
-        atualiza apenas o discriminador ligado à ação `A`. O §4.2.2 descreve as
-        duas realizações equivalentes da fig. 4.3 — vários discriminadores
-        escalares, ou um só com posições vetoriais; usamos a segunda, e é por
-        isso que **o contador é por componente**. Um contador único degradaria a
-        média ponderada de (4.9) para as ações menos visitadas.
+        O Algoritmo 4.1 (p.37) atualiza `v[i](S_code_τ, A_τ)`: só o
+        discriminador ligado à ação tomada. O §4.2.2 (p.35) explica por que a
+        função de valor-ação precisa disso — ela tem dois argumentos, mas a rede
+        aceita um só padrão binário:
+
+            "a much simpler approach is handling state and action separately.
+             The separation could be understood as modeling a state-value
+             function for each possible action."
+
+        A fig. 4.3 (p.36) mostra as **duas realizações equivalentes**: (a) um
+        discriminador com posições vetoriais, (b) vários discriminadores
+        escalares. Usamos (a) — é o que `n_saidas` já dá. E é por isso que o
+        contador é por componente: cada ação acumula suas próprias visitas.
+
+        Note que **só o estado é codificado**: "only states require being
+        encoded into a binary pattern".
         """
         if not 0 <= indice < self.n_saidas:
             raise ValueError(f"indice={indice} fora de [0, {self.n_saidas})")

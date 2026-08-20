@@ -1,4 +1,37 @@
-"""Codificadores **literais** da dissertação — §3.2.3, eqs. (3.23) e (3.24).
+"""Codificadores **literais** da dissertação — §3.2.3, p.25-26, eqs. (3.23)/(3.24).
+
+Katopodis (2022), `tmp/947841_compressed.pdf`. Páginas impressas; some 11 para
+achar no PDF. A **fig. 3.3 (p.26)** desenha os dois esquemas com resolução de 5
+bits e é a melhor referência visual para entender a diferença: o termômetro
+acende um número **variável** de bits, o circular um número **fixo**, e a figura
+mostra explicitamente o wrap-around do circular.
+
+POR QUE O ESQUEMA DE CODIFICAÇÃO IMPORTA — §3.2.3, p.25
+
+    "n-tuple networks measure the similarity between binary inputs in terms of
+     the tuple distance (3.17), which could be regarded as a generalized Hamming
+     distance. Therefore, in order to preserve the similarity between inputs, an
+     encoding scheme should map similar inputs to binary patterns with a small
+     tuple distance between them."
+
+    O contraexemplo do texto é IEEE 754: dois floats com pequena distância de
+    tupla podem representar números distantes, porque depende de onde os bits
+    diferentes caem (sinal, expoente ou mantissa).
+
+    Para binarizar vetores, "it only takes encoding its components individually
+    and stacking the resulting patterns together" — é o que `codificar` faz.
+
+O COMPROMISSO DE §3.2.4, p.27
+
+    Resolução menor → mais aliasing → mais generalização, menos complexidade.
+    "all values belonging to a given subinterval are mapped to a identical binary
+    pattern. The extent of this aliasing of inputs is regulated by the encoding
+    parameter R."
+
+    Consequência exata, verificada em teste: um termômetro de resolução `R` tem
+    **`R + 1` palavras-código** (`0000`, `1000`, `1100`, `1110`, `1111` para
+    `R = 4`). Esse é o teto do número de padrões distintos.
+
 
 Estes existem como **referência de fidelidade**, não como substitutos. O
 codificador de produção do projeto é o `TermometroQuantil`, que a SPEC-01 mediu
@@ -33,7 +66,7 @@ from numpy.typing import NDArray
 
 
 class TermometroArtigo:
-    """Eq. (3.23): `S_i = 1` se `x > l + (i−1)(u−l)/R`, para `i ∈ [1, R]`.
+    """Eq. (3.23), §3.2.3 p.25: `S_i = 1` se `x > l + (i−1)(u−l)/R`, `i ∈ [1,R]`.
 
     Limiares uniformes e comparação **estrita**, como no texto. `l` e `u` são
     fixos e informados — o artigo os toma como o intervalo de definição da
@@ -64,14 +97,29 @@ class TermometroArtigo:
 
 
 class CircularArtigo:
-    """Eq. (3.24): padrão base com `⌊R/2⌋` bits, deslocado por `n_shift`.
+    """Eq. (3.24), §3.2.3 p.26: padrão base com `⌊R/2⌋` bits, deslocado.
+
+    O texto descreve o esquema como procedimento de dois passos, e não por
+    equação de bit: "First, start with a base pattern of R bits, where the
+    first ⌊R/2⌋ ones are activated. Next, right-shift the pattern n_shift
+    units". Só o deslocamento tem fórmula fechada, a (3.24).
 
         n_shift = ⌊(x − l)/(u − l) · R⌋
 
-    O deslocamento é à direita **com wrap**, o que faz valores extremos do
-    intervalo mapearem para padrões próximos — a "similaridade radial" de
-    §3.2.3. É o que o termômetro não dá: nele `l` e `u` são os padrões mais
-    distantes possíveis.
+    O deslocamento é à direita **com wrap**: "the activated bits can be
+    shifted beyond the edge of the pattern, wrapping around. Besides aliasing
+    inputs that fall into the same subinterval, this circular behavior favors
+    a **radial similarity**, as extreme values are mapped to similar
+    patterns" (§3.2.3, p.26). É o que o termômetro não dá: nele `l` e `u` são
+    os padrões mais distantes possíveis.
+
+    Medido em `tests/test_identidades_artigo.py` com `R = 16`:
+    `d(0,00 · 0,99) = 2` no circular contra `16` no termômetro.
+
+    O apêndice A usa codificação circular em CartPole e Hopper, e a simples
+    em Lunar Lander e Mountain Car. A §5.2.2 (p.56) reporta que a circular
+    vence nas duas tarefas testadas; a nossa replicação parcial confirma só
+    em baixa resolução — ver `reports/replica-katopodis-52.md`.
 
     Número de bits ativos **constante**, ao contrário do termômetro. Ver o
     aviso sobre padding no docstring do módulo.
