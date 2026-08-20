@@ -51,7 +51,11 @@ Legenda: **✅** testada · **🟡** parcial · **⬜** não testada · **—** 
 | 4.13 | `v[i]ₜ(x) = Σⱼ αⱼ M[i]ⱼ(x)` | ✅ | `test_memoria_do_ator_e_soma_das_atualizacoes` |
 | 4.14–4.15 | indicador e núcleo (repetem 3.18/3.21) | ✅ | via 3.21 |
 | **4.16** | **a rede de gradiente funcional é máquina de núcleo** | ✅ | `test_rede_de_gradiente_funcional_e_maquina_de_nucleo` |
-| 4.17–4.25 | conexão com descida de gradiente funcional implícita | ⬜ | ver §4, item **T-B1** |
+| 4.17 | `v[i]ₜ(x) = v[i]ₜ₋₁(x) + αₜΔₜ M[i]ₜ(x)` | ✅ | `test_atualizacao_so_toca_posicoes_enderecadas` |
+| **4.19** | **`fₜ(x) = fₜ₋₁(x) + αₜΔₜ·k(xₜ,x)`** — a propagação pelo núcleo | ✅ | `test_uma_atualizacao_propaga_pelo_nucleo` |
+| 4.20–4.21 | `k` proporcional às tuplas compartilhadas | ✅ | via 3.21 e o mapa |
+| **4.22** | **mapa de características `φ(x)`, `N·2ⁿ` binário** | ✅ | `test_mapa_e_um_quente_por_neuronio_e_normalizado` |
+| **4.23** | **`⟨φ(w),φ(x)⟩ = k(w,x)`** → núcleo positivo-definido | ✅ | `test_mapa_de_caracteristicas_reproduz_o_nucleo`, `test_matriz_de_gram_e_positiva_semidefinida` |
 | 4.26 | funcional de risco do REINFORCE | — | não usamos REINFORCE |
 | 4.27–4.30 | política sigmoide (ação binária) | — | ação contínua |
 | 4.31–4.33 | política softmax (ação discreta) | — | ação contínua |
@@ -66,7 +70,9 @@ Legenda: **✅** testada · **🟡** parcial · **⬜** não testada · **—** 
 |---|---|---|
 | 5.2.3 | `φ = 0` → só a observação mais recente conta | ✅ `test_phi_zero_guarda_so_a_observacao_mais_recente` |
 | 5.2.3 | `φ = 1` → comporta-se como a NTRN | ✅ via 3.22 |
-| 5.2.2 | circular > simples em CartPole e Lunar Lander | ⬜ **T-B2** |
+| 5.2.2 | circular > simples em CartPole | 🟡 **replicado só em baixa resolução** — ver `reports/replica-katopodis-52.md` |
+| Alg. 4.1 | SARSA de `m` passos com esquecimento | ✅ | `test_sarsa.py`, 11 testes |
+| Alg. 4.2 | ε-greedy com desempate **uniforme** | ✅ | `test_desempate_entre_maximos_e_uniforme` |
 | 5.2.1 | efeito conjunto de resolução e tupla | 🟡 §3.2.4 coberto; curvas não |
 
 ---
@@ -136,22 +142,22 @@ correção de erro, e o eixo certo é `n/B`, não `n`.
 
 ## 4. Testes a criar nas etapas futuras
 
-### Ainda sobre o artigo (podem ser feitos já)
+### Feitos nesta passagem
 
-- **T-B1 — eqs. 4.17–4.25, descida de gradiente funcional implícita.**
-  O texto prova que a atualização (4.11) *é* um passo de gradiente funcional
-  numa máquina de núcleo. Testável comparando a nossa atualização com o passo
-  calculado explicitamente sobre a base de núcleo. Fecha a última lacuna
-  teórica do capítulo 4. *Custo: baixo. Valor: fecha a justificativa de
-  convergência do PRD por inteiro.*
+- **T-B1 — eqs. 4.17 a 4.23. ✅ Concluído.** As cinco identidades passaram,
+  incluindo a positividade definida da matriz de Gram (60 × 60, autovalor
+  mínimo > −1e−9). Com isso a justificativa de convergência do PRD está
+  verificada de ponta a ponta: a rede **é** máquina de núcleo (4.16), o núcleo
+  **é** positivo-definido (4.23), e a atualização **é** um passo de gradiente
+  funcional que se propaga por ele (4.19).
 
-- **T-B2 — §5.2.2, circular vence o termômetro simples.**
-  Agora que `CircularArtigo` existe, é reproduzível: mesma tarefa, mesmos
-  hiperparâmetros, só o codificador muda. **Cuidado:** o resultado do artigo é
-  em CartPole/Lunar Lander, não no nosso problema, e a nossa observação tem
-  padding que o circular não trata. O teste vale como **replicação da
-  dissertação**, não como escolha de projeto — o nosso codificador segue sendo
-  o quantil por slot da SPEC-01.
+- **T-B2 — §5.2.2. 🟡 Replicado parcialmente, e o resultado é desconfortável.**
+  Exigiu implementar o Algoritmo 4.1 (`rl/sarsa.py`), porque é com ele que o
+  capítulo 5 produziu os resultados. Em baixa resolução (`R=32, n=16`) o
+  circular vence por **1,68×**, IC95% [+39,6; +56,1], em 20 de 20 sementes. **Na
+  configuração declarada pelo artigo (`R=128, n=64`) dá empate** (0,96×, IC
+  cruza zero). Ressalvas e interpretação em `reports/replica-katopodis-52.md`;
+  a principal é que o nosso orçamento é ~1/50 do original.
 
 ### SPEC-02 — baselines e estatística
 

@@ -414,3 +414,128 @@ def test_phi_zero_guarda_so_a_observacao_mais_recente():
     item = next(iter(rede.memoria[0].values()))
     assert float(item[0][0]) == pytest.approx(3.5, abs=1e-12)
     assert float(item[1][0]) == 3.0, "o contador ainda conta todas as visitas"
+
+
+# --- (4.17)-(4.19): descida de gradiente funcional implícita (T-B1) -------
+
+
+def test_atualizacao_so_toca_posicoes_enderecadas():
+    """Eq. (4.17): `v[i]_t(x) = v[i]_{t−1}(x) + α_t Δ_t M[i]_t(x)`.
+
+    O indicador unifica os dois casos do texto: "the memory positions that are
+    addressed by the data point have their contents incremented by α_t Δ_t. The
+    other memory positions, on the other hand, remain unchanged."
+    """
+    rede = RedeGradienteFuncional(B, TUPLA, n_saidas=1, seed=20)
+    rng = np.random.default_rng(21)
+    X = rng.random((30, B)) > 0.5
+    for t in range(20):                       # popula algumas posições antes
+        rede.atualizar(X[t:t + 1], np.array([rng.normal()]))
+
+    antes = {i: dict((k, float(v[0])) for k, v in m.items())
+             for i, m in enumerate(rede.memoria)}
+    passo = 0.7
+    alvo = X[25:26]
+    rede.atualizar(alvo, np.array([passo]))
+    end = tuplas(rede, alvo[0])
+
+    for i, m in enumerate(rede.memoria):
+        for chave, v in m.items():
+            esperado = antes[i].get(chave, 0.0) + (passo if chave == end[i] else 0.0)
+            assert float(v[0]) == pytest.approx(esperado, abs=1e-12), (
+                f"RAM {i}, posição {chave}: eq. (4.17) violada")
+
+
+def test_uma_atualizacao_propaga_pelo_nucleo():
+    """Eq. (4.19) — a identidade mais forte do §4.3.1:
+
+        f_t(x) = f_{t−1}(x) + α_t Δ_t · k(x_t, x)
+
+    Uma atualização em `x_t` muda a saída em **qualquer** outro ponto `x` por
+    exatamente `α Δ k(x_t, x)`. É a forma precisa da generalização do modelo, e
+    o passo que o texto usa para concluir que "the system implicitly implements
+    a kernel machine that learns according to functional gradient descent".
+    """
+    rede = RedeGradienteFuncional(B, TUPLA, n_saidas=2, seed=22)
+    rng = np.random.default_rng(23)
+    X = rng.random((40, B)) > 0.5
+    for t in range(25):
+        rede.atualizar(X[t:t + 1], rng.normal(size=2))
+
+    sondas = X[25:]                            # pontos onde medimos a mudança
+    antes = rede.prever(sondas)
+    passo = np.array([0.4, -0.9])
+    xt = X[0:1]
+    rede.atualizar(xt, passo)
+    depois = rede.prever(sondas)
+
+    for j, x in enumerate(sondas):
+        k = nucleo(rede, xt[0], x)
+        esperado = passo * k
+        assert np.allclose(depois[j] - antes[j], esperado, atol=1e-12), (
+            f"sonda {j}: Δf = {depois[j] - antes[j]}, esperado {esperado}")
+
+
+# --- (4.20)-(4.23): o mapa de características e a positividade definida ---
+
+
+def mapa_de_caracteristicas(rede, x):
+    """Eq. (4.22): `φ(x)`, vetor binário de `N·2ⁿ` posições, escalado por `1/√N`.
+
+    Cada bloco de `N` elementos corresponde a um valor possível de tupla; a
+    posição indica se a tupla daquele neurônio vale aquele valor.
+    """
+    n_valores = 1 << rede.tamanho_tupla
+    phi = np.zeros((n_valores, rede.n_ram))
+    end = tuplas(rede, x)
+    for i, e in enumerate(end):
+        phi[int(e), i] = 1.0
+    return phi.ravel() / np.sqrt(rede.n_ram)
+
+
+def test_mapa_de_caracteristicas_reproduz_o_nucleo():
+    """Eq. (4.23): `⟨φ(w), φ(x)⟩ = k(w, x)`.
+
+    É o que prova a positividade definida — "kernels are positive-definite if,
+    and only if, they can be represented as inner products in a feature space"
+    — e a derivação de (4.18) para (4.19) **depende** disso. Tupla pequena para
+    que o mapa explícito, de `N·2ⁿ` posições, seja materializável.
+    """
+    rede = RedeGradienteFuncional(24, 4, seed=24)        # N = 6, 2^4 = 16
+    rng = np.random.default_rng(25)
+    Xs = rng.random((25, 24)) > 0.5
+    for w in Xs[:8]:
+        for x in Xs[8:16]:
+            assert float(mapa_de_caracteristicas(rede, w)
+                         @ mapa_de_caracteristicas(rede, x)) == pytest.approx(
+                nucleo(rede, w, x), abs=1e-12)
+
+
+def test_mapa_e_um_quente_por_neuronio_e_normalizado():
+    """Consequência de (4.22): exatamente `N` posições ativas, e `‖φ(x)‖² = 1`.
+
+    Daí `k(x,x) = 1` sai do próprio mapa, não de uma convenção separada.
+    """
+    rede = RedeGradienteFuncional(24, 4, seed=26)
+    phi = mapa_de_caracteristicas(rede, np.random.default_rng(27).random(24) > 0.5)
+    assert phi.size == rede.n_ram * (1 << rede.tamanho_tupla)
+    assert int((phi > 0).sum()) == rede.n_ram
+    assert float(phi @ phi) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_matriz_de_gram_e_positiva_semidefinida():
+    """A propriedade em que "one result was assumed to hold without previous
+    comment" — sem ela, (4.19) não se sustenta.
+
+    Testada diretamente no espectro, não só via o mapa: autovalores da matriz
+    de Gram do núcleo de distância de tupla não podem ser negativos.
+    """
+    rede = RedeGradienteFuncional(B, TUPLA, seed=28)
+    rng = np.random.default_rng(29)
+    Xs = rng.random((60, B)) > 0.5
+    K = np.array([[nucleo(rede, w, x) for x in Xs] for w in Xs])
+
+    assert np.allclose(K, K.T, atol=1e-12), "o núcleo deve ser simétrico"
+    assert np.allclose(np.diag(K), 1.0), "k(x,x) = 1"
+    autovalores = np.linalg.eigvalsh(K)
+    assert autovalores.min() > -1e-9, f"autovalor negativo: {autovalores.min()}"

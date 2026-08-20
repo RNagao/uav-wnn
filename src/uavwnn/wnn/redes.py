@@ -236,3 +236,29 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
                 v *= self.phi
                 v += alvo
                 c += 1.0
+
+    def treinar_componente(self, bits: NDArray[np.bool_], indice: int,
+                           alvo: float) -> None:
+        """Eq. (4.8) aplicada a **uma** componente da saída.
+
+        É o que o Algoritmo 4.1 exige: `v[i](S_code, A) ← φ v[i](S_code, A) + G`
+        atualiza apenas o discriminador ligado à ação `A`. O §4.2.2 descreve as
+        duas realizações equivalentes da fig. 4.3 — vários discriminadores
+        escalares, ou um só com posições vetoriais; usamos a segunda, e é por
+        isso que **o contador é por componente**. Um contador único degradaria a
+        média ponderada de (4.9) para as ações menos visitadas.
+        """
+        if not 0 <= indice < self.n_saidas:
+            raise ValueError(f"indice={indice} fora de [0, {self.n_saidas})")
+        for i, e in enumerate(self.enderecos(bits)[0]):
+            chave = int(e)
+            item = self.memoria[i].get(chave)
+            if item is None:
+                v, c = np.zeros(self.n_saidas), np.zeros(self.n_saidas)
+                v[indice] = float(alvo)
+                c[indice] = 1.0
+                self.memoria[i][chave] = (v, c)
+            else:
+                v, c = item
+                v[indice] = self.phi * v[indice] + float(alvo)
+                c[indice] += 1.0
