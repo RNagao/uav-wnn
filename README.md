@@ -295,6 +295,49 @@ Custo medido (0,56 s/episódio em `Na=2, Ns=12`), para dimensionar antes de lan�
 
 As runs são independentes e o CSV é cache, então dá para paralelizar por célula e
 retomar de onde parou.
+
+### Quarto braço: treinar com o PPO do RLlib, usando o código publicado
+
+`vendor/ntn_neurocomputing_v0` é o submodule de
+[`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0),
+o repositório do artigo *"Functional gradient descent for n-tuple regression"*
+(Neurocomputing 500, 2022). O `NTNModel` dele é usado **como está**, com o PPO do
+Ray RLlib — que é o que o artigo diz ter usado.
+
+**São dois passos, em dois ambientes, e isso não é escolha:** `ray[rllib]` fixa
+`gymnasium==1.2.2` no máximo e este projeto exige `>=1.3.0` — incompatíveis.
+
+```bash
+git submodule update --init vendor/ntn_neurocomputing_v0
+
+# 1. treino, em ambiente efêmero (não importa `uavwnn`)
+uv run --isolated --with "ray[rllib]" --with torch --with pettingzoo --with numpy     python scripts/spec06_ppo_anbubus.py --celula 2:12 --passos 1000000     --bruto reports/ckpt/ppo-a2s12-bruto.npz
+
+# 2. conversão para NumPy, no ambiente do projeto (verificada, tolerância 1e-5)
+uv run python scripts/spec06_importar_ppo.py     reports/ckpt/ppo-a2s12-bruto.npz reports/ckpt/ppo-a2s12
+
+# 3. campanha, como qualquer outro checkpoint
+uv run python scripts/spec06_campanha_wnn.py --aproximador ntupla_funcional     --checkpoint reports/ckpt/ppo-a2s12 --celulas 2:12 --runs 1000
+```
+
+A fronteira por arquivo coincide com o que a **RNF-11** já exigia: torch no treino,
+NumPy puro na medição. A conversão é exata (desvio medido `0,00e+00`) e só é
+defensável porque `tests/test_anbubus.py` prova que as duas implementações são
+numericamente a mesma.
+
+**Duas ressalvas medidas, e ambas mudam expectativas:**
+
+- **As configurações do repositório deles não rodam verbatim** no Ray atual:
+  `tune.run` depreciado, `sgd_minibatch_size`→`minibatch_size`,
+  `num_sgd_iter`→`num_epochs`, `local_mode` removido, e é preciso desativar
+  explicitamente a nova pilha de API (o `ModelCatalog`/`TorchModelV2` que o
+  `NTNModel` usa só existe na antiga).
+- **O PPO do RLlib treina uma gaussiana diagonal direta sobre `(θ, s)` com
+  recorte** — isto é, o **C0** da SPEC-05 §4.3, que o portão mediu perdendo do C2
+  por 13,45° com IC a 12 MDEs de zero. O braço PPO herda esse modo de falha, e a
+  campanha usa a política **certa** para o checkpoint (a diagonal, não a normal
+  projetada) — avaliar com a errada produziria ações plausíveis e sem relação com o
+  que foi treinado.
 | **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
 | **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
 | **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |

@@ -1,3 +1,6 @@
 [submodule "vendor/gradys-data-collection"]
 	path = vendor/gradys-data-collection
 	url = https://github.com/Project-GrADyS/gradys-data-collection.git
+[submodule "vendor/ntn_neurocomputing_v0"]
+	path = vendor/ntn_neurocomputing_v0
+	url = https://github.com/anbubus/ntn_neurocomputing_v0.git

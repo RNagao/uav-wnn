@@ -53,7 +53,7 @@ from spec02_maddpg_campanha import (  # noqa: E402
 )
 from spec02_maddpg_rollout import trilhas_de_um_episodio  # noqa: E402
 from uavwnn.agents import APROXIMADORES, AtorCriticoContinuo  # noqa: E402
-from uavwnn.agents.base import ContextoEpisodio, Observacao  # noqa: E402
+from uavwnn.agents.base import Acao, ContextoEpisodio, Observacao  # noqa: E402
 from uavwnn.encoding import TermometroQuantil  # noqa: E402
 from uavwnn.refenv import LAMENZA_003, run_episode  # noqa: E402
 
@@ -137,6 +137,14 @@ def _termometro(cfg, checkpoint: Path | None, seed: int) -> TermometroQuantil:
     return TermometroQuantil(BITS_POR_ESCALAR).ajustar(np.array(corpus))
 
 
+def _procedencia(checkpoint: Path | None) -> dict:
+    """Lê o `procedencia.json` do checkpoint, se houver."""
+    if checkpoint is None:
+        return {}
+    arq = Path(checkpoint) / "procedencia.json"
+    return json.loads(arq.read_text()) if arq.exists() else {}
+
+
 def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0):
     """Devolve `(callable no protocolo do refenv, aproximador)`.
 
@@ -151,32 +159,62 @@ def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0):
         communication_range=cfg.communication_range,
         dt=cfg.algorithm_iteration_interval)
 
+    proc = _procedencia(checkpoint)
+    # `d_saida` VEM DO CHECKPOINT quando há um. Assumir 3 sobre um modelo treinado
+    # pelo PPO do RLlib montaria a rede com a forma errada — e, pior, a
+    # `NormalProjetada` interpretaria as 4 saídas dele como `(u₁, u₂, μ_s)`,
+    # produzindo ações plausíveis e sem relação com o que foi treinado.
+    d_saida = int(proc.get("ator", {}).get("n_saidas", 3))
+
     if aprox == "mlp":
-        ap = APROXIMADORES[aprox](n_bits_ou_dim=d_obs, seed=seed)
+        ap = APROXIMADORES[aprox](n_bits_ou_dim=d_obs, seed=seed, d_saida=d_saida)
         codificar = lambda v: np.asarray(v, float).ravel()      # noqa: E731
     else:
         termo = _termometro(cfg, checkpoint, seed)
         ap = APROXIMADORES[aprox](n_bits=termo.n_bits, seed=seed,
+                                  d_saida=d_saida,
                                   n_dims_codificador=d_obs,
-                                  limiares_por_dim=BITS_POR_ESCALAR)
+                                  limiares_por_dim=proc.get("resolucao",
+                                                            BITS_POR_ESCALAR))
         codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
 
     if checkpoint is not None:
         ap.carregar(checkpoint)
 
-    politica = AtorCriticoContinuo(aproximador=ap, codificar=codificar,
-                                   id=f"wnn_{aprox}", treinando=False)
-    politica.reset(ctx, np.random.default_rng(seed))
+    if d_saida == 4:
+        # CHECKPOINT DO PPO/RLLIB. As 4 saídas são `[μ_θ, μ_s, logσ_θ, logσ_s]` da
+        # `DiagGaussian`, que é uma gaussiana diagonal **direta sobre a ação** com
+        # recorte — isto é, o **C0** da SPEC-05 §4.3.
+        #
+        # Avaliá-lo com a `NormalProjetada` seria erro grave e silencioso: ela
+        # leria `(u₁, u₂, μ_s)` das três primeiras componentes e derivaria o rumo
+        # por `atan2`, produzindo ações no domínio certo e **sem relação** com o
+        # que o PPO treinou.
+        #
+        # Vale registrar o que isso implica: o braço PPO herda o modo de falha que
+        # o portão da SPEC-05 mediu — o C0 perdeu do C2 por 13,45°, com IC a 12
+        # MDEs de zero. Não é defeito da nossa ponte; é o que a `DiagGaussian` do
+        # RLlib faz com uma ação circular, e é resultado a reportar.
+        def acao_de(f):
+            return Acao(theta_norm=float(np.clip(f[0], 0.0, 1.0)),
+                        s_norm=float(np.clip(f[1], 0.0, 1.0)))
+    else:
+        politica_np = AtorCriticoContinuo(
+            aproximador=ap, codificar=codificar, id=f"wnn_{aprox}",
+            treinando=False)
+        politica_np.reset(ctx, np.random.default_rng(seed))
+        acao_de = None
 
     def callable_refenv(observacao):
-        """Adapta o `Policy` congelado da SPEC-02 ao protocolo do `refenv`.
+        """Adapta ao protocolo do `refenv`: `obs -> ação em [0,1]²`.
 
-        O `refenv` quer `obs -> ação em [0,1]²`; o nosso quer uma `Observacao`
-        decodificada. A ponte é `Observacao.decodificar`, que é a mesma usada pelo
-        harness — então a política vê exatamente o que veria lá.
+        A ponte é `Observacao.decodificar`, a mesma que o harness usa — então a
+        política vê exatamente o que veria lá.
         """
+        if acao_de is not None:
+            return acao_de(ap.f(codificar(np.asarray(observacao, float)))).como_array()
         obs = Observacao.decodificar(observacao, ctx)
-        return politica.act(obs).como_array()
+        return politica_np.act(obs).como_array()
 
     return callable_refenv, ap
 
