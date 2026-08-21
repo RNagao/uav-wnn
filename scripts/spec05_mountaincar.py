@@ -162,17 +162,44 @@ def _avaliar(politica_media, env_fn, episodios: int, seed: int) -> tuple[list[fl
 
 
 def rodar_ntupla(episodios: int, seed: int, sigma_como_desvio: bool = False,
-                 n_aval: int = 100) -> dict:
+                 n_aval: int = 100, familia: str = "dissertacao") -> dict:
     cod, n_bits = _codificador()
+    # `familia` seleciona QUAL rede sem peso, e a diferença não é cosmética:
+    #
+    #   dissertacao   ator de gradiente funcional (§4.3.1) + crítico NTRN com
+    #                 esquecimento (§4.2.1). DUAS famílias, convenção de média —
+    #                 é o que fechou a pendência C2.
+    #   anbubus       gradiente funcional nos DOIS lados, convenção de soma. É o
+    #                 `NTNModel` de `anbubus/ntn_neurocomputing_v0`, cujo PPO
+    #                 treina ator e crítico por gradiente e portanto usa um
+    #                 modelo só.
+    #
+    # O laço é o MESMO nos dois, e é isso que torna a comparação sobre a rede.
+    if familia not in ("dissertacao", "anbubus"):
+        raise ValueError(f"familia={familia!r}")
+    soma = familia == "anbubus"
+    conv = "soma" if soma else "media"
+
     ator = RedeGradienteFuncional(n_bits, A3["tamanho_tupla"], n_saidas=1,
-                                  seed=seed, c_max=None)
-    critico = RedeRegressaoEsquecimento(n_bits, A3["tamanho_tupla"], n_saidas=1,
-                                        phi=A3["phi"], seed=seed)
+                                  seed=seed, c_max=None, convencao=conv)
+    if soma:
+        # `eta` do crítico convertido: sob soma, `atualizar` muda `f` em `η·N`.
+        # Sem dividir, `η = 0,1` daria 0,8 por passo com `N = 8`.
+        critico = RedeGradienteFuncional(
+            n_bits, A3["tamanho_tupla"], n_saidas=1, seed=seed, c_max=None,
+            convencao="soma", eta_treino=0.1 / ator.n_ram)
+    else:
+        critico = RedeRegressaoEsquecimento(n_bits, A3["tamanho_tupla"],
+                                            n_saidas=1, phi=A3["phi"], seed=seed)
+
+    # A taxa da A.3 está na convenção de MÉDIA. Transferi-la crua para a de soma
+    # multiplicaria o passo efetivo por `N` — o erro que a §4.2 nomeia.
+    taxa = ator.taxa_equivalente(A3["taxa"], conv) if soma else A3["taxa"]
     agente = AtorCriticoNTupla(
         politica=PoliticaGaussiana(ator, A3["covariancia"],
                                    escala_como_desvio=sigma_como_desvio),
         critico=critico, passos=A3["passos"], desconto=A3["desconto"],
-        taxa=A3["taxa"], rng=np.random.default_rng(seed))
+        taxa=taxa, rng=np.random.default_rng(seed))
 
     env = _env()
     retornos, chegadas = [], []
@@ -268,12 +295,14 @@ class _Tarefa:
     (2000 × 10) caber em tempo utilizável.
     """
 
-    def __init__(self, episodios: int, n_aval: int, p13: bool) -> None:
+    def __init__(self, episodios: int, n_aval: int, p13: bool,
+                 familia: str = "dissertacao") -> None:
         self.episodios, self.n_aval, self.p13 = episodios, n_aval, p13
+        self.familia = familia
 
     def __call__(self, seed: int):
         return (rodar_ntupla(self.episodios, seed, sigma_como_desvio=self.p13,
-                             n_aval=self.n_aval),
+                             n_aval=self.n_aval, familia=self.familia),
                 rodar_mlp(self.episodios, seed, n_aval=self.n_aval))
 
 
@@ -301,6 +330,11 @@ def main() -> int:
     ap.add_argument("--n-aval", type=int, default=100,
                     help="episódios de avaliação DETERMINÍSTICA por semente — "
                          "é esta a coluna que se compara ao publicado")
+    ap.add_argument("--familia", choices=("dissertacao", "anbubus"),
+                    default="dissertacao",
+                    help="qual rede sem peso: `dissertacao` (duas famílias, "
+                         "convenção de média) ou `anbubus` (gradiente funcional "
+                         "nos dois lados, convenção de soma)")
     ap.add_argument("--p13", action="store_true",
                     help="trata Σ como desvio (ContinousActionPolicy.jl) e não "
                          "como covariância (eq. 4.34) — mede a pendência P13")
@@ -313,10 +347,12 @@ def main() -> int:
           f"removido (Lamenza §7)")
     print(f"treino = últimos {a.avaliar_ultimos} episódios, com ruído — NÃO é o "
           f"que se compara ao publicado")
-    print(f"Σ tratada como {'DESVIO (P13)' if a.p13 else 'covariância (eq. 4.34)'}\n")
+    print(f"Σ tratada como {'DESVIO (P13)' if a.p13 else 'covariância (eq. 4.34)'}")
+    print(f"família WNN: {a.familia}\n")
 
     arv = ArvoreSementes(20260821)
-    art: dict = {"config": vars(a), "A3": A3, "A6": A6, "resultados": []}
+    art: dict = {"config": vars(a), "familia": a.familia, "A3": A3, "A6": A6,
+                 "resultados": []}
 
     aval_nt, aval_mlp = [], []
     trei_nt, trei_mlp = [], []
@@ -326,7 +362,7 @@ def main() -> int:
     print(f"{'semente':>11} {'treino':>8} {'AVAL':>8} {'cheg.av':>8}   "
           f"{'treino':>8} {'AVAL':>8} {'cheg.av':>8}")
 
-    tarefa = _Tarefa(a.episodios, a.n_aval, a.p13)
+    tarefa = _Tarefa(a.episodios, a.n_aval, a.p13, a.familia)
     if a.processos > 1:
         import multiprocessing as mp
         with mp.Pool(a.processos) as pool:

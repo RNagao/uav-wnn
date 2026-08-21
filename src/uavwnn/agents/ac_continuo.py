@@ -85,12 +85,15 @@ class MlpAprox:
 
     n_bits_ou_dim: int
     oculta: int = 32
+    d_saida: int = D_ATOR
+    """Dimensão da saída do ator. `D_ATOR = 3` é a normal projetada de σ fixa; o
+    PPO com σ aprendida pede mais (ver `rl/ppo.py`)."""
     taxa_ator: float = 3e-4
     taxa_critico: float = 1e-3
     seed: int = 0
 
     def __post_init__(self) -> None:
-        self.ator = MLP(self.n_bits_ou_dim, D_ATOR, self.oculta, seed=self.seed)
+        self.ator = MLP(self.n_bits_ou_dim, self.d_saida, self.oculta, seed=self.seed)
         self.critico = MLP(self.n_bits_ou_dim, 1, self.oculta, seed=self.seed + 1)
         self._opt_a = Adam(taxa=self.taxa_ator)
         self._opt_c = Adam(taxa=self.taxa_critico)
@@ -131,7 +134,7 @@ class MlpAprox:
 
     @property
     def camadas(self) -> list[int]:
-        return [self.n_bits_ou_dim, self.oculta, self.oculta, D_ATOR]
+        return [self.n_bits_ou_dim, self.oculta, self.oculta, self.d_saida]
 
     def custo(self) -> dict[str, Any]:
         """T1 e T3 pelo harness da SPEC-03. `custo_mlp` conta pesos **e vieses**;
@@ -167,6 +170,7 @@ class NTuplaAprox:
     """`φ = 0,85` foi o melhor nas quatro tarefas do apêndice A."""
     taxa_ator: float = 2e-3
     seed: int = 0
+    d_saida: int = D_ATOR
     c_max: float | None = 0.5
     """Asserção de estabilidade da §4.2, **ligada aqui** e não na rede.
 
@@ -192,8 +196,8 @@ class NTuplaAprox:
         from ..wnn import RedeGradienteFuncional, RedeRegressaoEsquecimento
 
         self.ator = RedeGradienteFuncional(
-            self.n_bits, self.tamanho_tupla, n_saidas=D_ATOR, seed=self.seed,
-            c_max=self.c_max)
+            self.n_bits, self.tamanho_tupla, n_saidas=self.d_saida,
+            seed=self.seed, c_max=self.c_max)
         self.critico = RedeRegressaoEsquecimento(
             self.n_bits, self.tamanho_tupla, n_saidas=1, phi=self.phi,
             seed=self.seed)
@@ -259,10 +263,10 @@ class NTuplaAprox:
             limiares_por_dim=self.limiares_por_dim,
             rotulo="n-tuple (ator)")
         so_rede = operacoes_ntuple(
-            self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+            self.ator.n_ram, self.tamanho_tupla, self.d_saida,
             incluir_codificador=False, incluir_amostragem=False)
         ops = operacoes_ntuple(
-            self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+            self.ator.n_ram, self.tamanho_tupla, self.d_saida,
             n_dims=self.n_dims_codificador, n_niveis=self.limiares_por_dim,
             incluir_codificador=self.limiares_por_dim > 0)
         return {
@@ -336,6 +340,7 @@ class NTuplaFuncionalAprox:
     """Padrão 8, que é o que as configurações do repositório deles usam — e o teto
     prático da alocação densa que eles têm."""
     taxa_ator: float = 2e-4
+    d_saida: int = D_ATOR
     taxa_critico: float = 2e-4
     """Na convenção de **soma**. Divida por `N` para comparar com as taxas do
     apêndice A do Katopodis, que estão na de média."""
@@ -354,7 +359,8 @@ class NTuplaFuncionalAprox:
                      c_max=self.c_max, convencao="soma")
         # Mesmo mapeamento nos dois, como no `NTNModel`: um `randperm` só, e as
         # duas `EmbeddingBag` endereçadas pelas MESMAS chaves.
-        self.ator = RedeGradienteFuncional(n_saidas=D_ATOR, seed=self.seed, **comum)
+        self.ator = RedeGradienteFuncional(n_saidas=self.d_saida, seed=self.seed,
+                                           **comum)
         self.critico = RedeGradienteFuncional(n_saidas=1, seed=self.seed, **comum)
 
     def f(self, x):

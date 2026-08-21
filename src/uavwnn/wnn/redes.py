@@ -447,10 +447,18 @@ class RedeGradienteFuncional(_RedeNTupla):
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
                  seed: int = 0, c_max: float | None = None,
-                 convencao: str = "media") -> None:
+                 convencao: str = "media", eta_treino: float = 0.1) -> None:
         super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
         if convencao not in ("media", "soma"):
             raise ValueError(f"convencao={convencao!r}, esperado 'media' ou 'soma'")
+        self.eta_treino = float(eta_treino)
+        """`η` padrão de `treinar`, para quem chama sem passá-lo.
+
+        Existe porque o `_aplicar` do Algoritmo 4.4 chama `critico.treinar(bits,
+        alvo)` sem `eta` — e quando o crítico é desta família (a variante do
+        `anbubus`), o `η` **precisa** respeitar a convenção. Sob soma, `η = 0,1`
+        muda `f` em `0,1·N`, que com `N = 8` é 0,8 por passo: quase divergente.
+        """
         self.convencao = convencao
         """`media` (eq. 4.12, padrão) ou `soma` — as **duas convenções
         incompatíveis** que a SPEC-05 §4.2 discute, agora selecionáveis.
@@ -520,7 +528,7 @@ class RedeGradienteFuncional(_RedeNTupla):
                 v += passo
 
     def treinar(self, bits: NDArray[np.bool_], alvo: NDArray[np.float64],
-                eta: float = 0.1, epocas: int = 1,
+                eta: float | None = None, epocas: int = 1,
                 rng: np.random.Generator | None = None) -> None:
         """Regressão supervisionada com perda quadrática.
 
@@ -535,6 +543,11 @@ class RedeGradienteFuncional(_RedeNTupla):
         A ordem de visita é uma permutação por época, como o `epochs` do
         `FunctionalOptimizer` do Ramnet.jl.
         """
+        eta = self.eta_treino if eta is None else float(eta)
+        # Aceita `(B,)` além de `(M, B)`. O `_aplicar` do Algoritmo 4.4 passa uma
+        # observação só, e sem isto a variante de crítico funcional (`anbubus`)
+        # estoura no `enderecos` com um `IndexError` obscuro.
+        bits = np.atleast_2d(bits)
         alvo = np.asarray(alvo, dtype=np.float64)
         if alvo.ndim == 1:
             alvo = alvo[:, None]

@@ -32,6 +32,14 @@ dev = [
 baseline = [
     "torch>=2.0",
 ]
+# NÃO existe grupo `ppo`, e a razão é um conflito medido, não esquecimento:
+# `ray[rllib]` fixa `gymnasium==1.2.2` no máximo e este projeto exige `>=1.3.0`.
+# São incompatíveis no mesmo ambiente.
+#
+# O treino com o PPO do RLlib roda, portanto, num ambiente EFÊMERO e separado, e
+# se comunica com o projeto por arquivo — o checkpoint em NumPy. Isso é o que a
+# RNF-11 já queria de todo modo: torch no treino, NumPy puro na medição. Ver
+# `scripts/spec06_ppo_anbubus.py` para a invocação.
 
 [tool.pytest.ini_options]
 # `vendor/` é código de terceiros carregado como submodule: não coletar os
