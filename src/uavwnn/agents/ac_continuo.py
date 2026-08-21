@@ -62,6 +62,11 @@ class Aproximador(Protocol):
     """Aproxima o crítico de `alvo`. No n-tuple é acumulação (eq. 4.8), na MLP é
     um passo de Adam sobre perda quadrática."""
 
+    def salvar(self, diretorio) -> None: ...
+    """Grava o modelo treinado. Sem isto, uma campanha de mil runs teria de
+    retreinar a cada run — o que é caro e, pior, mediria variância de treino
+    misturada com variância de avaliação."""
+
     def custo(self) -> dict[str, Any]: ...
     """Instrumentação de T1/T3 — **vinda do harness da SPEC-03** (T-05.7).
 
@@ -107,6 +112,22 @@ class MlpAprox:
         erro = self.v(x) - float(alvo)
         self._opt_c.passo(self.critico.parametros(),
                           self.critico.gradientes(x, np.array([[erro]])))
+
+    def salvar(self, diretorio) -> None:
+        from pathlib import Path
+        d = Path(diretorio); d.mkdir(parents=True, exist_ok=True)
+        for nome, rede in (("ator", self.ator), ("critico", self.critico)):
+            np.savez_compressed(d / f"mlp-{nome}.npz",
+                                **{str(i): p for i, p in enumerate(rede.parametros())})
+        (d / "familia.txt").write_text("mlp")
+
+    def carregar(self, diretorio) -> None:
+        from pathlib import Path
+        d = Path(diretorio)
+        for nome, rede in (("ator", self.ator), ("critico", self.critico)):
+            z = np.load(d / f"mlp-{nome}.npz")
+            for i, p in enumerate(rede.parametros()):
+                p[...] = z[str(i)]
 
     @property
     def camadas(self) -> list[int]:
@@ -192,6 +213,27 @@ class NTuplaAprox:
         # ACUMULA `G` pela eq. (4.8) — não é passo de gradiente para o alvo. É a
         # média ponderada da (4.9) que converte acumulação em estimativa.
         self.critico.treinar(np.atleast_2d(x), np.array([float(alvo)]))
+
+    def salvar(self, diretorio) -> None:
+        from pathlib import Path
+        d = Path(diretorio); d.mkdir(parents=True, exist_ok=True)
+        self.ator.salvar(d / "ntupla-ator.npz")
+        self.critico.salvar(d / "ntupla-critico.npz")
+        (d / "familia.txt").write_text(self.custo()["familia"])
+
+    def carregar(self, diretorio) -> None:
+        """Substitui as redes pelas gravadas — inclusive o **mapeamento**.
+
+        Reconstruir o mapeamento pela semente daria uma rede cujos endereços não
+        correspondem aos valores gravados, e o erro seria silencioso: a política
+        prediria zero em quase todo estado e pareceria "não aprendeu".
+        """
+        from pathlib import Path
+
+        from ..wnn.redes import RedeGradienteFuncional
+        d = Path(diretorio)
+        self.ator = RedeGradienteFuncional.carregar(d / "ntupla-ator.npz")
+        self.critico = RedeGradienteFuncional.carregar(d / "ntupla-critico.npz")
 
     def custo(self) -> dict[str, Any]:
         """T1 e T3 pelo harness da SPEC-03, via a porta esparsa de T-05.7.
@@ -334,6 +376,27 @@ class NTuplaFuncionalAprox:
         """
         erro = self.v(x) - float(alvo)
         self.critico.atualizar(np.atleast_2d(x), np.array([-self.taxa_critico * erro]))
+
+    def salvar(self, diretorio) -> None:
+        from pathlib import Path
+        d = Path(diretorio); d.mkdir(parents=True, exist_ok=True)
+        self.ator.salvar(d / "ntupla-ator.npz")
+        self.critico.salvar(d / "ntupla-critico.npz")
+        (d / "familia.txt").write_text(self.custo()["familia"])
+
+    def carregar(self, diretorio) -> None:
+        """Substitui as redes pelas gravadas — inclusive o **mapeamento**.
+
+        Reconstruir o mapeamento pela semente daria uma rede cujos endereços não
+        correspondem aos valores gravados, e o erro seria silencioso: a política
+        prediria zero em quase todo estado e pareceria "não aprendeu".
+        """
+        from pathlib import Path
+
+        from ..wnn.redes import RedeGradienteFuncional
+        d = Path(diretorio)
+        self.ator = RedeGradienteFuncional.carregar(d / "ntupla-ator.npz")
+        self.critico = RedeGradienteFuncional.carregar(d / "ntupla-critico.npz")
 
     def custo(self) -> dict[str, Any]:
         from ..custo import custo_ntuple_de_rede, operacoes_ntuple

@@ -268,6 +268,33 @@ medido dos pesos publicados (256 × 256, 287–299 KB). Estes três são variaç
 # a portagem do NTNModel é verificada contra o PyTorch deles (torch é só de teste)
 uv run --group baseline pytest tests/test_anbubus.py -q
 ```
+
+### Campanha das políticas WNN — mesmas figuras de mérito do MADDPG
+
+`scripts/spec06_campanha_wnn.py` espelha `spec02_maddpg_campanha.py`: `R` runs por
+célula, CSV como cache, média ± desvio **sobre as runs**, trajetórias no estilo
+`plot_paths.py`, e as **mesmas colunas** — as tabelas juntam linha a linha.
+
+```bash
+uv run python scripts/spec06_campanha_wnn.py     --aproximador ntupla --checkpoint reports/ckpt/ntupla --runs 1000
+```
+
+**`--checkpoint` é obrigatório, e a razão não é burocracia.** Uma rede n-tuple vazia
+prediz `f = 0` em todo estado, o que a normal projetada mapeia num rumo constante —
+e isso rende uma linha de CSV completa, plausível e **sem significado**. Rodar sem
+modelo exige `--sem-treino-proposital`, que marca `treinado=False` em cada linha.
+O treino no ambiente real é a **SPEC-06**; este script é o arnês de avaliação dela.
+
+Custo medido (0,56 s/episódio em `Na=2, Ns=12`), para dimensionar antes de lançar:
+
+| escopo | CPU sequencial |
+|---|---|
+| 1000 runs × 200 episódios, 1 célula (`2:12`) | ~31 h |
+| 1000 runs × 200 episódios, **as 9 células** | **~37 dias** |
+| 1000 runs × 20 episódios, as 9 células | ~89 h |
+
+As runs são independentes e o CSV é cache, então dá para paralelizar por célula e
+retomar de onde parou.
 | **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
 | **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
 | **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |

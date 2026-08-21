@@ -84,6 +84,33 @@ class TermometroGlobal:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
 
+    # -- persistência: os limiares SÃO estado treinado ----------------------
+
+    def salvar(self, caminho) -> None:
+        """Grava os limiares.
+
+        Eles **têm** de viajar com o modelo. Reajustar o termômetro num corpus
+        diferente daria uma binarização diferente para a mesma observação, e as
+        posições de memória do modelo passariam a ser endereçadas por outros bits
+        — erro silencioso, que apareceria como "a política não aprendeu".
+
+        É também por isso que o harness de custo da SPEC-03 conta
+        `limiares_por_dim` no footprint: são `D × T` floats de estado
+        persistente, não constantes reconstruíveis de dois números (o que é o
+        caso do E0, e a razão de lá `limiares_por_dim = 0`).
+        """
+        assert self._limiares is not None, "nada a salvar: chame ajustar() antes"
+        np.savez_compressed(caminho, limiares=self._limiares,
+                            n_niveis=np.array(self.n_niveis))
+
+    @classmethod
+    def carregar(cls, caminho) -> "TermometroQuantil":
+        z = np.load(caminho, allow_pickle=False)
+        t = cls(int(z["n_niveis"]))
+        t._limiares = z["limiares"]
+        t.n_bits = t._limiares.shape[0] * t.n_niveis
+        return t
+
 
 class TermometroPorSlot:
     """E1 — limiares lineares, com o suporte empírico de **cada** dimensão."""
@@ -112,6 +139,33 @@ class TermometroPorSlot:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    # -- persistência: os limiares SÃO estado treinado ----------------------
+
+    def salvar(self, caminho) -> None:
+        """Grava os limiares.
+
+        Eles **têm** de viajar com o modelo. Reajustar o termômetro num corpus
+        diferente daria uma binarização diferente para a mesma observação, e as
+        posições de memória do modelo passariam a ser endereçadas por outros bits
+        — erro silencioso, que apareceria como "a política não aprendeu".
+
+        É também por isso que o harness de custo da SPEC-03 conta
+        `limiares_por_dim` no footprint: são `D × T` floats de estado
+        persistente, não constantes reconstruíveis de dois números (o que é o
+        caso do E0, e a razão de lá `limiares_por_dim = 0`).
+        """
+        assert self._limiares is not None, "nada a salvar: chame ajustar() antes"
+        np.savez_compressed(caminho, limiares=self._limiares,
+                            n_niveis=np.array(self.n_niveis))
+
+    @classmethod
+    def carregar(cls, caminho) -> "TermometroQuantil":
+        z = np.load(caminho, allow_pickle=False)
+        t = cls(int(z["n_niveis"]))
+        t._limiares = z["limiares"]
+        t.n_bits = t._limiares.shape[0] * t.n_niveis
+        return t
 
 
 class TermometroQuantil:
@@ -150,6 +204,33 @@ class TermometroQuantil:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    # -- persistência: os limiares SÃO estado treinado ----------------------
+
+    def salvar(self, caminho) -> None:
+        """Grava os limiares.
+
+        Eles **têm** de viajar com o modelo. Reajustar o termômetro num corpus
+        diferente daria uma binarização diferente para a mesma observação, e as
+        posições de memória do modelo passariam a ser endereçadas por outros bits
+        — erro silencioso, que apareceria como "a política não aprendeu".
+
+        É também por isso que o harness de custo da SPEC-03 conta
+        `limiares_por_dim` no footprint: são `D × T` floats de estado
+        persistente, não constantes reconstruíveis de dois números (o que é o
+        caso do E0, e a razão de lá `limiares_por_dim = 0`).
+        """
+        assert self._limiares is not None, "nada a salvar: chame ajustar() antes"
+        np.savez_compressed(caminho, limiares=self._limiares,
+                            n_niveis=np.array(self.n_niveis))
+
+    @classmethod
+    def carregar(cls, caminho) -> "TermometroQuantil":
+        z = np.load(caminho, allow_pickle=False)
+        t = cls(int(z["n_niveis"]))
+        t._limiares = z["limiares"]
+        t.n_bits = t._limiares.shape[0] * t.n_niveis
+        return t
 
 
 def cobertura_de_bits(n_ram: int, tamanho_tupla: int, n_bits: int) -> float:

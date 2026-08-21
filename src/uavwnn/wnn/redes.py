@@ -255,6 +255,104 @@ class _RedeNTupla:
                     f"recorte δ. Passe c_max=None para desligar a asserção."
                 )
 
+    # -- persistência -------------------------------------------------------
+
+    def _config(self) -> dict:
+        """Tudo que não é conteúdo de memória. Vai junto no arquivo.
+
+        Guardar o **mapeamento** e não a semente é deliberado: `randperm` depende
+        da implementação do gerador, e um `numpy` futuro pode sortear diferente
+        para a mesma semente. Um checkpoint que muda de significado com a versão
+        da biblioteca é pior que um checkpoint grande — e a SPEC-03 já mediu que o
+        mapeamento é ~20 % do footprint, então o custo é conhecido, não surpresa.
+        """
+        return {
+            "classe": type(self).__name__,
+            "n_bits": self.n_bits,
+            "tamanho_tupla": self.tamanho_tupla,
+            "n_saidas": self.n_saidas,
+            "c_max": self.c_max,
+            "convencao": getattr(self, "convencao", "media"),
+            "phi": getattr(self, "phi", None),
+        }
+
+    def salvar(self, caminho) -> None:
+        """Grava num `.npz`, achatando a memória esparsa em vetores paralelos.
+
+        Formato: para cada RAM, os endereços e os valores em arrays separados,
+        mais um vetor de contagens que diz onde cada RAM começa. É o mesmo
+        princípio da `LUTOrdenada` da SPEC-03 — chaves e valores lado a lado —, e
+        deixa o arquivo legível por qualquer coisa que leia `npz`, sem `pickle`.
+        """
+        import json
+
+        enderecos, valores, contadores, tamanhos = [], [], [], []
+        for m in self.memoria:
+            tamanhos.append(len(m))
+            for chave, v in m.items():
+                enderecos.append(chave)
+                if isinstance(v, tuple):          # crítico: (valor, contador)
+                    valores.append(v[0])
+                    contadores.append(v[1])
+                else:
+                    valores.append(v)
+        dados = {
+            "config": np.array(json.dumps(self._config())),
+            "mapeamento": np.concatenate(self.mapeamento).astype(np.int64),
+            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento], np.int64),
+            "tamanhos_ram": np.array(tamanhos, np.int64),
+            "enderecos": np.array(enderecos, np.uint64) if enderecos
+                         else np.zeros(0, np.uint64),
+            "valores": (np.stack(valores) if valores
+                        else np.zeros((0, self.n_saidas))),
+        }
+        if contadores:
+            dados["contadores"] = np.stack(contadores)
+        np.savez_compressed(caminho, **dados)
+
+    @classmethod
+    def carregar(cls, caminho):
+        """Reconstrói a rede. Devolve a **classe gravada**, não `cls`.
+
+        Assim `RedeGradienteFuncional.carregar` sobre um arquivo de crítico
+        devolve o crítico, em vez de montar silenciosamente a rede errada.
+        """
+        import json
+
+        z = np.load(caminho, allow_pickle=False)
+        cfg = json.loads(str(z["config"]))
+        alvo = {c.__name__: c for c in (RedeGradienteFuncional,
+                                        RedeRegressaoEsquecimento)}[cfg["classe"]]
+
+        kwargs = dict(n_bits=cfg["n_bits"], tamanho_tupla=cfg["tamanho_tupla"],
+                      n_saidas=cfg["n_saidas"], c_max=cfg["c_max"])
+        if alvo is RedeGradienteFuncional:
+            kwargs["convencao"] = cfg["convencao"]
+        else:
+            kwargs["phi"] = cfg["phi"]
+        rede = alvo(**kwargs)
+
+        # mapeamento gravado, não re-sorteado
+        corte = np.cumsum(z["tamanhos_tupla"])[:-1]
+        rede.mapeamento = np.split(z["mapeamento"], corte)
+        rede.n_ram = len(rede.mapeamento)
+        rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
+                           for t in rede.mapeamento]
+
+        rede.memoria = [{} for _ in range(rede.n_ram)]
+        tem_cont = "contadores" in z
+        i = 0
+        for r, n in enumerate(z["tamanhos_ram"]):
+            for _ in range(int(n)):
+                chave = int(z["enderecos"][i])
+                if tem_cont:
+                    rede.memoria[r][chave] = (z["valores"][i].copy(),
+                                              z["contadores"][i].copy())
+                else:
+                    rede.memoria[r][chave] = z["valores"][i].copy()
+                i += 1
+        return rede
+
     def entradas_ocupadas(self) -> int:
         """Posições de memória efetivamente escritas, somadas sobre as RAMs.
 
