@@ -247,6 +247,7 @@ uv run pytest -q                    # 18 testes, ~1 min
 | **`spec05_circular.py`** | **portão da SPEC-05**: normal projetada contra gaussiana simples, em três instrumentos. Sai com código 0 só se o C2 vencer com IC separado |
 | **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
 | **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
+| **`spec06_orcamento.py`** | T-06.0: vazão por célula e por parcela, `B_max`, e o veredito sobre P2. **Bloqueia as outras tarefas da SPEC-06** |
 
 ### Os três aproximadores comparáveis contra o MADDPG
 

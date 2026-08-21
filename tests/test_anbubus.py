@@ -91,10 +91,10 @@ def _nossa_com_mapeamento_deles(n_bits, tupla, n_saidas, mapping):
     r = RedeGradienteFuncional(n_bits, tupla, n_saidas=n_saidas, seed=0,
                                c_max=None, convencao="soma")
     idx = mapping.numpy()
-    r.mapeamento = [idx[i:i + tupla] for i in range(0, len(idx), tupla)]
-    r.n_ram = len(r.mapeamento)
-    r._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                    for t in r.mapeamento]
+    # `remapear` e não atribuição direta: a rede pré-computa matrizes de
+    # endereçamento, e trocar `mapeamento` sem remontá-las usaria o mapeamento
+    # antigo em silêncio. Este teste foi o que pegou isso.
+    r.remapear([idx[i:i + tupla] for i in range(0, len(idx), tupla)])
     r.memoria = [{} for _ in range(r.n_ram)]
     return r
 

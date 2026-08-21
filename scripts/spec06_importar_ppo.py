@@ -62,11 +62,13 @@ def _rede_de(peso: np.ndarray, mapeamento: np.ndarray, tupla: int,
     # Mapeamento DELES, fatiado como as nossas tuplas. Nunca re-sorteado: o
     # `torch.randperm` não coincide com o do NumPy, e uma rede cujos endereços não
     # correspondem aos valores falha em silêncio.
-    rede.mapeamento = [mapeamento[i:i + tupla]
-                       for i in range(0, len(mapeamento), tupla)]
-    rede.n_ram = len(rede.mapeamento)
-    rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                       for t in rede.mapeamento]
+    #
+    # Via `remapear` e não por atribuição direta: a rede mantém matrizes de
+    # endereçamento pré-computadas, e trocar `mapeamento` sem remontá-las deixaria o
+    # endereçamento usando o mapeamento ANTIGO — em silêncio. Foi o que seis testes
+    # pegaram quando a vetorização entrou.
+    rede.remapear([mapeamento[i:i + tupla]
+                   for i in range(0, len(mapeamento), tupla)])
 
     base = 2 ** tupla
     esperado = rede.n_ram * base

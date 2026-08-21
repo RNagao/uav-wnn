@@ -199,6 +199,44 @@ O PRD §6.1 é honesto quanto ao status do número: 0,11 s por episódio de 120 
 
 **Saída:** tabela de vazão por célula e por parcela; veredito escrito sobre a estimativa de 8–30 h (confirmada, otimista ou pessimista, com o fator); `B_max` e o plano de campanha; P2 fechada.
 
+> **FECHADA (2026-08-21).** `scripts/spec06_orcamento.py`, relatório em
+> `reports/spec06-orcamento.md`. Quatro resultados:
+>
+> **1. Não há resposta única para "quem domina".** Há cruzamento: em `Na = 1` o
+> aprendizado domina (52-58 %); em `Na = 8` a simulação domina (67-79 %). A alegação
+> de tempo de parede **não pode ser feita em geral** — vale onde o aprendizado
+> domina. A codificação é **0,2 %** do relógio, o que **contradiz** a contagem de
+> operações da SPEC-05 §4.8 (onde o codificador domina). As duas estão certas: o
+> termômetro é NumPy vetorizado, a consulta esparsa é laço Python. É o primeiro caso
+> em que a separação T2/T3 da §5.5 muda a leitura, e reportar só uma enganaria.
+>
+> **2. A medição expôs um defeito nosso, e ele mudava o orçamento.** `enderecos()`
+> consumia **331 dos 337 µs** de `prever()`, com custo linear em `n_ram` a ~5 µs por
+> RAM — despacho, não aritmética. Vetorizado: **42×** no endereçamento, **13×** no
+> `prever()`, e os 45 testes diferenciais contra o `Ramnet.jl` passam sem alteração.
+> Efeito no orçamento: `B_max` de 10,5 M (**em cima** da linha de corte de ~10 M,
+> que acionaria a ordem do PRD §8) para **19,5 M**. **A correção é o que torna a
+> varredura pagável.**
+>
+> **3. Estimativa do PRD §6.1 CONFIRMADA:** 848 passos/s em `Na=4, Ns=12` → **16,4 h**
+> num núcleo para 50 M passos, dentro dos 8-30 h. Antes da vetorização eram 30,5 h,
+> isto é, fora pela borda pessimista — a estimativa estava certa, a implementação não.
+>
+> **4. P2 NÃO É TESTÁVEL COMO POSTA.** `update_rate` não é parâmetro livre: o
+> ambiente o deriva de `algorithm_iteration_interval/2` (`environment.py:473`).
+> Variá-lo isolado exigiria editar o ambiente, o que a regra do projeto proíbe;
+> variar as duas juntas e atribuir a diferença ao integrador seria confusão de
+> variáveis.
+>
+> O que é testável **falha**: o par `(aii, update_rate)` muda `CT` em **9,0 %**
+> (`Na=1`, IC `[−3,39; −2,70]`) e **15,4 %** (`Na=8`, IC `[−10,75; −3,80]`, KS
+> p = 0,014), contra um critério que pedia IC contendo zero e `|Δ| < 1 %`.
+>
+> **Isso quantifica a assimetria da fig. 7.3** que a SPEC-00 registrou: o
+> `visualize_performance.py` avalia o MADDPG a `aii = 0,5` e o guloso a `0,1`, e o
+> intervalo mais fino dá ao guloso **9-15 % de vantagem** em tempo de conclusão. O
+> sinal é o que a SPEC-00 supôs; a magnitude não era conhecida.
+
 ---
 
 ### T-06.1 — Réplica 1a: experimento exploratório (Lamenza §7.1)
