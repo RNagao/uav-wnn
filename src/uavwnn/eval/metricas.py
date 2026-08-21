@@ -23,6 +23,25 @@ escalar único sobre o qual o bootstrap opera sem tratamento especial. É o aná
 do escore **PAR-1** de competições com limite de tempo; a variante PAR-2
 (`2 × max_episode_length`) fica registrada e não usada.
 
+**E NÃO É INVENÇÃO NOSSA — é fidelidade ao original.** O `environment.py` de
+referência já faz exatamente isto, em duas linhas:
+
+    # linha 674
+    "completion_time": self.max_episode_length if not all_sensors_collected
+                       else self.simulator._current_timestamp
+
+    # linha 551 — o vetor NASCE penalizado, e cada coleta sobrescreve a sua posição
+    self.collection_times = [self.max_episode_length for _ in range(self.num_sensors)]
+
+Ou seja, **Lamenza usa PAR-1 nas duas métricas de tempo**: por episódio em
+`completion_time` e por sensor em `avg_collection_time`. Chegamos à mesma escolha
+por raciocínio antes de ler essas linhas, e a coincidência tem consequência
+prática: **os nossos números são diretamente comparáveis com os publicados, sem
+conversão**.
+
+Por isso `t_conc_s` guarda o valor que o ambiente devolve — já penalizado — e
+`t_conc_pen_s` é reaplicação defensiva. Ver a nota em cada um.
+
 **A primária sozinha esconde o mecanismo**, então `resumir_episodios` devolve
 sempre o conjunto: `t_conc_pen`, `taxa_sucesso`, `t_conc_sucesso` (com `n`
 explícito e o aviso preso), mediana e p90.
@@ -48,10 +67,30 @@ class MetricasEpisodio:
     sucesso: bool
     n_visitados: int
     n_sensores: int
-    t_conc_s: float           # NaN se falhou
+    t_conc_s: float
+    """O `completion_time` do ambiente de referência, **já penalizado**.
+
+    Cuidado ao ler `episodios.csv`: esta coluna **não** é `NaN` nas falhas — ela
+    traz `max_episode_length`, porque é o que a linha 674 do `environment.py`
+    devolve. `NaN` aparece só quando o episódio termina **sem** `info` populada,
+    o que acontece se o laço quebra por `termination`/`truncation` antes de o
+    ambiente montar o dicionário.
+
+    Guardamos o valor do ambiente em vez de reconstruir o nosso para manter a
+    métrica **idêntica à do artigo**. Quem quer o tempo de conclusão sem
+    penalização usa `t_conc_s` filtrado por `sucesso`, que é o que
+    `resumir_episodios` faz.
+    """
     t_fim_s: float
     motivo_fim: str           # sucesso | stalled | timeout
     n_decisoes: int
+    coleta_media_s: float = float("nan")
+    """`avg_collection_time` do ambiente — a **quarta métrica do artigo**.
+
+    Média dos instantes de coleta, com os sensores não coletados entrando como
+    `max_episode_length` (linha 551 do `environment.py`). Ver o aviso em
+    `Resumo.media_coleta`.
+    """
     dist_por_agente_m: list[float] = field(default_factory=list)
     visitas_por_agente: list[int] = field(default_factory=list)
     coletas_redundantes: int = 0
@@ -60,7 +99,13 @@ class MetricasEpisodio:
 
     @property
     def t_conc_pen_s(self) -> float:
-        """D-02.2. **A métrica primária.**"""
+        """D-02.2. **A métrica primária.**
+
+        Reaplicação defensiva: como o ambiente já penaliza (linha 674), isto é
+        no-op quando `info` veio populada. Existe pelo caso em que ela não veio —
+        aí `t_conc_s` é `NaN` e propagar `NaN` para o bootstrap envenenaria a
+        média inteira em silêncio.
+        """
         return float(self.t_conc_s) if self.sucesso else MAX_EPISODE_LENGTH
 
     @property
@@ -133,6 +178,16 @@ class Resumo:
     de Lamenza, não porque seja comparável.
     """
     media_lb1: float
+    media_coleta: float = float("nan")
+    """`avg_collection_time` do ambiente, média sobre os episódios.
+
+    **MESMO AVISO de `media_t_conc_sucesso`, e pelo mesmo motivo.** A linha 551
+    do `environment.py` inicializa `collection_times` em `max_episode_length` e
+    divide por `num_sensors` sempre, então num episódio com 11 de 12 coletados o
+    sensor faltante entra com 500 s e domina a média. É consistente com PAR-1 —
+    mas torna a métrica **incomparável entre métodos com taxas de sucesso
+    diferentes**, exatamente como a média sobre sucessos.
+    """
 
     def como_linha(self) -> dict:
         return {
@@ -141,8 +196,22 @@ class Resumo:
             "media_t_conc_pen": self.media_t_conc_pen,
             "mediana": self.mediana_t_conc_pen, "p90": self.p90_t_conc_pen,
             "media_t_conc_sucesso": self.media_t_conc_sucesso,
+            "media_coleta": self.media_coleta,
             "media_lb1": self.media_lb1,
         }
+
+
+def _media_ignorando_nan(x: Sequence[float]) -> float:
+    """`nanmean` sem o `RuntimeWarning` de fatia vazia.
+
+    Acontece de verdade: `coleta_media_s` é `NaN` quando o `info` do ambiente não
+    veio, e num conjunto onde isso ocorre em todos os episódios o `np.nanmean`
+    avisa e devolve `nan`. O aviso é ruído — `nan` já é a resposta certa —, mas
+    poluir a saída de teste esconde avisos que importam.
+    """
+    v = np.asarray(x, dtype=float)
+    v = v[~np.isnan(v)]
+    return float(v.mean()) if v.size else float("nan")
 
 
 def resumir_episodios(eps: Iterable[MetricasEpisodio]) -> Resumo:
@@ -162,7 +231,8 @@ def resumir_episodios(eps: Iterable[MetricasEpisodio]) -> Resumo:
         mediana_t_conc_pen=float(np.median(pen)),
         p90_t_conc_pen=float(np.percentile(pen, 90)),
         media_t_conc_sucesso=float(conc.mean()) if conc.size else float("nan"),
-        media_lb1=float(np.nanmean(lb)) if lb.size else float("nan"),
+        media_lb1=_media_ignorando_nan(lb),
+        media_coleta=_media_ignorando_nan([e.coleta_media_s for e in lista]),
     )
 
 

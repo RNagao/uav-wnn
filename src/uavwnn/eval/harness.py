@@ -164,7 +164,11 @@ def rodar_episodio(
         prune_logging_handlers(handlers)
 
     sucesso = bool(info.get("all_collected", False))
+    # As duas métricas de tempo saem do `info` do ambiente, já penalizadas em
+    # `max_episode_length` (linhas 674 e 551 do `environment.py`). Guardamos o
+    # valor dele em vez de recalcular, para a métrica ficar IDÊNTICA à do artigo.
     t_conc = float(info.get("completion_time", float("nan")))
+    coleta = float(info.get("avg_collection_time", float("nan")))
     n_vis = int(coletado_ant.sum())
     motivo = ("sucesso" if sucesso
               else info.get("cause", "timeout" if passos >= max_passos else "stalled"))
@@ -173,6 +177,7 @@ def rodar_episodio(
         idx_episodio=idx_episodio, seed_cenario=seed_cenario, sucesso=sucesso,
         n_visitados=n_vis, n_sensores=cfg.num_sensors,
         t_conc_s=t_conc, t_fim_s=t, motivo_fim=str(motivo), n_decisoes=passos,
+        coleta_media_s=coleta,
         dist_por_agente_m=[float(x) for x in dist],
         visitas_por_agente=[int(x) for x in visitas],
         coletas_redundantes=redundantes, lb1_s=lb,

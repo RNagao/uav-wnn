@@ -317,3 +317,58 @@ def test_holm_e_monotono_e_nunca_reduz_p():
     assert np.all(aj >= np.array(p))
     assert np.all(np.diff(aj[np.argsort(p)]) >= -1e-12), "não pode decrescer"
     assert aj.max() <= 1.0
+
+
+# --- fidelidade às métricas do artigo -----------------------------------
+
+
+def test_as_quatro_metricas_do_artigo_estao_no_grao_do_episodio():
+    """`environment.py` popula `infos` com quatro métricas de desempenho, e as
+    quatro têm campo próprio aqui — nenhuma é recalculada por nós.
+
+        all_collected        -> sucesso
+        completion_time      -> t_conc_s
+        avg_collection_time  -> coleta_media_s
+        cause                -> motivo_fim
+    """
+    e = _ep()
+    for campo in ("sucesso", "t_conc_s", "coleta_media_s", "motivo_fim"):
+        assert hasattr(e, campo), f"falta {campo}"
+
+
+def test_t_conc_s_guarda_o_valor_ja_penalizado_do_ambiente():
+    """**A coluna NÃO é `NaN` nas falhas.**
+
+    A linha 674 do `environment.py` devolve `max_episode_length` quando não
+    coletou tudo, e nós guardamos o valor dele para a métrica ficar idêntica à do
+    artigo. Quem ler `episodios.csv` esperando `NaN` na falha encontra 500 — e
+    este teste existe para que isso esteja escrito em algum lugar executável.
+    """
+    falhou = MetricasEpisodio(
+        idx_episodio=0, seed_cenario=0, sucesso=False, n_visitados=2,
+        n_sensores=12, t_conc_s=MAX_EPISODE_LENGTH, t_fim_s=61.0,
+        motivo_fim="stalled", n_decisoes=122, coleta_media_s=417.8,
+        visitas_por_agente=[1, 1], lb1_s=6.0)
+    assert falhou.t_conc_s == MAX_EPISODE_LENGTH
+    assert falhou.t_conc_pen_s == MAX_EPISODE_LENGTH, "reaplicação é no-op"
+
+
+def test_t_conc_pen_protege_contra_info_ausente():
+    """O único caso em que `t_conc_s` é `NaN`: o laço quebra por
+    `termination`/`truncation` antes de o ambiente montar o `info`.
+
+    Propagar `NaN` para o bootstrap envenenaria a média inteira em silêncio.
+    """
+    sem_info = MetricasEpisodio(
+        idx_episodio=0, seed_cenario=0, sucesso=False, n_visitados=0,
+        n_sensores=12, t_conc_s=float("nan"), t_fim_s=10.0,
+        motivo_fim="stalled", n_decisoes=20, visitas_por_agente=[0, 0], lb1_s=6.0)
+    assert np.isnan(sem_info.t_conc_s)
+    assert sem_info.t_conc_pen_s == MAX_EPISODE_LENGTH
+
+
+def test_coleta_media_entra_no_resumo():
+    eps = [_ep(0, t=20.0), _ep(1, t=30.0)]
+    eps = [MetricasEpisodio(**{**e.__dict__, "coleta_media_s": c})
+           for e, c in zip(eps, (10.0, 20.0))]
+    assert resumir_episodios(eps).media_coleta == pytest.approx(15.0)

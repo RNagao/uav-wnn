@@ -106,6 +106,72 @@ mesmo harness.
 sucesso 0,000 não há episódio em que ela e outra política tenham concluído, e a
 T-02.5 manda não reportar. O harness omite a linha em vez de produzir `nan`.
 
+## 5-bis. Fidelidade às métricas do artigo
+
+O `environment.py` de referência popula `infos` com **quatro** métricas de
+desempenho, e as quatro entram no nosso grão de episódio **sem recálculo**:
+
+| `infos[...]` | nosso campo |
+|---|---|
+| `all_collected` | `sucesso` |
+| `completion_time` | `t_conc_s` |
+| `avg_collection_time` | `coleta_media_s` |
+| `cause` | `motivo_fim` |
+
+**A imputação da D-02.2 não é invenção nossa — é o que o original faz.** Duas
+linhas do `environment.py`:
+
+```python
+# linha 674 — por episódio
+"completion_time": self.max_episode_length if not all_sensors_collected
+                   else self.simulator._current_timestamp
+
+# linha 551 — por sensor; o vetor NASCE penalizado
+self.collection_times = [self.max_episode_length for _ in range(self.num_sensors)]
+```
+
+Ou seja, **Lamenza usa PAR-1 nas duas métricas de tempo**. Chegamos à mesma
+escolha por raciocínio (monotonicidade, não manipulável por travar cedo, escalar
+único para o bootstrap) antes de ler essas linhas, e a coincidência tem
+consequência prática: **os nossos números são diretamente comparáveis com os
+publicados, sem conversão**.
+
+Duas notas que vão para quem lê `episodios.csv`:
+
+- **`t_conc_s` não é `NaN` nas falhas** — traz `max_episode_length`, porque é o
+  que a linha 674 devolve. `NaN` aparece só quando o episódio termina sem `info`
+  populada. `t_conc_pen_s` é reaplicação defensiva, no-op no caso comum, e
+  existe para não propagar `NaN` ao bootstrap.
+- **`media_coleta` herda o mesmo viés de sobrevivência** de
+  `media_t_conc_sucesso`: com 11 de 12 coletados, o sensor faltante entra com
+  500 s e domina a média. É consistente com PAR-1, mas torna a métrica
+  incomparável entre métodos com taxas de sucesso diferentes.
+
+### Um trade-off que só a coleta média revela
+
+| célula | política | `t_conc_pen` | `media_coleta` |
+|---|---|---|---|
+| `Na1` | `guloso` | 33,85 | **15,28** |
+| `Na1` | `kmeans_tsp` | **31,12** | 15,80 |
+| `Na2` | `guloso` | 32,51 | 14,51 |
+| `Na2` | `kmeans_tsp` | **16,99** | **8,28** |
+| `Na4` | `guloso` | 30,64 | 13,54 |
+| `Na4` | `kmeans_tsp` | **9,38** | **5,10** |
+
+Em `Na = 1` o planejador conclui **antes** (31,12 contra 33,85) mas tem coleta
+média **pior** (15,80 contra 15,28). Não é ruído: é o que as duas métricas
+medem. O TSP otimiza o **comprimento total** da rota, e para isso aceita deixar
+sensores próximos para depois; o vizinho-mais-próximo agarra o mais perto
+primeiro, o que adianta as coletas iniciais ao custo do total.
+
+Com `Na ≥ 2` o particionamento vence nas duas, porque dividir o mapa domina
+qualquer escolha de ordem.
+
+Vale para a Etapa 1: **as duas métricas do artigo podem discordar**, e reportar
+só uma esconderia esse comportamento.
+
+---
+
 ## 6. Decisões e suposições registradas
 
 | id | decisão |
