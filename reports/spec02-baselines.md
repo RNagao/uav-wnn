@@ -106,6 +106,61 @@ mesmo harness.
 sucesso 0,000 não há episódio em que ela e outra política tenham concluído, e a
 T-02.5 manda não reportar. O harness omite a linha em vez de produzir `nan`.
 
+## 5-ter. A cadeia de validação está fechada
+
+Três elos independentes, e o terceiro era o que faltava:
+
+| o que | como | resultado |
+|---|---|---|
+| **`greedy` de referência** vs fig. 7.3 | SPEC-00, 9 células × 200 ep | **9/9 dentro de ±3,3 %**, mediana 1,7 % |
+| **MADDPG** vs publicado | campanha de 900 runs, pesos liberados | **3/3 dentro de um desvio** |
+| **nossa `Guloso`** vs `heuristics.py` | mesma config, 60 cenários pareados | **idêntico, delta +0,00 s** |
+| **nossa `Guloso`** vs fig. 7.3 | `phase="eval_heuristic"`, 200 ep | **−1,3 %** e **+0,5 %** |
+
+O terceiro elo importa porque a SPEC-00 provou que o *guloso de referência*
+reproduz a figura, não que a *nossa* `Guloso` seja aquela política. Agora está
+provado: elas coincidem **episódio a episódio**, e a igualdade é exata.
+
+Isso valida, de uma vez, tudo que existe entre as duas: a decodificação da
+observação (`Observacao.decodificar`), o sinal do rumo, a moeda da ação, a
+semeadura e a métrica. Um erro em qualquer desses pontos apareceria como
+divergência. Travado em `tests/test_harness.py`.
+
+### E explica um número que parecia divergir
+
+A tabela da §1 dá `Na2_Ns12 = 32,51 s` para o guloso, contra **29,6** publicado.
+Não é erro:
+
+| config | intervalo de decisão | resultado |
+|---|---|---|
+| `phase="eval"` — a desta spec | 0,5 s | 32,17 s |
+| `phase="eval_heuristic"` — a da fig. 7.3 | **0,1 s** | **29,23 s** ✓ |
+
+É a assimetria que a SPEC-00 §4.3 registrou: **o `visualize_performance.py`
+avalia o MADDPG a 0,5 s por decisão e o guloso a 0,1 s.** Cinco vezes mais
+reativo, com integrador de mobilidade proporcionalmente mais fino.
+
+A SPEC-02 usa 0,5 s para **todas** as políticas, o que é a escolha certa
+internamente — comparar políticas com intervalos diferentes seria variável não
+controlada. Mas a consequência tem de ser declarada: **a coluna do guloso desta
+spec não é a da fig. 7.3.** Quando as duas aparecerem juntas no relatório, a
+diferença de intervalo vai ao lado.
+
+### O que a reprodução NÃO cobre
+
+**É reprodução da avaliação, não do treino.** Carregamos os pesos que Lamenza
+publicou; não retreinamos. O que está validado é que *avaliar* aquela política no
+nosso harness dá o número dele. Uma diferença sistemática no treino não
+apareceria aqui — é exatamente o que a **D7 estreitada** diz.
+
+**Os valores publicados do MADDPG existem só para `Ns = 24`**, lidos das barras
+de `statistics/completion_times/` com ~0,3 s de precisão. Nas outras seis células
+não há referência: só o nosso número.
+
+**Não há checkpoint para `Na = 1`.**
+
+---
+
 ## 5-bis. Fidelidade às métricas do artigo
 
 O `environment.py` de referência popula `infos` com **quatro** métricas de

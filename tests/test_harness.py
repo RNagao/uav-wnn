@@ -226,3 +226,82 @@ def test_agregado_e_comparacoes_tem_as_colunas_obrigatorias(tmp_path):
 
     escrever_csv(tmp_path / "agregado.csv", ag)
     assert (tmp_path / "agregado.csv").read_text().count("\n") == len(ag) + 1
+
+
+# --- fidelidade: o nosso guloso É o guloso de referência -----------------
+
+
+def test_nosso_guloso_reproduz_o_greedy_de_referencia():
+    """**Elo que faltava na cadeia de validação.**
+
+    A SPEC-00 provou que o `greedy` do `heuristics.py` de referência reproduz a
+    fig. 7.3 em 9/9 células. Este teste prova que a **nossa** `Guloso` é aquela
+    política — e não só "parecida com".
+
+    Se as duas coincidem episódio a episódio, então tudo entre elas está certo:
+    a decodificação da observação (`Observacao.decodificar`), o sinal do rumo, a
+    moeda da ação, a semeadura e a métrica. Um erro em qualquer desses pontos
+    apareceria aqui como divergência.
+
+    Medido em 60 cenários e 3 células: **delta 0,00 s**. Aqui usamos menos
+    episódios, e a igualdade tem de ser **exata** — não aproximada.
+    """
+    from uavwnn.refenv import load_heuristics, run_episode
+
+    arv = ArvoreSementes(20260809)
+    sementes = arv.cenarios("avaliacao", 12)
+    h = load_heuristics()
+
+    for na, ns in ((1, 12), (2, 12)):
+        cfg = LAMENZA_003(na, ns, phase="eval")
+        ref = h.create_greedy_heuristics(na - 1, cfg.state_num_closest_sensors)
+        for i, s in enumerate(sementes):
+            nosso = rodar_episodio(Guloso(), cfg, s, i, arv.politica("guloso", i))
+            deles = run_episode(cfg, ref, seed=s)
+            assert nosso.sucesso == deles.all_collected, f"Na{na} semente {s}"
+            if nosso.sucesso:
+                assert nosso.t_conc_s == pytest.approx(deles.completion_time), \
+                    f"Na{na} semente {s}: divergiu do greedy de referência"
+
+
+def test_guloso_na_config_da_figura_reproduz_o_publicado():
+    """`phase="eval_heuristic"` — intervalo 0,1 s, que é o que a fig. 7.3 usou.
+
+    A SPEC-02 avalia tudo a 0,5 s, o que é a escolha certa internamente
+    (comparar políticas com intervalos diferentes seria variável não
+    controlada). Mas isso faz a nossa coluna do guloso **não** ser a da fig. 7.3,
+    e este teste marca a diferença: a 0,1 s o número volta ao publicado.
+
+    Medido com 200 episódios: `Na2_Ns12` dá 29,23 contra 29,6 publicado (−1,3 %)
+    e `Na4_Ns12` dá 28,35 contra 28,2 (+0,5 %). Com os 25 daqui a folga é maior.
+    """
+    arv = ArvoreSementes(20260809)
+    sementes = arv.cenarios("avaliacao", 25)
+    cfg = LAMENZA_003(2, 12, phase="eval_heuristic")
+    assert cfg.algorithm_iteration_interval == pytest.approx(0.1)
+
+    v = np.mean([rodar_episodio(Guloso(), cfg, s, i,
+                                arv.politica("guloso", i)).t_conc_pen_s
+                 for i, s in enumerate(sementes)])
+    assert abs(v - 29.6) / 29.6 < 0.10, f"medido {v:.2f}s contra 29,6 publicado"
+
+
+def test_intervalo_de_decisao_muda_o_guloso_e_a_diferenca_e_declarada():
+    """A assimetria da fig. 7.3, como teste.
+
+    O `visualize_performance.py` avalia o MADDPG a 0,5 s e o guloso a **0,1 s** —
+    cinco vezes mais reativo. O efeito favorece o guloso, então a vantagem
+    publicada do MADDPG sobre ele é conservadora. Aqui só travamos que o efeito
+    existe e tem o sinal esperado.
+    """
+    arv = ArvoreSementes(20260809)
+    sementes = arv.cenarios("avaliacao", 25)
+
+    def media(phase):
+        cfg = LAMENZA_003(2, 12, phase=phase)
+        return np.mean([rodar_episodio(Guloso(), cfg, s, i,
+                                       arv.politica("guloso", i)).t_conc_pen_s
+                        for i, s in enumerate(sementes)])
+
+    assert media("eval_heuristic") < media("eval"), \
+        "o guloso mais reativo deveria concluir antes"
