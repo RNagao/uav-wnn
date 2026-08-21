@@ -248,6 +248,8 @@ uv run pytest -q                    # 18 testes, ~1 min
 | **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
 | **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
 | **`spec06_orcamento.py`** | T-06.0: vazão por célula e por parcela, `B_max`, e o veredito sobre P2. **Bloqueia as outras tarefas da SPEC-06** |
+| **`spec06_bancos.py`** | bancos `test`/`val` disjuntos (§4.2), horizonte permissivo (P5) e a interação `max_seconds_stalled` × RF-02 |
+| **`spec06_treinar.py`** | o treinador da campanha: réplicas 1a e 1b, um laço para as duas, com os artefatos da §4.7 |
 
 ### Os três aproximadores comparáveis contra o MADDPG
 

@@ -183,3 +183,53 @@ def test_horizonte_arredonda_para_cima_em_centenas():
     h = horizonte_permissivo(np.full(50, 250.0))     # 3 × 250 = 750
     assert h == 800.0
     assert h >= 3 * 250.0
+
+
+# --- §4.4 parada antecipada -----------------------------------------------
+
+
+def test_parada_nao_dispara_com_metrica_achatada_no_zero():
+    """A correção ao critério da §4.4, guardada por teste.
+
+    O critério como escrito disparava com `SR = 0` no início do treino, declarando
+    "convergiu" numa corrida que não havia começado a aprender — medido numa corrida
+    de fumaça: 1950 de 6000 passos. Confundir "platô antes" com "platô depois"
+    libera orçamento de quem mais precisa dele.
+    """
+    from uavwnn.campanha.treino import MINIMO_AVALIACOES, ParadaAntecipada
+
+    p = ParadaAntecipada(maior_e_melhor=True)
+    for i in range(MINIMO_AVALIACOES - 1):
+        assert not p.registrar(0.0), f"parou na avaliação {i + 1} com métrica zero"
+
+
+def test_parada_dispara_depois_de_platô_real():
+    """Sobe, estabiliza, e aí sim para."""
+    from uavwnn.campanha.treino import MINIMO_AVALIACOES, ParadaAntecipada
+
+    p = ParadaAntecipada(maior_e_melhor=True)
+    subida = [0.1 * i for i in range(1, 11)]
+    parou_em = None
+    for i, v in enumerate(subida + [1.0] * 40):
+        if p.registrar(v):
+            parou_em = i + 1
+            break
+    assert parou_em is not None, "nunca parou, mesmo com platô longo"
+    assert parou_em >= MINIMO_AVALIACOES
+
+
+def test_parada_respeita_a_direcao_da_metrica():
+    """`SR` é maior-é-melhor e `CT_cens` é menor-é-melhor.
+
+    Deixar a direção implícita faria a parada disparar de imediato numa das duas —
+    uma métrica que cai seria lida como "sem melhora".
+    """
+    from uavwnn.campanha.treino import ParadaAntecipada
+
+    caindo = [50.0 - i for i in range(30)]
+    p_menor = ParadaAntecipada(maior_e_melhor=False)
+    assert not any(p_menor.registrar(v) for v in caindo), \
+        "menor-é-melhor parou enquanto a métrica ainda caía"
+    p_maior = ParadaAntecipada(maior_e_melhor=True)
+    assert any(p_maior.registrar(v) for v in caindo), \
+        "maior-é-melhor não parou com a métrica piorando"

@@ -423,6 +423,56 @@ Redigir o veredito com **o número que o sustenta** (PRD §11.6). Os três desfe
 
 ---
 
+## 5-bis. Estado da execução (2026-08-21)
+
+`reports/spec06-etapa1.md`. **4 dos 10 critérios fechados**, infraestrutura da §4
+pronta e validada de ponta a ponta, e **o portão G1 não declarado** — declará-lo com
+2 % do orçamento medido seria afirmar mais do que se mediu.
+
+| fechado | |
+|---|---|
+| 1 | P2, vazão decomposta, `B_max` = 19,5 M |
+| 7 | `R ≥ 3` sem descarte, implementado e ativo |
+| 10 | RNF-07, por teste estrutural que guarda o futuro |
+| — | **P5**: horizonte permissivo = **500 s** (o piso), SR do guloso 100 % |
+| — | `max_seconds_stalled` × RF-02 = **30,5 s**, variância zero, previsão confirmada |
+
+### Três correções ao protocolo da §4, descobertas por execução
+
+**A eq. 7-2 não existe no ambiente.** Ele implementa `punish` (eq. 5-6) e o
+incremento. Calculá-la fora não modifica o problema — a recompensa de aprendizado é
+escolha do agente. E a diferença **não é uma constante**: a 7-2 é não negativa, então
+episódio mais longo acumula mais retorno; ela não penaliza demora, que é o que o §7.1
+descreve. Confundi-las mediria o §7.2 com horizonte generoso.
+
+**A parada antecipada da §4.4 dispara antes de o treino começar.** Medido:
+*"convergiu em 1950 passos"* de 6000, com `SR = 0` do começo ao fim. O critério
+confunde *"platô depois de aprender"* com *"ainda não começou"*, e libera orçamento de
+quem mais precisa. Corrigido com guarda de metade das avaliações.
+
+**`SR` e `CT_cens` saturam.** A caminhada aleatória também dá `SR = 0,0 %`, e
+`CT_cens` fica em 500 s para todos. Com as duas achatadas, a seleção de checkpoint
+escolhe **ao acaso** e a falha catastrófica dispara para qualquer corrida
+sub-treinada. Separadas: **seleção** por `cobertura` (sinal desde o primeiro passo, o
+próprio objetivo da 7-2, monótona em `SR`), **reporte** por `SR` como a T-06.1 manda.
+
+### A asserção da SPEC-05 §4.2 pagou por si, no caso previsto
+
+A T-06.1 previu que a 7-2 acumulada sob horizonte permissivo daria alvos de TD
+grandes e prescreveu normalizar por `(1−γ)`. Medido: **sem a normalização a asserção
+aborta no passo 998** (`passo 0,6742 excede c_max=0,5`). A §4.3 classifica como bug e
+manda corrigir e re-executar. A escala `(1−γ) = 0,01` está registrada em código
+**antes** da campanha, com o fator 100 que a previsão antecipou.
+
+### O custo do que falta
+
+`B_max` = 19,5 M a 848 passos/s são **6,4 h por corrida**. O critério 2 são 3 células
+× 5 sementes × 2 braços = **192 h de CPU**, ~16 h de parede por braço em 12 núcleos.
+A campanha executada aqui usa `B_max = 400 000` — **2 % do medido** — e existe para
+validar o arnês, não para fechar o critério.
+
+---
+
 ## 6. Critério de saída — portão G1
 
 Cada item **medido**, não implementado.

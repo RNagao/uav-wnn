@@ -14,6 +14,8 @@ from .bancos import (
 )
 from .recompensas import RECOMPENSAS, eq_5_6, eq_7_2
 from .sementes import PapeisDeSemente
+from .treino import Avaliacao, Corrida, ParadaAntecipada, treinar
 
-__all__ = ["Banco", "BancoPar", "PapeisDeSemente", "RECOMPENSAS", "carregar_bancos",
-           "eq_5_6", "eq_7_2", "gerar_bancos", "horizonte_permissivo"]
+__all__ = ["Avaliacao", "Banco", "BancoPar", "Corrida", "ParadaAntecipada",
+           "PapeisDeSemente", "RECOMPENSAS", "carregar_bancos", "eq_5_6", "eq_7_2",
+           "gerar_bancos", "horizonte_permissivo", "treinar"]
