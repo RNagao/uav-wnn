@@ -61,11 +61,40 @@ from uavwnn.rl.actor_critic import AtorCriticoNTupla
 from uavwnn.rl.politica import PoliticaGaussiana
 from uavwnn.wnn.redes import RedeGradienteFuncional, RedeRegressaoEsquecimento
 
-# -- alvos publicados (tab. 5.x de Katopodis) -------------------------------
+# -- alvos publicados, tabela 5.8 (p.67) ------------------------------------
+#
+# ERRO DE TRANSCRIÇÃO CORRIGIDO. A tabela da SPEC-05 T-05.4(a) registra o alvo da
+# MLP como `0,02 (−0,03; −0,02)` — um estimador pontual FORA do próprio intervalo,
+# o que já denunciava o problema. A tabela 5.8 do original diz **−0,02**, e o sinal
+# se perdeu na transcrição.
 ALVOS = {
     "n-tuple AC": (93.3, 92.9, 93.8),
-    "AC com MLP": (0.02, -0.03, -0.02),
+    "AC com MLP": (-0.02, -0.03, -0.02),
 }
+
+# -- orçamento do §5.4 (p.65), que a spec não registrava --------------------
+#
+# > "Each pair of algorithm and benchmark task is executed **10 times**, with
+# > distinct random initializations, for **2000 episodes**, except for hopper".
+#
+# A primeira execução usou 1500 × 5 — 75 % dos episódios e 50 % das sementes. Não
+# era reprodução do protocolo dele, e um resultado negativo ali não seria
+# atribuível ao método.
+EPISODIOS_PUBLICADO = 2000
+SEMENTES_PUBLICADO = 10
+
+# O protocolo de avaliação também sai da p.66, e por dedução em vez de citação
+# direta. O texto explica o resultado da MLP assim:
+#
+# > "the MLP methods having optimized their agents to a local optimum of not
+# > moving the car. In this way, they **never incur the penalty of expending
+# > energy**, but also never attain the reward of reaching the flag."
+#
+# Com `Σ = 0,4` o ruído sozinho custa `−0,1 · 0,4 · 999 = −39,96` por episódio. Se
+# o número reportado incluísse exploração, a MLP NÃO poderia "never incur the
+# penalty" — logo o número é **sem ruído**, e a avaliação determinística da
+# `_avaliar` é o protocolo certo. Confirmado por medição: com ruído medimos
+# −31,86; sem ruído, −0,01 contra os −0,02 publicados.
 
 # -- tabela A.3, linha Mountaincar ------------------------------------------
 A3 = dict(passos=100, tamanho_tupla=32, resolucao=128, phi=0.85,
@@ -99,7 +128,41 @@ def _codificador():
     return cod, sum(t.n_bits_para(1) for t in termos)
 
 
-def rodar_ntupla(episodios: int, seed: int, sigma_como_desvio: bool = False) -> list[float]:
+def _avaliar(politica_media, env_fn, episodios: int, seed: int) -> tuple[list[float], float]:
+    """**Avaliação determinística: sem ruído, usando a média.**
+
+    Não é escolha nossa — é o protocolo, e vale para os dois braços:
+
+    > Lamenza §7: *"during an evaluation the training is temporarily halted and
+    > action noise is removed"*.
+
+    ISTO CORRIGE UM ERRO MEU. A primeira versão deste script reportava os
+    retornos de **treino**, com o ruído de exploração ligado, e por isso não podia
+    reproduzir número algum: com `Σ = 0,4`, a MLP tem `σ = 0,632`, logo
+    `E[a²] = 0,4`, e o custo de ação sozinho vale `−0,1 · 0,4 · 999 = −39,96`. O
+    `0,02` publicado é **inatingível** sob ruído; ele exige média ≈ 0 **e** ruído
+    removido. Medi −31,86 e chamei de discrepância — a discrepância era do
+    protocolo, não do algoritmo.
+    """
+    env = env_fn()
+    retornos, chegadas = [], 0
+    for ep in range(episodios):
+        obs, _ = env.reset(seed=900_000 + seed * 10_000 + ep)
+        total = 0.0
+        while True:
+            acao = politica_media(obs)
+            obs, r, term, trunc, _ = env.step(np.clip(acao, -LIMITE_ACAO, LIMITE_ACAO))
+            total += float(r)
+            if term or trunc:
+                chegadas += bool(term)
+                break
+        retornos.append(total)
+    env.close()
+    return retornos, chegadas / episodios
+
+
+def rodar_ntupla(episodios: int, seed: int, sigma_como_desvio: bool = False,
+                 n_aval: int = 100) -> dict:
     cod, n_bits = _codificador()
     ator = RedeGradienteFuncional(n_bits, A3["tamanho_tupla"], n_saidas=1,
                                   seed=seed, c_max=None)
@@ -134,10 +197,16 @@ def rodar_ntupla(episodios: int, seed: int, sigma_como_desvio: bool = False) -> 
         retornos.append(total)
         chegadas.append(chegou)
     env.close()
-    return retornos, chegadas
+
+    # A média da gaussiana É a ação determinística (`mode` do
+    # `ContinousActionPolicy.jl`): `f(s)`, sem somar ruído.
+    aval, cheg_aval = _avaliar(
+        lambda o: agente.politica.media(cod(o)), _env, n_aval, seed)
+    return {"treino": retornos, "chegadas_treino": chegadas,
+            "aval": aval, "chegada_aval": cheg_aval}
 
 
-def rodar_mlp(episodios: int, seed: int) -> list[float]:
+def rodar_mlp(episodios: int, seed: int, n_aval: int = 100) -> dict:
     """MLP `2→32→32→1`, Adam, hiperparâmetros da A.6.
 
     Duas camadas ocultas de 32 com ReLU é a arquitetura da §5.4 de Katopodis, e a
@@ -183,7 +252,29 @@ def rodar_mlp(episodios: int, seed: int) -> list[float]:
         retornos.append(total)
         chegadas.append(chegou)
     env.close()
-    return retornos, chegadas
+
+    aval, cheg_aval = _avaliar(lambda o: ator.prever(np.asarray(o, float)),
+                               _env, n_aval, seed)
+    return {"treino": retornos, "chegadas_treino": chegadas,
+            "aval": aval, "chegada_aval": cheg_aval}
+
+
+class _Tarefa:
+    """Uma semente, os dois braços. Classe e não closure para ser picklável.
+
+    As sementes são independentes por construção — cada uma instancia redes,
+    `rng` e `env.reset` próprios —, então rodá-las em paralelo **não altera
+    resultado algum**, só o relógio. É o que permite o orçamento publicado
+    (2000 × 10) caber em tempo utilizável.
+    """
+
+    def __init__(self, episodios: int, n_aval: int, p13: bool) -> None:
+        self.episodios, self.n_aval, self.p13 = episodios, n_aval, p13
+
+    def __call__(self, seed: int):
+        return (rodar_ntupla(self.episodios, seed, sigma_como_desvio=self.p13,
+                             n_aval=self.n_aval),
+                rodar_mlp(self.episodios, seed, n_aval=self.n_aval))
 
 
 def _veredito(rotulo: str, medido, arv: ArvoreSementes) -> dict:
@@ -199,10 +290,17 @@ def _veredito(rotulo: str, medido, arv: ArvoreSementes) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--episodios", type=int, default=1500)
-    ap.add_argument("--sementes", type=int, default=5)
+    ap.add_argument("--episodios", type=int, default=EPISODIOS_PUBLICADO)
+    ap.add_argument("--sementes", type=int, default=SEMENTES_PUBLICADO)
+    ap.add_argument("--processos", type=int, default=1,
+                    help="sementes em paralelo. As sementes são independentes por "
+                         "construção (cada uma tem rng e reset próprios), então "
+                         "paralelizar NÃO altera resultado algum — só o relógio.")
     ap.add_argument("--avaliar-ultimos", type=int, default=100,
-                    help="episódios finais que entram na média reportada")
+                    help="episódios finais de TREINO, para a coluna de treino")
+    ap.add_argument("--n-aval", type=int, default=100,
+                    help="episódios de avaliação DETERMINÍSTICA por semente — "
+                         "é esta a coluna que se compara ao publicado")
     ap.add_argument("--p13", action="store_true",
                     help="trata Σ como desvio (ContinousActionPolicy.jl) e não "
                          "como covariância (eq. 4.34) — mede a pendência P13")
@@ -211,40 +309,65 @@ def main() -> int:
 
     print(f"T-05.4(a) · MountainCarContinuous-v0 · {a.episodios} episódios "
           f"· {a.sementes} sementes")
-    print(f"média sobre os últimos {a.avaliar_ultimos} episódios de cada semente")
+    print(f"AVAL = {a.n_aval} episódios determinísticos por semente, ruído "
+          f"removido (Lamenza §7)")
+    print(f"treino = últimos {a.avaliar_ultimos} episódios, com ruído — NÃO é o "
+          f"que se compara ao publicado")
     print(f"Σ tratada como {'DESVIO (P13)' if a.p13 else 'covariância (eq. 4.34)'}\n")
 
     arv = ArvoreSementes(20260821)
     art: dict = {"config": vars(a), "A3": A3, "A6": A6, "resultados": []}
 
-    finais_nt, finais_mlp = [], []
+    aval_nt, aval_mlp = [], []
+    trei_nt, trei_mlp = [], []
     cheg_nt, cheg_mlp = [], []
-    for s in range(a.sementes):
-        rn, cn = rodar_ntupla(a.episodios, s, sigma_como_desvio=a.p13)
-        rm, cm = rodar_mlp(a.episodios, s)
-        finais_nt.extend(rn[-a.avaliar_ultimos:])
-        finais_mlp.extend(rm[-a.avaliar_ultimos:])
-        cheg_nt.extend(cn)
-        cheg_mlp.extend(cm)
-        print(f"  semente {s}: n-tuple {np.mean(rn[-a.avaliar_ultimos:]):>7.2f} "
-              f"(chegou em {np.mean(cn):>5.1%} dos episódios)   "
-              f"MLP {np.mean(rm[-a.avaliar_ultimos:]):>7.2f} "
-              f"({np.mean(cm):>5.1%})")
+    ca_nt, ca_mlp = [], []
+    print(f"{'':>11} {'n-tuple':>26}   {'MLP':>26}")
+    print(f"{'semente':>11} {'treino':>8} {'AVAL':>8} {'cheg.av':>8}   "
+          f"{'treino':>8} {'AVAL':>8} {'cheg.av':>8}")
+
+    tarefa = _Tarefa(a.episodios, a.n_aval, a.p13)
+    if a.processos > 1:
+        import multiprocessing as mp
+        with mp.Pool(a.processos) as pool:
+            pares = pool.map(tarefa, range(a.sementes))
+    else:
+        pares = [tarefa(s) for s in range(a.sementes)]
+
+    for s, (rn, rm) in enumerate(pares):
+        for r, trei, avl, cheg, ca in ((rn, trei_nt, aval_nt, cheg_nt, ca_nt),
+                                       (rm, trei_mlp, aval_mlp, cheg_mlp, ca_mlp)):
+            trei.extend(r["treino"][-a.avaliar_ultimos:])
+            avl.extend(r["aval"])
+            cheg.extend(r["chegadas_treino"])
+            ca.append(r["chegada_aval"])
+        print(f"{s:>11} {np.mean(rn['treino'][-a.avaliar_ultimos:]):>8.2f} "
+              f"{np.mean(rn['aval']):>8.2f} {rn['chegada_aval']:>7.1%}   "
+              f"{np.mean(rm['treino'][-a.avaliar_ultimos:]):>8.2f} "
+              f"{np.mean(rm['aval']):>8.2f} {rm['chegada_aval']:>7.1%}")
+
+    finais_nt, finais_mlp = aval_nt, aval_mlp   # o publicado é AVALIAÇÃO
+    art["treino"] = {"n-tuple": float(np.mean(trei_nt)),
+                     "mlp": float(np.mean(trei_mlp))}
 
     # A TAXA DE CHEGADA É O QUE TORNA UMA DISCREPÂNCIA DIAGNOSTICÁVEL.
     # "nunca alcançou a bandeira" e "alcançou e aprendeu mal" são falhas
     # diferentes com correções opostas: a primeira é exploração (Σ, m), a segunda
     # é atribuição de crédito (α, φ, γ). Sem este número, um retorno de -33 não
     # distingue as duas — e o critério 1 exige diagnóstico, não só o veredito.
-    art["taxa_chegada"] = {"n-tuple": float(np.mean(cheg_nt)),
-                           "mlp": float(np.mean(cheg_mlp))}
+    art["taxa_chegada"] = {"n-tuple_treino": float(np.mean(cheg_nt)),
+                           "mlp_treino": float(np.mean(cheg_mlp)),
+                           "n-tuple_aval": float(np.mean(ca_nt)),
+                           "mlp_aval": float(np.mean(ca_mlp))}
 
     print()
     art["resultados"].append(_veredito("n-tuple AC", finais_nt, arv))
     art["resultados"].append(_veredito("AC com MLP", finais_mlp, arv))
 
-    print(f"\ntaxa de chegada à bandeira: n-tuple {np.mean(cheg_nt):.1%}, "
+    print(f"\ntaxa de chegada à bandeira — treino: n-tuple {np.mean(cheg_nt):.1%}, "
           f"MLP {np.mean(cheg_mlp):.1%}")
+    print(f"                              avaliação: n-tuple {np.mean(ca_nt):.1%}, "
+          f"MLP {np.mean(ca_mlp):.1%}")
     if np.mean(cheg_nt) < 0.01:
         print("  -> a n-tupla praticamente NUNCA chega. Uma discrepância aqui é")
         print("     de EXPLORAÇÃO (Σ, m), não de atribuição de crédito.")

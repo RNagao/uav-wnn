@@ -453,3 +453,57 @@ O critério de saída 5 ("nenhuma dependência de PyTorch fora de `tests/`") é 
 por construção: `scripts/spec02_maddpg_*.py` importam `torch` porque é o que lê os
 pesos publicados de Lamenza. O que a RNF-11 protege é **`src/uavwnn/`**, que está
 limpo e agora tem teste. O critério estava escrito mais forte do que se pretende.
+
+### T-05.4(a) fechada com discrepância — e o que ela deixa de garantir
+
+A reprodução do Katopodis no `MountainCarContinuous-v0` rodou com o orçamento
+publicado (2000 episódios × 10 sementes, §5.4 p.65):
+
+| | medido | publicado |
+|---|---|---|
+| AC com MLP (controle negativo) | −0,0370 [−0,0393; −0,0347] | **−0,02** (−0,03; −0,02) |
+| n-tuple AC | −0,1989 [−0,2124; −0,1842] | **93,3** (92,9; 93,8) |
+
+O controle negativo reproduz o fenômeno; o n-tuple cai no **mesmo ótimo local de
+não mover o carro** que o artigo atribui à MLP, com **0,00 % de chegada à bandeira**
+em 1000 episódios de avaliação.
+
+Três erros nossos corrigidos no caminho: retornos de treino em vez de avaliação
+determinística (a MLP foi de −31,86 para −0,04 com a correção), sinal trocado no
+alvo publicado da nossa própria tabela (`0,02` em vez de `−0,02`), e orçamento a
+37 % do publicado.
+
+**O que a T-05.4(a) deixa de garantir, e é o motivo de isto virar pendência.** O
+propósito escrito do critério era *"sem isto, nenhum resultado negativo da SPEC-06 é
+atribuível ao problema"*. Continua garantido: redes bit-idênticas ao `Ramnet.jl`,
+codificador com semântica de resolução provada, mapeamento por partição provado,
+protocolo de avaliação correto, e capacidade/generalização eliminada por varredura
+de `n ∈ {8,16,32,64}`. **Não** garantido: que o laço do Algoritmo 4.4 atribua
+crédito corretamente sobre horizonte longo e recompensa quase esparsa — e ele é o
+único componente da cadeia **sem oráculo diferencial**.
+
+Se a SPEC-06 der resultado negativo no braço n-tuple, **a atribuição fica em aberto
+e o primeiro suspeito é o laço.**
+
+### Nova — TS7: os dois braços do `spec05_mountaincar.py` usam laços diferentes
+
+Viola o *"a única diferença é `f(·)`"* da §4.8: o n-tuple usa `AtorCriticoNTupla`
+(Algoritmo 4.4, retorno de `m` passos por transição) e a MLP um laço próprio com um
+único ponto de truncamento por episódio.
+
+Consequência que importa: **a MLP reproduzir não valida o laço**, porque o alvo que
+ela reproduz é um ótimo local degenerado que quase qualquer esquema de crédito
+encontra. Unificar antes de qualquer nova rodada; até então, só a comparação de cada
+braço com o **seu** número publicado é válida, nunca a comparação entre eles.
+
+### Retratação — a varredura de tupla não responde a pergunta aberta 2
+
+Quase registrei que ela respondia. O retorno melhora monotonicamente com tupla maior
+(−1,73 → −0,94 → −0,13 → −0,01) e o **sinal** coincide com o achado da §5.3 do
+Katopodis. Mas zero é o teto do "não mover o carro": convergir para zero é assentar
+no ótimo local com mais precisão, não resolver. A chegada em avaliação é 0,00 % nos
+quatro pontos, e a de treino não sobe com `n`.
+
+A recomendação de incluir `n = 16` na varredura da SPEC-06 **continua válida**, mas
+pelo argumento de fidelidade à referência — Katopodis usa `n ∈ {16,32,64}` em tarefa
+contínua e o PRD varre `{8,10,12}` — e **não** por esta medição.

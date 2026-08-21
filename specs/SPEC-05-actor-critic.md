@@ -15,7 +15,7 @@ leitura generosa é pior que um critério aberto.
 
 | # | Critério | Estado |
 |---|---|---|
-| 1 | T-05.4(a) — os quatro números do Katopodis | `scripts/spec05_mountaincar.py`, hiperparâmetros A.3/A.6 verbatim; discrepância diagnosticada por escrito |
+| 1 | T-05.4(a) — os quatro números do Katopodis | **FECHADO com discrepância diagnosticada**, que é o que o critério admite. O controle negativo (MLP) reproduz o fenômeno: −0,0370 contra −0,02 publicado. O n-tuple **falha**: −0,1989 contra 93,3, com 0,00 % de chegada à bandeira. `reports/spec05-mountaincar.md` — ver (e) |
 | 2 | T-05.4(b) — C2 > C0 com IC separado | **FECHADO.** `Δ = −13,45°`, IC95 % `[−14,53; −12,43]`, 12× o MDE. `reports/spec05-circular.md` |
 | 3 | Pareamento auditável | **FECHADO.** `tests/test_pareamento.py` |
 | 4 | `γ = 0,99` fixo e faixas com procedência | **FECHADO.** `configs/spec05/hiperparametros.toml`, verificado por teste |
@@ -81,6 +81,59 @@ de método e não detalhe de implementação. **O que se entrega é determinismo
 ordem canônica (índice crescente), que é o que `make repro` precisa. A distinção
 está em `tests/test_barreira.py`, incluindo um teste que **afirma a desigualdade**
 para que mudá-la seja decisão e não efeito colateral.
+
+### (e) T-05.4(a) não entrega a atribuição que ela existia para garantir
+
+O propósito escrito do critério 1 é: *"sem isto, nenhum resultado negativo da
+SPEC-06 é atribuível ao problema"*. **Ele entrega isso em parte, e a parte que falta
+precisa ficar declarada.**
+
+Três erros nossos foram corrigidos no caminho, e o primeiro relatório que quase
+escrevi estaria errado nos três ao mesmo tempo:
+
+1. **Reportava retornos de treino, com ruído.** A regra oposta está na §4.4 e está
+   codificada em `politica_continua.py`; o script a violava. Com `Σ = 0,4` o ruído
+   sozinho custa `−0,1 · 0,4 · 999 = −39,96`, e o `−0,02` publicado é inatingível
+   sob ruído. Corrigido: a MLP foi de **−31,86 para −0,04**.
+2. **A tabela de alvos desta spec tinha o sinal trocado** (`0,02` em vez de
+   `−0,02`) — um estimador pontual fora do próprio intervalo.
+3. **O orçamento estava a 37 % do publicado.** O §5.4 (p.65) diz 10 sementes ×
+   2000 episódios; rodávamos 1500 × 5.
+
+**O que ficou eliminado com evidência:** protocolo de avaliação (a MLP passou a
+reproduzir), hiperparâmetros (A.3 verbatim; a tabela 5.6 divergente é de outro
+experimento), semântica de resolução (**provada** bits-por-dimensão pela aritmética
+do cartpole na p.67), mapeamento por partição (**provado** pelo *"eight times the
+number of units"*), orçamento, as duas redes (bit-idênticas ao `Ramnet.jl`), e
+capacidade/generalização — uma varredura de `n ∈ {8, 16, 32, 64}` (32→4 RAMs) não
+tira nenhuma configuração do ótimo local.
+
+> **Cuidado de leitura na varredura, que quase me pegou.** O retorno melhora
+> monotonicamente com tupla maior (−1,73 → −0,01), e o sinal dessa tendência
+> coincide com o achado da §5.3 do Katopodis. **O significado é oposto:** zero é o
+> teto do "não mover o carro", então convergir para zero é assentar no ótimo local
+> com mais precisão, não resolver. A chegada em avaliação é **0,00 % nos quatro
+> pontos**. Isso também significa que a **pergunta aberta 2 continua aberta** — a
+> curva não mede desempenho de tarefa, e usá-la para justificar ampliar a faixa de
+> `n` seria construir a recomendação sobre um artefato.
+
+**O que sobra como suspeito**, e o primeiro é desconfortável: o **laço do Algoritmo
+4.4**, que é o único componente da cadeia **sem oráculo diferencial** (item 1 da
+`PLANO-TESTES.md` §5). Inspecionado linha a linha e correto na leitura; sem
+verificação na execução.
+
+E esta spec revelou um defeito no próprio script que impede usar a MLP como
+validação do laço: **os dois braços usam laços diferentes**, violando o *"a única
+diferença é `f(·)`"* da §4.8 — o n-tuple usa `AtorCriticoNTupla` e a MLP um laço
+com um único ponto de truncamento por episódio. Como o alvo que a MLP reproduz é um
+ótimo local degenerado que quase qualquer esquema de crédito encontra, reproduzi-lo
+**não é evidência** de que a atribuição de crédito funciona.
+
+**Mitigação levada para a SPEC-06:** o ambiente de Lamenza tem recompensa muito mais
+densa que o Mountain Car — `R_t = (Σ visited − Ns)/Ns` muda a cada coleta —, então o
+regime de quase-ausência de sinal que domina aqui pode não transferir. Isso é razão
+para esperança, não evidência: **se a SPEC-06 der resultado negativo no braço
+n-tuple, a atribuição fica em aberto e o primeiro suspeito é o laço.**
 
 ### Perguntas em aberto que a execução resolveu
 
@@ -499,8 +552,33 @@ Isto é o que garante o pareamento: se o laço estivesse duplicado nos dois agen
 
 | Alvo | n-tuple AC | AC com MLP |
 |---|---|---|
-| Mountain Car | 93,3 (92,9; 93,8) | 0,02 (−0,03; −0,02) |
+| Mountain Car | 93,3 (92,9; 93,8) | **−0,02** (−0,03; −0,02) |
 | Hopper | 748,8 (741,7; 758,0) | 643,6 (577,0; 746,0) |
+
+> **Erro de transcrição corrigido (2026-08-21).** Esta tabela dizia `0,02
+> (−0,03; −0,02)` — um estimador pontual **fora do próprio intervalo**, o que já
+> denunciava o problema. A tabela 5.8 (p.67) do original diz **−0,02**; o sinal se
+> perdeu na transcrição. Importa porque o alvo é o controle negativo, e o sinal é
+> justamente o que distingue "o carro não se move" de "o carro se move um pouco".
+>
+> **Orçamento, que esta spec não registrava** (§5.4, p.65): *"each pair of
+> algorithm and benchmark task is executed **10 times**, with distinct random
+> initializations, for **2000 episodes**"*, com IC bootstrap de 95 % sobre 1000
+> reamostragens. A primeira execução nossa usou 1500 × 5 — 75 % dos episódios e
+> 50 % das sementes —, e um resultado negativo ali não seria atribuível ao método.
+>
+> **O protocolo de avaliação sai por dedução, não por citação.** A p.66 explica o
+> resultado da MLP assim: *"the MLP methods having optimized their agents to a
+> local optimum of not moving the car. In this way, they **never incur the penalty
+> of expending energy**"*. Com `Σ = 0,4` o ruído sozinho custa
+> `−0,1 · 0,4 · 999 = −39,96` por episódio, então um número que inclua exploração
+> **não pode** "never incur the penalty" — logo o reportado é **sem ruído**, e a
+> avaliação determinística da §4.4 é o protocolo certo. Confirmado por medição: com
+> ruído medimos −31,86; sem ruído, −0,01.
+>
+> **Cuidado com a tabela 5.6.** Ela dá resolução 16 para o Mountain Car, contra 128
+> da A.3. Não é contradição: a 5.6 é do experimento de **taxa de aprendizado com
+> n-tuple REINFORCE** (§5.3), não do §5.4. Para o Actor-Critic vale a **A.3**.
 
 Hiperparâmetros do apêndice A.3/A.6 dele, verbatim. O alvo do AC com MLP no Mountain Car (≈ 0, ótimo local de não mover o carro) é um **controle negativo** tão informativo quanto o positivo: se a nossa MLP resolver o Mountain Car, ela não é a MLP dele e a comparação de H1 não é a comparação dele.
 

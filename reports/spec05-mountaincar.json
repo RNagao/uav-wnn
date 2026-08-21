@@ -1,8 +1,10 @@
 {
   "config": {
-    "episodios": 25,
-    "sementes": 1,
-    "avaliar_ultimos": 10,
+    "episodios": 2000,
+    "sementes": 10,
+    "processos": 10,
+    "avaliar_ultimos": 100,
+    "n_aval": 100,
     "p13": false,
     "saida": "reports/spec05-mountaincar.json"
   },
@@ -24,10 +26,10 @@
   "resultados": [
     {
       "rotulo": "n-tuple AC",
-      "media": -36.56058574487268,
+      "media": -0.1988910229264102,
       "ic": [
-        -37.218181254869336,
-        -35.97156539597956
+        -0.21242749604337796,
+        -0.18417676657050008
       ],
       "publicado": [
         93.3,
@@ -38,22 +40,28 @@
     },
     {
       "rotulo": "AC com MLP",
-      "media": -31.86619726442266,
+      "media": -0.037021036049554465,
       "ic": [
-        -32.428029162102995,
-        -31.310167029177517
+        -0.03928150728074384,
+        -0.03468094467351096
       ],
       "publicado": [
-        0.02,
+        -0.02,
         -0.03,
         -0.02
       ],
       "sobrepoe": false
     }
   ],
+  "treino": {
+    "n-tuple": -36.75656999002015,
+    "mlp": -31.726175993009928
+  },
   "taxa_chegada": {
-    "n-tuple": 0.0,
-    "mlp": 0.0
+    "n-tuple_treino": 0.0034,
+    "mlp_treino": 0.00455,
+    "n-tuple_aval": 0.0,
+    "mlp_aval": 0.0
   },
   "hopper": {
     "rodado": false,

@@ -1,0 +1,114 @@
+{
+  "descricao": "Varredura de tamanho de tupla no MountainCarContinuous-v0, 2000 episódios × 3 sementes por ponto. Hiperparâmetros da tabela A.3 salvo `tamanho_tupla`.",
+  "leitura": "A monotonia do retorno é convergência ao ótimo local de não mover o carro (0 é o teto sem alcançar a bandeira), NÃO aprendizado. A chegada em avaliação é 0,00 % nos quatro pontos.",
+  "pontos": [
+    {
+      "n": 8,
+      "seed": 0,
+      "n_ram": 32,
+      "n_bits": 256,
+      "aval": -1.63312547381878,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.0025
+    },
+    {
+      "n": 8,
+      "seed": 1,
+      "n_ram": 32,
+      "n_bits": 256,
+      "aval": -2.025011560836145,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.0015
+    },
+    {
+      "n": 8,
+      "seed": 2,
+      "n_ram": 32,
+      "n_bits": 256,
+      "aval": -1.5203496723800318,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.002
+    },
+    {
+      "n": 16,
+      "seed": 0,
+      "n_ram": 16,
+      "n_bits": 256,
+      "aval": -1.4432392205726414,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.003
+    },
+    {
+      "n": 16,
+      "seed": 1,
+      "n_ram": 16,
+      "n_bits": 256,
+      "aval": -1.144891117120961,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.003
+    },
+    {
+      "n": 16,
+      "seed": 2,
+      "n_ram": 16,
+      "n_bits": 256,
+      "aval": -0.23665411627443544,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.0015
+    },
+    {
+      "n": 32,
+      "seed": 0,
+      "n_ram": 8,
+      "n_bits": 256,
+      "aval": -0.10653787653940941,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.005
+    },
+    {
+      "n": 32,
+      "seed": 1,
+      "n_ram": 8,
+      "n_bits": 256,
+      "aval": -0.2297253546434045,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.003
+    },
+    {
+      "n": 32,
+      "seed": 2,
+      "n_ram": 8,
+      "n_bits": 256,
+      "aval": -0.042589468272615005,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.0045
+    },
+    {
+      "n": 64,
+      "seed": 0,
+      "n_ram": 4,
+      "n_bits": 256,
+      "aval": -0.02779748471789931,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.005
+    },
+    {
+      "n": 64,
+      "seed": 1,
+      "n_ram": 4,
+      "n_bits": 256,
+      "aval": -0.0026615043049078926,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.003
+    },
+    {
+      "n": 64,
+      "seed": 2,
+      "n_ram": 4,
+      "n_bits": 256,
+      "aval": -0.011837689532005894,
+      "chegada_aval": 0.0,
+      "chegada_treino": 0.003
+    }
+  ]
+}
