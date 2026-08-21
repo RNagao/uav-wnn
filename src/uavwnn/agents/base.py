@@ -68,6 +68,13 @@ class ContextoEpisodio:
     v_max: float = V_MAX
     max_episode_length: float = 500.0
     state_num_closest_sensors: int = 12
+    state_num_closest_drones: int | None = None
+    """`None` = `num_drones − 1`, o default do `benchmark.py`.
+
+    Existe explícito porque o experimento exploratório do §7.1 usa **`N*_a = 0`** —
+    agentes cegos aos demais —, e aí a observação tem 25 escalares
+    **independentemente de `Na`**. Derivar de `num_drones` faria a decodificação
+    esperar duas entradas que não existem, e o erro só apareceria em `Na > 1`."""
 
 
 @dataclass(frozen=True)
@@ -105,7 +112,8 @@ class Observacao:
         dos sensores — o modo de falha que o teste de sinal da T-02.9 §3 pega.
         """
         v = np.asarray(vetor, dtype=float).ravel()
-        n_a = ctx.num_drones - 1
+        n_a = (ctx.num_drones - 1 if ctx.state_num_closest_drones is None
+               else ctx.state_num_closest_drones)
         n_s = ctx.state_num_closest_sensors
         esperado = 2 * n_a + 2 * n_s + 1
         if v.size != esperado:
