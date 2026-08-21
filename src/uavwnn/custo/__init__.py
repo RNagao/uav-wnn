@@ -10,6 +10,8 @@ from .memoria import (
     Variante,
     custo_mlp,
     custo_ntuple,
+    custo_ntuple_de_rede,
+    ocupacao_esparsa,
     ocupacao_por_ram,
 )
 from .operacoes import CustoOperacoes, operacoes_mlp, operacoes_ntuple
@@ -20,6 +22,8 @@ __all__ = [
     "Variante",
     "custo_mlp",
     "custo_ntuple",
+    "custo_ntuple_de_rede",
+    "ocupacao_esparsa",
     "ocupacao_por_ram",
     "operacoes_mlp",
     "operacoes_ntuple",

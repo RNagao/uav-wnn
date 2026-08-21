@@ -7,6 +7,212 @@
 ---
 
 
+## 0-quater. Fechamento da spec (2026-08-21)
+
+Estado por critério de saída, e **quatro correções que a execução impôs aos
+próprios critérios**. Elas estão aqui em cima porque um critério satisfeito por
+leitura generosa é pior que um critério aberto.
+
+| # | Critério | Estado |
+|---|---|---|
+| 1 | T-05.4(a) — os quatro números do Katopodis | **FECHADO, e o fenômeno reproduz nos dois braços.** n-tuple **96,72** com **100 % de chegada à bandeira** (publicado 93,3); MLP −0,04 (publicado −0,02). A "falha" anterior era **bug meu no ponto de chamada** — ver (e) |
+| 2 | T-05.4(b) — C2 > C0 com IC separado | **FECHADO.** `Δ = −13,45°`, IC95 % `[−14,53; −12,43]`, 12× o MDE. `reports/spec05-circular.md` |
+| 3 | Pareamento auditável | **FECHADO.** `tests/test_pareamento.py` |
+| 4 | `γ = 0,99` fixo e faixas com procedência | **FECHADO.** `configs/spec05/hiperparametros.toml`, verificado por teste |
+| 5 | Sem PyTorch fora de `tests/` | **FECHADO com redação corrigida** — ver (b) |
+| 6 | Asserção de estabilidade ativa, com caso que aborta | **FECHADO.** `TreinoInstavel`; ligada em `NTuplaAprox`, não na rede — ver (c) |
+| 7 | Determinismo com `Na > 1` e ordens diferentes | **FECHADO em parte, com achado** — ver (d) |
+| 8 | Relatório curto | `reports/spec05-circular.md`, `spec05-identidade.md`, `spec05-mountaincar.md` |
+| 9 | PRD atualizado em dois pontos | **FECHADO.** `PRD.md` §5.5, RNF-05, RNF-11 e a linha de risco |
+
+### (a) O primeiro portão media exploração, não parametrização
+
+A T-05.4(b) começou apenas no brinquedo sequencial `toy/nav.py` e deu
+**inconclusivo com os dois braços piores que rumo aleatório** (150° de erro, 3–8 %
+de sucesso). Diagnóstico: `δ ≈ −19` constante, porque com sucesso quase nulo o
+retorno vale ≈ −60 **qualquer que seja o rumo** e o gradiente não carrega direção.
+
+O portão foi decomposto em três instrumentos — bandido fixo, bandido contextual,
+nav sequencial — e **só o contextual decide**, porque é o único em que os dois
+braços demonstravelmente aprendem. Um braço que não aprende não é evidência sobre
+o outro, e um empate entre dois fracassos não é empate.
+
+O nav sequencial permanece **pendência aberta**: a política ótima analítica faz
+7,86 passos com 100 % de sucesso, então o brinquedo é resolvível e a falha é de
+crédito temporal — nos dois braços. Fica registrado, fora do veredito.
+
+### (b) O critério 5 estava escrito mais forte do que se pretende
+
+"Nenhuma dependência de PyTorch fora de `tests/`" é violado **por construção**:
+`scripts/spec02_maddpg_*.py` importam `torch` porque é o que lê os pesos publicados
+de Lamenza, e o baseline MADDPG não existe sem eles. O que a regra protege é a
+**nossa** implementação, e `src/uavwnn/` está limpo — verificado por teste
+(`test_src_nao_importa_torch`), que é a leitura que RNF-11 de fato exige.
+
+### (c) A asserção da §4.2 não pode viver na rede
+
+Ligar `c_max = 0,5` em `RedeGradienteFuncional` **aborta 13 testes existentes**: os
+diferenciais alimentam gradientes arbitrários para casar bit a bit com o
+`Ramnet.jl`, e os de identidade usam passo unitário para sondar as eqs. (4.16) e
+(4.22). Essa validação contra o Julia é a evidência mais forte do projeto.
+
+A asserção foi movida para `NTuplaAprox` — o ponto onde o gradiente de política de
+fato entra na tabela, e onde a divergência da RNF-01 foi **medida**. A rede é
+primitiva de uso geral e não policia quem a chama. Um teste garante que o padrão
+não seja invertido por descuido.
+
+### (d) Invariância à ordem é inatingível para o crítico com esquecimento
+
+O critério 7 pede tabelas idênticas "inclusive com `Na > 1` e **ordens de evento
+diferentes**". Medido, isso é impossível, e a razão é aritmética:
+
+    ator      `v ← v + passo`        soma, COMUTA
+    crítico   `v ← φ·v + alvo`       NÃO comuta
+
+Com dois agentes escrevendo na mesma posição no mesmo tique,
+`(φv + a₁)φ + a₂ ≠ (φv + a₂)φ + a₁`, e a diferença é exatamente `(φ−1)(a₁−a₂)`.
+**A colisão é o regime normal, não o de canto:** com `Na = 4` e `R = 1`, só 18 %
+das RAMs leem bit de índice, então nas outras 82 % dois agentes com a mesma
+observação posicional endereçam a mesma posição.
+
+Invariância exigiria acumular os alvos por endereço dentro do tique e aplicar `φ`
+uma vez só — o que muda a eq. (4.8) de "por observação" para "por tique", desvio
+de método e não detalhe de implementação. **O que se entrega é determinismo** com
+ordem canônica (índice crescente), que é o que `make repro` precisa. A distinção
+está em `tests/test_barreira.py`, incluindo um teste que **afirma a desigualdade**
+para que mudá-la seja decisão e não efeito colateral.
+
+### (e) T-05.4(a) reproduz — depois de quatro erros nossos, o último deles caro
+
+**O n-tuple resolve o Mountain Car em 100 % dos episódios de avaliação, nas dez
+sementes, com retorno 96,72 contra os 93,3 publicados** — e o excesso é para cima:
+gastamos 3,28 de energia contra 6,70 dele. A MLP fica no ótimo local de não mover o
+carro (−0,04 contra −0,02), que é o contraste que o artigo descreve.
+
+**O erro que custou mais.** `AtorCriticoNTupla.reiniciar()` apaga as duas redes, e o
+laço de treino do script a chamava a **cada episódio**, acreditando que ela só
+esvaziava a janela de `m` passos. Resultado: 2000 episódios **independentes**, cada
+um de rede em branco — e o retorno ≈ 0 que isso produz é **indistinguível de "o
+método não funciona"**.
+
+O sintoma que denunciou não foi nenhuma das métricas de RL: foi a **ocupação de
+memória oscilando** (188 → 722 → 283 → …) numa estrutura que só recebe chaves e
+portanto não pode encolher. Corrigido com `novo_episodio()`, aviso na docstring do
+`reiniciar()`, e teste de regressão que exige ocupação monotonicamente crescente
+entre episódios.
+
+| | antes | depois |
+|---|---|---|
+| retorno (avaliação) | −0,199 | **96,72** |
+| chegada à bandeira | 0,00 % | **100,0 %** |
+
+**Os outros três**, todos corrigidos antes: retornos de treino em vez de avaliação
+determinística (com `Σ = 0,4` o ruído custa `−39,96` por episódio, então o `−0,02`
+publicado é inatingível sob ruído — a MLP foi de −31,86 para −0,04); sinal trocado
+no alvo publicado da nossa própria tabela; e orçamento a 37 % do publicado.
+
+**Confirmação independente do protocolo.** Com o bug corrigido os dois protocolos
+podem ser comparados de frente, e um se refuta: avaliação erra no máximo **3,4**
+(n-tuple +3,4, MLP +0,02); treino erra **31,7** (a MLP o desmonta). O treino é
+tentador — 92,47 fica a 0,43 do limite inferior do n-tuple — e é aí que engana.
+
+**RETRATAÇÕES.** A varredura de tamanho de tupla que eu havia reportado rodou com o
+bug e está **inválida** — media aprendizado de um episódio só. **Refeita**, ela
+responde a pergunta aberta 2: `n = 8` (32 RAMs) foi o único a falhar — 1 das 3
+sementes em −99,37 com 0 % de chegada —, e `n ≥ 16` resolveu em 100 % das avaliações
+nas três sementes, com energia caindo de 3,91 (`n=16`) para 2,58 (`n=64`).
+**A faixa `{8, 10, 12}` do PRD está na borda que quebrou** — e pelo eixo do número de
+RAMs é pior ainda: no nosso problema (`B ≈ 800`) ela dá `N ∈ {66, 80, 100}`, contra
+os 32 que falharam aqui. Recomendação: **incluir `n = 16` e `n = 32`**, e tratar
+`n = 8` como ponto de risco. Ressalva de transferência mantida: 2 dimensões contra
+as nossas 25, e Katopodis mediu direção oposta entre Mountain Car e Hopper. E a conclusão *"o
+primeiro suspeito é o laço do Algoritmo 4.4"* está **retirada**: a lista de
+eliminação estava correta, mas faltava nela o meu próprio ponto de chamada, que não
+é componente do método e por isso não estava sendo auditado.
+
+**A lição, que é a da SPEC-03 outra vez:** antes de atribuir uma discrepância ao
+método, esgotar as hipóteses sobre o arnês — **e o arnês inclui o código de chamada,
+não só as bibliotecas.**
+
+### (e-bis) O que continua sem oráculo, e o que mudou
+
+O propósito escrito do critério 1 é: *"sem isto, nenhum resultado negativo da
+SPEC-06 é atribuível ao problema"*. **Ele entrega isso em parte, e a parte que falta
+precisa ficar declarada.**
+
+Três erros nossos foram corrigidos no caminho, e o primeiro relatório que quase
+escrevi estaria errado nos três ao mesmo tempo:
+
+1. **Reportava retornos de treino, com ruído.** A regra oposta está na §4.4 e está
+   codificada em `politica_continua.py`; o script a violava. Com `Σ = 0,4` o ruído
+   sozinho custa `−0,1 · 0,4 · 999 = −39,96`, e o `−0,02` publicado é inatingível
+   sob ruído. Corrigido: a MLP foi de **−31,86 para −0,04**.
+2. **A tabela de alvos desta spec tinha o sinal trocado** (`0,02` em vez de
+   `−0,02`) — um estimador pontual fora do próprio intervalo.
+3. **O orçamento estava a 37 % do publicado.** O §5.4 (p.65) diz 10 sementes ×
+   2000 episódios; rodávamos 1500 × 5.
+
+**O que ficou eliminado com evidência:** protocolo de avaliação (a MLP passou a
+reproduzir), hiperparâmetros (A.3 verbatim; a tabela 5.6 divergente é de outro
+experimento), semântica de resolução (**provada** bits-por-dimensão pela aritmética
+do cartpole na p.67), mapeamento por partição (**provado** pelo *"eight times the
+number of units"*), orçamento, as duas redes (bit-idênticas ao `Ramnet.jl`), e
+capacidade/generalização — uma varredura de `n ∈ {8, 16, 32, 64}` (32→4 RAMs) não
+tira nenhuma configuração do ótimo local.
+
+> **Cuidado de leitura na varredura, que quase me pegou.** O retorno melhora
+> monotonicamente com tupla maior (−1,73 → −0,01), e o sinal dessa tendência
+> coincide com o achado da §5.3 do Katopodis. **O significado é oposto:** zero é o
+> teto do "não mover o carro", então convergir para zero é assentar no ótimo local
+> com mais precisão, não resolver. A chegada em avaliação é **0,00 % nos quatro
+> pontos**. Isso também significa que a **pergunta aberta 2 continua aberta** — a
+> curva não mede desempenho de tarefa, e usá-la para justificar ampliar a faixa de
+> `n` seria construir a recomendação sobre um artefato.
+
+**O que sobra como suspeito**, e o primeiro é desconfortável: o **laço do Algoritmo
+4.4**, que é o único componente da cadeia **sem oráculo diferencial** (item 1 da
+`PLANO-TESTES.md` §5). Inspecionado linha a linha e correto na leitura; sem
+verificação na execução.
+
+E esta spec revelou um defeito no próprio script que impede usar a MLP como
+validação do laço: **os dois braços usam laços diferentes**, violando o *"a única
+diferença é `f(·)`"* da §4.8 — o n-tuple usa `AtorCriticoNTupla` e a MLP um laço
+com um único ponto de truncamento por episódio. Como o alvo que a MLP reproduz é um
+ótimo local degenerado que quase qualquer esquema de crédito encontra, reproduzi-lo
+**não é evidência** de que a atribuição de crédito funciona.
+
+O laço do Algoritmo 4.4 continua **sem oráculo diferencial** (item 1 da
+`PLANO-TESTES.md` §5), e isso não muda. Mas agora ele atravessa uma validação **de
+ponta a ponta contra número publicado**, o que é evidência muito mais forte que a
+inspeção de código que havia antes.
+
+**O que a T-05.4(a) agora entrega:** um resultado negativo da SPEC-06 no braço
+n-tuple **é** atribuível ao problema, que era o propósito escrito do critério.
+
+**O que continua aberto (TS7):** os dois braços deste script usam laços diferentes,
+violando o *"a única diferença é `f(·)`"* da §4.8. Isso não invalida a reprodução —
+cada braço é comparado ao **seu** número publicado — mas invalida qualquer
+comparação **entre** os braços deste script.
+
+### Perguntas em aberto que a execução resolveu
+
+- **Nº 3** (variância do Hopper, 0,2 ou 0,3): a tabela A.3 diz **0,3**. A
+  inconsistência é entre o texto da §5.3 e o apêndice, não dentro do apêndice.
+  Qual reproduz o número publicado fica sem resposta sem rodar o Hopper (MuJoCo,
+  fora do orçamento — a própria T-05.4(a) o trata como condicional).
+- **Nº 6** (cronograma do anelamento de `σ_s`): **não há anelamento.** Medido um
+  bug na primeira tentativa — `decaimento` conta transições, não episódios, e num
+  brinquedo de 40 passos colapsava `σ` em ~20 episódios. Desligado, porque a
+  avaliação já é determinística (Lamenza §7) e ruído residual de treino não
+  contamina o que é reportado.
+- **T-05.5, cobertura do canal:** a fórmula `p = 1 − (1 − R·Na/B)^n` da §4.7 supõe
+  amostragem **com reposição** por RAM — o que gerou o achado C4. Com mapeamento
+  particionado a conta certa é **hipergeométrica**,
+  `1 − C(B−K,n)/C(B,n)`. Medido, a hipergeométrica bate melhor em 5 das 6
+  configurações; a binomial fica registrada como aproximação, não identidade.
+
+---
+
 ## 0-ter. A dissertação corrige o código do autor em dois pontos (2026-08-15)
 
 A §0-bis tratava o `ContinousFunctionalAC.jl` como referência. Com a leitura da
@@ -279,6 +485,43 @@ Há uma alternativa: usar a **rede funcional** também como crítico, com perda 
 
 **Decisão:** NTRN com esquecimento como **primária** (fidelidade a D6), variante funcional atrás de uma *flag*, ambas medidas em T-05.6. O custo marginal é baixo porque o núcleo esparso é o mesmo.
 
+> **A variante funcional foi implementada (2026-08-21), e ela tem procedência.** É a
+> portagem do `NTNModel` de `anbubus/ntn_neurocomputing_v0` — o repositório do artigo
+> *"Functional gradient descent for n-tuple regression"* (Neurocomputing 500, 2022).
+> Fica como `NTuplaFuncionalAprox`, selecionável por
+> `APROXIMADORES["ntupla_funcional"]`, para a comparação contra o MADDPG ter **duas**
+> opções de rede sem peso em vez de uma.
+>
+> **Três diferenças substantivas**, todas lidas no código-fonte deles:
+>
+> 1. **Crítico da mesma família do ator** — `EmbeddingBag` nos dois (`policy_mem` e
+>    `vf_mem`), treinados por autograd. A dissertação usa modelos **diferentes**
+>    (§4.3.1 no ator, §4.2.1 no crítico), que foi o achado que fechou a pendência
+>    **C2**. A divergência vem do algoritmo: o PPO deles treina os dois por
+>    gradiente; o Algoritmo 4.4 **acumula** retorno no crítico pela eq. (4.8).
+> 2. **Convenção de soma** (`mode='sum'`), contra a de média da eq. (4.12). Agora
+>    selecionável em `RedeGradienteFuncional(convencao=...)`, com
+>    `taxa_equivalente()` fazendo a conversão explícita — e a conta é grande: os
+>    `2·10⁻⁴` deles equivalem a **0,02** na convenção de média, 25× a taxa do
+>    apêndice A.
+> 3. **Alocação densa** — `num_embeddings = n_nodes · 2^n`, o que impõe teto duro em
+>    `n` (com `n = 32` seriam 4,3·10⁹ posições por RAM). É por isso que as
+>    configurações deles usam `tuple_size = 8`. Aqui a estrutura é esparsa, e
+>    `variante_lut="denso"` reproduz o custo deles para medição.
+>
+> **O que NÃO foi importado, e é decisão declarada:** o `NTNModel` emite
+> `2 · dim(ação)` saídas — média **e `log σ`**, isto é **variância aprendida** (o
+> trecho comentado deles inicializando o segundo bloco em `log(0,5)` confirma). Nós
+> mantemos `σ` fixa pelas quatro razões da §4.4, e a política é **a mesma nas duas
+> famílias de propósito**: trocar aproximador e política ao mesmo tempo mediria duas
+> coisas. Fica registrada como a diferença remanescente.
+>
+> **Portagem provada fiel** por teste diferencial contra o PyTorch deles
+> (`tests/test_anbubus.py`, 11 casos): endereçamento idêntico **exato** (inteiros),
+> saída idêntica na convenção de soma, o autograd do `EmbeddingBag` **é** a eq.
+> (4.11), e o `Thermometer` deles **é** o nosso `TermometroArtigo`. O `torch` fica
+> só em `tests/` (grupo `baseline`), e o teste é pulado sem ele.
+
 **Modo de falha do crítico frio.** Uma entrada vista uma única vez tem `s = 1` e devolve o retorno bruto daquela visita: `V` de altíssima variância, e a vantagem `δ = G − V` herda essa variância multiplicada por `η·σ⁻²` no ator. Mitigações a instrumentar: (i) **aquecimento** — `K_warmup` passos com o crítico atualizando e o ator congelado; (ii) encolhimento por confiança para `c` baixo; (iii) monitorar a fração de leituras do crítico que caem em entradas com `c < c_min` por decisão. Entrada nunca endereçada devolve `0`, que na nossa escala de recompensa é **otimista** (estados valem números negativos) — otimismo diante da incerteza, que pode ajudar a exploração ou desestabilizar. É comportamento a medir, não a assumir.
 
 ### 4.6 Interface `Policy` e a ponte
@@ -405,8 +648,33 @@ Isto é o que garante o pareamento: se o laço estivesse duplicado nos dois agen
 
 | Alvo | n-tuple AC | AC com MLP |
 |---|---|---|
-| Mountain Car | 93,3 (92,9; 93,8) | 0,02 (−0,03; −0,02) |
+| Mountain Car | 93,3 (92,9; 93,8) | **−0,02** (−0,03; −0,02) |
 | Hopper | 748,8 (741,7; 758,0) | 643,6 (577,0; 746,0) |
+
+> **Erro de transcrição corrigido (2026-08-21).** Esta tabela dizia `0,02
+> (−0,03; −0,02)` — um estimador pontual **fora do próprio intervalo**, o que já
+> denunciava o problema. A tabela 5.8 (p.67) do original diz **−0,02**; o sinal se
+> perdeu na transcrição. Importa porque o alvo é o controle negativo, e o sinal é
+> justamente o que distingue "o carro não se move" de "o carro se move um pouco".
+>
+> **Orçamento, que esta spec não registrava** (§5.4, p.65): *"each pair of
+> algorithm and benchmark task is executed **10 times**, with distinct random
+> initializations, for **2000 episodes**"*, com IC bootstrap de 95 % sobre 1000
+> reamostragens. A primeira execução nossa usou 1500 × 5 — 75 % dos episódios e
+> 50 % das sementes —, e um resultado negativo ali não seria atribuível ao método.
+>
+> **O protocolo de avaliação sai por dedução, não por citação.** A p.66 explica o
+> resultado da MLP assim: *"the MLP methods having optimized their agents to a
+> local optimum of not moving the car. In this way, they **never incur the penalty
+> of expending energy**"*. Com `Σ = 0,4` o ruído sozinho custa
+> `−0,1 · 0,4 · 999 = −39,96` por episódio, então um número que inclua exploração
+> **não pode** "never incur the penalty" — logo o reportado é **sem ruído**, e a
+> avaliação determinística da §4.4 é o protocolo certo. Confirmado por medição: com
+> ruído medimos −31,86; sem ruído, −0,01.
+>
+> **Cuidado com a tabela 5.6.** Ela dá resolução 16 para o Mountain Car, contra 128
+> da A.3. Não é contradição: a 5.6 é do experimento de **taxa de aprendizado com
+> n-tuple REINFORCE** (§5.3), não do §5.4. Para o Actor-Critic vale a **A.3**.
 
 Hiperparâmetros do apêndice A.3/A.6 dele, verbatim. O alvo do AC com MLP no Mountain Car (≈ 0, ótimo local de não mover o carro) é um **controle negativo** tão informativo quanto o positivo: se a nossa MLP resolver o Mountain Car, ela não é a MLP dele e a comparação de H1 não é a comparação dele.
 
@@ -420,9 +688,45 @@ Hiperparâmetros do apêndice A.3/A.6 dele, verbatim. O alvo do AC com MLP no Mo
 
 Estender o brinquedo de T-05.4(b) para `Na ∈ {2, 4}` com 4 sensores. Medir:
 
+> **Implementado** em `scripts/spec05_identidade.py`, relatório em
+> `reports/spec05-identidade.md`. Usa o **bandido contextual** de T-05.4(b), e não
+> o `nav` sequencial, porque aquele tem pendência aberta de crédito temporal que
+> afetaria as duas condições e mascararia o efeito de `R`.
+>
+> O brinquedo **exige** diferenciação em vez de só permiti-la: `Na` agentes veem a
+> observação **idêntica** exceto o índice, e o rumo correto do agente `k` é o do
+> sensor `k`. Sem usar o índice, nenhuma política acerta mais de uma das `Na`
+> respostas — então "o canal passou" e "o canal não passou" são separáveis sem
+> ambiguidade.
+
 - `p = 1 − (1 − R·Na/B)^n` teórico contra a fração medida de RAMs que leem ao menos um bit de índice, para `R ∈ {1, 4, 16}`;
+
+> **Correção medida:** esta fórmula supõe que cada RAM sorteie seus `n` bits **com
+> reposição** — a mesma suposição do `NTupleRegressor` do protótipo, que gerou o
+> achado **C4** (bits sem nenhuma RAM lendo). O `mapeamento_particionado` da
+> SPEC-04 **particiona** (`randperm` fatiado, cobertura 1,0 por construção), então
+> a distribuição certa é **hipergeométrica**:
+>
+>     p = 1 − C(B − K, n) / C(B, n),    K = R·Na
+>
+> Amostragem sem reposição contra com reposição. A diferença é pequena quando
+> `K, n ≪ B`, e medida ela favorece a hipergeométrica em 5 das 6 configurações. A
+> binomial fica registrada como **aproximação**, não identidade.
 - efeito de `R` sobre a diferenciação de comportamento (dispersão dos rumos escolhidos por agentes na mesma observação, exceto o índice);
 - determinismo da barreira: mesma semente, duas ordens de evento diferentes → tabelas idênticas bit a bit (**teste automatizado**).
+
+> **Este item é impossível como escrito, e a medição está em
+> `tests/test_barreira.py`.** O ator é invariante à ordem sempre (`v ← v + passo`
+> comuta); o crítico **não pode ser**, porque `v ← φ·v + alvo` não comuta e a
+> diferença entre duas ordens é exatamente `(φ−1)(a₁−a₂)`. A colisão de endereço é
+> o **regime normal**: com `Na = 4` e `R = 1`, apenas 18 % das RAMs leem bit de
+> índice, então nas outras 82 % dois agentes com a mesma observação posicional
+> escrevem na mesma posição.
+>
+> O que se entrega é **determinismo** com ordem canônica (índice crescente), que é
+> o que `make repro` precisa. A distinção entre *determinístico* e *invariante à
+> ordem* está escrita, com um teste que **afirma a desigualdade** para que mudá-la
+> seja decisão consciente e não efeito colateral. Ver §0-quater (d).
 
 ### T-05.6 — Varredura mínima de hiperparâmetros no brinquedo
 

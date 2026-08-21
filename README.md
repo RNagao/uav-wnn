@@ -244,6 +244,57 @@ uv run pytest -q                    # 18 testes, ~1 min
 | `spec03_custo.py` | harness de custo: T1 (tamanho) e T3 (operações) |
 | `spec04_diferencial.py` · `spec04_diferencial_redes.py` | testes diferenciais contra o `Ramnet.jl` do Katopodis |
 | `replica_katopodis_52.py` | replica §5.2.2 da dissertação: circular vs termômetro |
+| **`spec05_circular.py`** | **portão da SPEC-05**: normal projetada contra gaussiana simples, em três instrumentos. Sai com código 0 só se o C2 vencer com IC separado |
+| **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
+| **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
+
+### Os três aproximadores comparáveis contra o MADDPG
+
+`uavwnn.agents.APROXIMADORES` seleciona por nome, e os três atravessam **o mesmo**
+laço do Algoritmo 4.4, a mesma política e o mesmo bootstrap — trocar o laço junto
+com o aproximador mediria duas coisas.
+
+| nome | o que é | crítico | convenção |
+|---|---|---|---|
+| `mlp` | MLP densa `D→32→32→3`, NumPy puro | MLP | — |
+| `ntupla` | **a nossa**: gradiente funcional (§4.3.1) | NTRN com esquecimento (§4.2.1) | média (eq. 4.12) |
+| `ntupla_funcional` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
+
+O baseline do **problema** é outro e não entra nessa tabela: o MADDPG de Lamenza,
+medido dos pesos publicados (256 × 256, 287–299 KB). Estes três são variações do
+**método**, e cada um é um braço da comparação contra ele.
+
+```bash
+# a portagem do NTNModel é verificada contra o PyTorch deles (torch é só de teste)
+uv run --group baseline pytest tests/test_anbubus.py -q
+```
+
+### Campanha das políticas WNN — mesmas figuras de mérito do MADDPG
+
+`scripts/spec06_campanha_wnn.py` espelha `spec02_maddpg_campanha.py`: `R` runs por
+célula, CSV como cache, média ± desvio **sobre as runs**, trajetórias no estilo
+`plot_paths.py`, e as **mesmas colunas** — as tabelas juntam linha a linha.
+
+```bash
+uv run python scripts/spec06_campanha_wnn.py     --aproximador ntupla --checkpoint reports/ckpt/ntupla --runs 1000
+```
+
+**`--checkpoint` é obrigatório, e a razão não é burocracia.** Uma rede n-tuple vazia
+prediz `f = 0` em todo estado, o que a normal projetada mapeia num rumo constante —
+e isso rende uma linha de CSV completa, plausível e **sem significado**. Rodar sem
+modelo exige `--sem-treino-proposital`, que marca `treinado=False` em cada linha.
+O treino no ambiente real é a **SPEC-06**; este script é o arnês de avaliação dela.
+
+Custo medido (0,56 s/episódio em `Na=2, Ns=12`), para dimensionar antes de lançar:
+
+| escopo | CPU sequencial |
+|---|---|
+| 1000 runs × 200 episódios, 1 célula (`2:12`) | ~31 h |
+| 1000 runs × 200 episódios, **as 9 células** | **~37 dias** |
+| 1000 runs × 20 episódios, as 9 células | ~89 h |
+
+As runs são independentes e o CSV é cache, então dá para paralelizar por célula e
+retomar de onde parou.
 | **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
 | **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
 | **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |
@@ -253,6 +304,13 @@ uv run python scripts/spec00_demo.py --policy smart --plot traj.png
 uv run python scripts/spec00_demo.py --compare greedy-vs-smart.png
 uv run python scripts/spec00_demo.py --agents 2 --sensors 12 --estilo lamenza --plot path-a2s12.png
 uv run python scripts/spec00_visualizar.py --policy greedy
+
+# SPEC-05 — o portão da ação circular. Código de saída 0 só se o C2 vencer.
+uv run python scripts/spec05_circular.py --sementes 3 --tentativas 20000
+
+# SPEC-05 — reprodução do Katopodis e canal de identidade (rodam em ~1 h cada)
+uv run python scripts/spec05_mountaincar.py --episodios 1500 --sementes 5
+uv run python scripts/spec05_identidade.py --tentativas 15000 --sementes 3
 
 # baseline MADDPG (ver a seção própria acima)
 uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo

@@ -369,3 +369,247 @@ quase tudo; se aprender só roteamento, ganha 8 %.
 **T-02.9 §7 — sensibilidade a `communication_range`.** O motivo original era
 decidir entre candidatos da P1, que foi fechada na SPEC-00 com o valor lido do
 código (20 m). Continua valendo como análise de robustez.
+
+---
+
+## Adendo — 2026-08-21: SPEC-05 fechada, C1 resolvida por medição
+
+### ~~C1~~ — ação circular. **FECHADA.**
+
+A pendência mais antiga da classe C. Estava marcada como *"falta só validar
+empiricamente"*, e a validação aconteceu — com o critério escrito para **falsificar
+a nossa própria decisão**:
+
+```
+C2 (normal projetada) − C0 (gaussiana simples), erro angular, pareado por alvo
+    Δ = −13,45°    IC95 % [−14,53; −12,43]    MDE 1,06°    n = 400
+    vitória do C2 em 98,5 % dos alvos      Wilcoxon p = 4,4·10⁻⁶⁷
+```
+
+O IC está a 12 MDEs de zero, e o C0 recebeu **quatro concessões** contra
+espantalho: varredura própria de `σ` (que significa coisas diferentes nos dois
+esquemas), varredura própria de taxa, variante centrada em 0,5 (que foi de fato a
+melhor dele e é a que entrou na comparação), e `d = 2` contra `d = 3`.
+
+**O mecanismo, medido em isolamento.** No bandido de alvo fixo o C0 resolve
+*apenas* o alvo em 0° — e a sua curva de recompensa é **exatamente `cos(alvo)`**,
+isto é, ele aponta sempre para 0° e recebe o que a sorte do alvo der. Com `f₁`
+abaixo de zero com margem, **toda** amostra recorta na mesma ação, a recompensa
+deixa de variar, `(r − b) → 0` e o gradiente morre. É zona absorvente: não é
+convergência lenta, é ausência de sinal, e nenhuma quantidade de episódios sai de
+lá.
+
+Consequência a jusante já propagada: `d = 3` para os dois aproximadores, o que
+corrige o PRD §5.5 (arquitetura pareada `D→32→32→3`) e triplica a carga útil por
+posição de memória da WNN.
+
+### Nova — TS5: crédito temporal no brinquedo sequencial
+
+`toy/nav.py` não é resolvido por nenhum dos dois braços (0–8 % de sucesso), embora
+a política ótima analítica faça **7,86 passos com 100 % de sucesso**. Descartados
+por medição: anelamento de `σ` (persiste com `σ` fixa), recompensa esparsa
+(persiste com termo denso de progresso), e a maquinaria de atualização (o bandido
+com a mesma maquinaria aprende perfeitamente).
+
+Resta crédito temporal. **Não bloqueia a SPEC-06** — o portão foi decidido no
+bandido contextual, onde os dois braços aprendem —, mas fica registrado porque o
+ambiente real tem horizonte muito maior (250 decisões) e, se o modo de falha
+transferir, aparecerá lá como "não aprende" sem diagnóstico pronto.
+
+### Nova — TS6: invariância à ordem é inatingível com esquecimento
+
+O critério de saída 7 da SPEC-05 pede tabelas idênticas "inclusive com `Na > 1` e
+**ordens de evento diferentes**". Medido: impossível para o crítico, por aritmética.
+`v ← φ·v + alvo` não comuta, e a diferença entre duas ordens é exatamente
+`(φ−1)(a₁−a₂)`.
+
+E **a colisão de endereço é o regime normal**: com `Na = 4` e `R = 1`, só 18 % das
+RAMs leem bit de índice, então nas outras 82 % dois agentes com a mesma observação
+posicional escrevem na mesma posição.
+
+O que se entrega é **determinismo** com ordem canônica (índice crescente), que é o
+que `make repro` precisa. Invariância exigiria acumular alvos por endereço dentro
+do tique e aplicar `φ` uma vez só — desvio da eq. (4.8), não detalhe de
+implementação. Decisão a tomar se a SPEC-08/09 precisar de replay paralelo.
+
+### Perguntas do artigo resolvidas de passagem
+
+- **Variância do Hopper (0,2 ou 0,3):** a tabela A.3 diz **0,3**. A inconsistência
+  é entre o texto da §5.3 e o apêndice, não dentro do apêndice. Qual reproduz o
+  número publicado só se decide rodando o Hopper (MuJoCo, fora de escopo).
+- **Cronograma do anelamento de `σ_s`:** **não há anelamento.** A primeira
+  tentativa tinha um bug — `decaimento` conta transições, não episódios, e num
+  brinquedo de 40 passos colapsava `σ` em ~20 episódios. Desligado, porque a
+  avaliação já é determinística (Lamenza §7).
+- **Cobertura do canal de identidade:** a fórmula `p = 1 − (1 − R·Na/B)^n` da
+  SPEC-05 §4.7 supõe amostragem **com reposição** por RAM — a mesma suposição que
+  gerou o achado C4. Com mapeamento particionado a conta é **hipergeométrica**.
+  Medida, ela bate melhor em 5 das 6 configurações; a binomial fica como
+  aproximação, não identidade.
+
+### Correção de redação, não de fato
+
+O critério de saída 5 ("nenhuma dependência de PyTorch fora de `tests/`") é violado
+por construção: `scripts/spec02_maddpg_*.py` importam `torch` porque é o que lê os
+pesos publicados de Lamenza. O que a RNF-11 protege é **`src/uavwnn/`**, que está
+limpo e agora tem teste. O critério estava escrito mais forte do que se pretende.
+
+### ~~T-05.4(a) fechada com discrepância~~ — RETRATADO, ver abaixo
+
+A reprodução do Katopodis no `MountainCarContinuous-v0` rodou com o orçamento
+publicado (2000 episódios × 10 sementes, §5.4 p.65):
+
+| | medido | publicado |
+|---|---|---|
+| AC com MLP (controle negativo) | −0,0370 [−0,0393; −0,0347] | **−0,02** (−0,03; −0,02) |
+| n-tuple AC | −0,1989 [−0,2124; −0,1842] | **93,3** (92,9; 93,8) |
+
+O controle negativo reproduz o fenômeno; o n-tuple cai no **mesmo ótimo local de
+não mover o carro** que o artigo atribui à MLP, com **0,00 % de chegada à bandeira**
+em 1000 episódios de avaliação.
+
+Três erros nossos corrigidos no caminho: retornos de treino em vez de avaliação
+determinística (a MLP foi de −31,86 para −0,04 com a correção), sinal trocado no
+alvo publicado da nossa própria tabela (`0,02` em vez de `−0,02`), e orçamento a
+37 % do publicado.
+
+**O que a T-05.4(a) deixa de garantir, e é o motivo de isto virar pendência.** O
+propósito escrito do critério era *"sem isto, nenhum resultado negativo da SPEC-06 é
+atribuível ao problema"*. Continua garantido: redes bit-idênticas ao `Ramnet.jl`,
+codificador com semântica de resolução provada, mapeamento por partição provado,
+protocolo de avaliação correto, e capacidade/generalização eliminada por varredura
+de `n ∈ {8,16,32,64}`. **Não** garantido: que o laço do Algoritmo 4.4 atribua
+crédito corretamente sobre horizonte longo e recompensa quase esparsa — e ele é o
+único componente da cadeia **sem oráculo diferencial**.
+
+Se a SPEC-06 der resultado negativo no braço n-tuple, **a atribuição fica em aberto
+e o primeiro suspeito é o laço.**
+
+### Nova — TS7: os dois braços do `spec05_mountaincar.py` usam laços diferentes
+
+Viola o *"a única diferença é `f(·)`"* da §4.8: o n-tuple usa `AtorCriticoNTupla`
+(Algoritmo 4.4, retorno de `m` passos por transição) e a MLP um laço próprio com um
+único ponto de truncamento por episódio.
+
+Consequência que importa: **a MLP reproduzir não valida o laço**, porque o alvo que
+ela reproduz é um ótimo local degenerado que quase qualquer esquema de crédito
+encontra. Unificar antes de qualquer nova rodada; até então, só a comparação de cada
+braço com o **seu** número publicado é válida, nunca a comparação entre eles.
+
+### Retratação — a varredura de tupla não responde a pergunta aberta 2
+
+Quase registrei que ela respondia. O retorno melhora monotonicamente com tupla maior
+(−1,73 → −0,94 → −0,13 → −0,01) e o **sinal** coincide com o achado da §5.3 do
+Katopodis. Mas zero é o teto do "não mover o carro": convergir para zero é assentar
+no ótimo local com mais precisão, não resolver. A chegada em avaliação é 0,00 % nos
+quatro pontos, e a de treino não sobe com `n`.
+
+A recomendação de incluir `n = 16` na varredura da SPEC-06 **continua válida**, mas
+pelo argumento de fidelidade à referência — Katopodis usa `n ∈ {16,32,64}` em tarefa
+contínua e o PRD varre `{8,10,12}` — e **não** por esta medição.
+
+---
+
+## Adendo — 2026-08-21 (b): T-05.4(a) reproduz; a "falha" era bug nosso
+
+**Retrata o adendo anterior por inteiro.** O n-tuple **resolve o Mountain Car**:
+
+| | antes | depois da correção | publicado |
+|---|---|---|---|
+| retorno (avaliação) | −0,199 | **96,72** [96,70; 96,75] | 93,3 (92,9; 93,8) |
+| chegada à bandeira | 0,00 % | **100,0 %** (10/10 sementes) | — |
+| MLP (controle negativo) | −0,037 | −0,04 | −0,02 (−0,03; −0,02) |
+
+O excesso é **para cima**: gastamos 3,28 de energia contra 6,70 dele. A explicação
+econômica é que o número dele inclui ~3 % de episódios que não chegam — a conta é
+robusta ao valor assumido para a falha (96,5 % a 97,5 % de chegada implicada), mas
+não é verificável porque ele não publica a taxa.
+
+### O bug, e por que ele passou tanto tempo escondido
+
+`AtorCriticoNTupla.reiniciar()` **apaga as duas redes**. O laço de treino do
+`spec05_mountaincar.py` a chamava a **cada episódio**, acreditando que só esvaziava a
+janela de `m` passos. Foram 2000 episódios independentes, cada um de rede em branco.
+
+O que torna isso perigoso: o resultado — retorno ≈ 0, o ótimo local de "não mover o
+carro" — **é indistinguível de "o método não funciona"**, e é um ótimo local que o
+próprio artigo descreve para a MLP. A falha imitava um resultado plausível.
+
+O sintoma que denunciou não foi métrica de RL nenhuma: foi a **ocupação de memória
+oscilando** (188 → 722 → 283 → …) numa estrutura *append-only*, que não pode
+encolher.
+
+Corrigido: `novo_episodio()` para a operação de início de episódio, aviso na
+docstring do `reiniciar()`, e **teste de regressão** que exige ocupação
+monotonicamente crescente entre episódios — mais o par que fixa o contrato
+destrutivo do `reiniciar` para ninguém "consertá-lo".
+
+### Retratações
+
+- **~~TS5~~ pode não ser o que eu disse.** Registrei que `toy/nav.py` falha por
+  crédito temporal nos dois braços. Aquele brinquedo usa laço inline do
+  `spec05_circular.py`, não o `AtorCriticoNTupla`, então **não** compartilha este
+  bug — mas a lição se aplica: antes de concluir "crédito temporal", auditar o
+  ponto de chamada. Fica **reaberta para reexame**, não fechada.
+- **A varredura de tamanho de tupla está inválida.** Rodou com o bug, medindo
+  aprendizado de um episódio só. A monotonia observada era convergência ao ótimo
+  local dentro do episódio. **Refeita** — ver abaixo, e ela agora responde a
+  pergunta aberta 2.
+- **"O primeiro suspeito é o laço do Algoritmo 4.4" está retirado.** A lista de
+  eliminação estava correta — protocolo, hiperparâmetros, codificador, mapeamento,
+  orçamento, redes —, mas faltava nela **o nosso próprio código de chamada**, que
+  não é componente do método e por isso não estava sendo auditado.
+
+### O que a T-05.4(a) agora entrega
+
+O propósito escrito era *"sem isto, nenhum resultado negativo da SPEC-06 é
+atribuível ao problema"*. **Agora entrega.** O laço continua sem oráculo diferencial
+(`PLANO-TESTES.md` §5, item 1), mas atravessa uma validação de ponta a ponta contra
+número publicado — evidência muito mais forte que inspeção de código.
+
+**TS7 continua aberta:** os dois braços do `spec05_mountaincar.py` usam laços
+diferentes, violando a §4.8. Não invalida a reprodução (cada braço é comparado ao
+**seu** número publicado), mas invalida comparações **entre** os braços.
+
+### A lição, que é a da SPEC-03 outra vez
+
+Antes de atribuir uma discrepância ao método, esgotar as hipóteses sobre o arnês —
+**e o arnês inclui o código de chamada, não só as bibliotecas.** Auditei sete
+componentes do método com evidência documental, extraindo provas do PDF, e o erro
+estava numa linha do meu laço de treino.
+
+### ~~Pergunta aberta 2~~ (faixa de `n`) — RESPONDIDA com a varredura refeita
+
+`n ∈ {8, 16, 32, 64}`, 2000 episódios × 3 sementes, no Mountain Car:
+
+| `n` | N RAMs | retorno | energia | sementes que resolvem |
+|---|---|---|---|---|
+| 8 | 32 | 30,35 | 4,80 | **2 de 3** (uma em −99,37, 0 % de chegada) |
+| 16 | 16 | 96,09 | 3,91 | 3 de 3 |
+| 32 | 8 | 96,55 | 3,45 | 3 de 3 |
+| 64 | 4 | **97,42** | **2,58** | 3 de 3 |
+
+**A média esconde o achado.** O 30,35 de `n = 8` são duas sementes resolvendo e
+**uma falhando por completo** — energia ~99 em 999 passos, isto é `|a| ≈ 1,0`,
+acelerador no fundo sem chegar. É falha de **confiabilidade**, não de qualidade
+média.
+
+**Dois eixos independentes desfavorecem a faixa `{8, 10, 12}` do PRD:**
+
+- *pelo `n`:* `n = 8` foi o único a falhar; `n ≥ 16` foi uniformemente confiável. A
+  faixa do PRD está na borda que quebrou.
+- *pelo `N`:* a falha aqui foi com `N = 32`. No nosso problema (`B ≈ 800`, 25 dims) a
+  faixa do PRD dá `N ∈ {66, 80, 100}` — mais fundo ainda na região que falhou.
+
+**Recomendação para a SPEC-06:** incluir `n = 16` e `n = 32`; tratar `n = 8` como
+ponto de risco a monitorar, não como padrão.
+
+Ressalva de transferência, mantida: 2 dimensões contra as nossas 25, e com 25 pode
+ser *necessário* ter mais RAMs para cobrir a entrada. Katopodis mediu direção
+**oposta** entre Mountain Car e Hopper, então o sinal não é universal. Os dois eixos
+concordarem é o mais forte que uma medição em tarefa auxiliar consegue ser.
+
+E agora a direção reproduz de fato o achado da §5.3 dele — *"much more benefited from
+greater model capacity than generalization ability"* — com o significado certo, porque
+os retornos representam **resolver** e não assentar num ótimo local. (A versão
+anterior desta varredura tinha o mesmo sinal e significado oposto.)

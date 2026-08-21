@@ -188,3 +188,70 @@ def custo_mlp(
         residente=total + buffers,
         detalhe={**detalhe, "buffer_ativacoes": buffers},
     )
+
+
+def ocupacao_esparsa(memoria: list[dict], n_ram: int) -> NDArray[np.int64]:
+    """Ocupação por RAM lida direto da memória **esparsa** — SPEC-05 T-05.7.
+
+    O `ocupacao_por_ram` acima exige o array denso `(cabeças, N, 2^n)`, e a
+    SPEC-03 mediu que ele é **impossível de alocar** para tuplas de 16 a 64:
+    `2^64` posições não existem. As redes da SPEC-04 guardam
+    `list[dict[endereço, valor]]` exatamente por isso, e esta função é a ponte —
+    a mesma grandeza, sem materializar o que não cabe.
+
+    Uma posição conta **uma vez**, não uma por cabeça: a decisão de arquitetura
+    da SPEC-05 §4.8 é um discriminador com posições **vetoriais** (Katopodis fig.
+    4.3a), então um endereço guarda `d` valores sob uma chave só. Contar por
+    cabeça superestimaria o realizado em ~2 chaves por entrada.
+    """
+    if len(memoria) != n_ram:
+        raise ValueError(f"memória com {len(memoria)} RAMs, esperado {n_ram}")
+    return np.array([len(m) for m in memoria], dtype=np.int64)
+
+
+def custo_ntuple_de_rede(
+    rede,
+    variante: Variante = "hash",
+    bytes_valor: int = 4,
+    limiares_por_dim: int = 0,
+    n_dims: int = 0,
+    bytes_limiar: int = 4,
+    mapeamento_por_seed: bool = False,
+    rotulo: str = "n-tuple",
+) -> CustoMemoria:
+    """`custo_ntuple` aplicado a uma rede da SPEC-04 — a ligação de T-05.7.
+
+    Existe para que `Aproximador.custo()` devolva os números **do harness da
+    SPEC-03**, e não uma segunda contagem paralela que pode divergir dela em
+    silêncio. Toda a aritmética de bytes continua a viver em `_bytes_luts`; aqui
+    só se lê a ocupação da estrutura esparsa.
+    """
+    occ = ocupacao_esparsa(rede.memoria, rede.n_ram)
+    luts = _bytes_luts(occ, rede.n_ram, rede.tamanho_tupla, rede.n_saidas,
+                       bytes_valor, variante)
+
+    b_idx = _bytes_indice(rede.n_bits)
+    mapeamento = rede.n_ram * rede.tamanho_tupla * b_idx
+    mapeamento_persistente = 4 if mapeamento_por_seed else mapeamento
+    limiares = n_dims * limiares_por_dim * bytes_limiar
+    distribuicao = 8
+
+    buf_bits = math.ceil(rede.n_bits / 8)
+    buf_end = rede.n_ram * 4
+    buf_acum = rede.n_saidas * 8
+
+    return CustoMemoria(
+        rotulo=rotulo,
+        persistente=luts + mapeamento_persistente + limiares + distribuicao,
+        residente=(luts + mapeamento + limiares + distribuicao
+                   + buf_bits + buf_end + buf_acum),
+        detalhe={
+            "luts": luts,
+            "mapeamento_tuplas": mapeamento_persistente,
+            "limiares_codificador": limiares,
+            "params_distribuicao": distribuicao,
+            "buffer_bits": buf_bits,
+            "buffer_enderecos": buf_end,
+            "buffer_acumuladores": buf_acum,
+        },
+    )

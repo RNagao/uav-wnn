@@ -1,0 +1,72 @@
+{
+  "config": {
+    "episodios": 2000,
+    "sementes": 10,
+    "processos": 10,
+    "avaliar_ultimos": 100,
+    "n_aval": 100,
+    "p13": false,
+    "saida": "reports/spec05-mountaincar.json"
+  },
+  "A3": {
+    "passos": 100,
+    "tamanho_tupla": 32,
+    "resolucao": 128,
+    "phi": 0.85,
+    "taxa": 0.0008,
+    "desconto": 1.0,
+    "covariancia": 0.5
+  },
+  "A6": {
+    "passos": 500,
+    "taxa": 1e-05,
+    "desconto": 0.95,
+    "covariancia": 0.4
+  },
+  "resultados": [
+    {
+      "rotulo": "n-tuple AC",
+      "media": 96.7245463709138,
+      "ic": [
+        96.6955094219205,
+        96.74920098782425
+      ],
+      "publicado": [
+        93.3,
+        92.9,
+        93.8
+      ],
+      "sobrepoe": false
+    },
+    {
+      "rotulo": "AC com MLP",
+      "media": -0.037021036049554465,
+      "ic": [
+        -0.03928150728074384,
+        -0.03468094467351096
+      ],
+      "publicado": [
+        -0.02,
+        -0.03,
+        -0.02
+      ],
+      "sobrepoe": false
+    }
+  ],
+  "treino": {
+    "n-tuple": 92.47375163628917,
+    "mlp": -31.726175993009928
+  },
+  "taxa_chegada": {
+    "n-tuple_treino": 0.9818,
+    "mlp_treino": 0.00455,
+    "n-tuple_aval": 1.0,
+    "mlp_aval": 0.0
+  },
+  "hopper": {
+    "rodado": false,
+    "motivo": "exige MuJoCo; T-05.4(a) trata o Hopper como condicional ao orçamento ('e, se o orçamento permitir, Hopper')",
+    "pergunta_aberta_3": "a tabela A.3 diz covariância 0,3 no Hopper; a inconsistência é com o texto da §5.3, não dentro do apêndice. Qual reproduz o número publicado fica sem resposta sem rodar o Hopper."
+  },
+  "veredito": "discrepante"
+}

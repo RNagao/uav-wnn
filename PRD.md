@@ -253,7 +253,7 @@ A montagem da observação é **compartilhada por todos os métodos**, inclusive
 
 **RNF-10 — mediana e p99.** A cauda importa mais aqui que a mediana: uma MLP densa é *branch-free* e de tempo praticamente constante; uma LUT esparsa com hash tem latência variável (falhas de cache, colisões). É perfeitamente possível que a WNN ganhe na mediana e **perca no p99** — e isso arranharia a alegação de "inferência previsível". Se acontecer, é resultado a reportar, e a mitigação é medir também a variante de LUT densa, que troca previsibilidade por memória.
 
-**RNF-11 — comparação justa de arcabouço.** Uma MLP 31→32→32→2 executada via PyTorch mede sobretudo o *overhead* de despacho do PyTorch, não o modelo. Ou os dois lados rodam em NumPy puro, ou reporta-se **as duas colunas** (com arcabouço e sem). Caso contrário a medição não é do que se pensa que é.
+**RNF-11 — comparação justa de arcabouço.** Uma MLP 31→32→32→3 executada via PyTorch mede sobretudo o *overhead* de despacho do PyTorch, não o modelo. Ou os dois lados rodam em NumPy puro, ou reporta-se **as duas colunas** (com arcabouço e sem). Caso contrário a medição não é do que se pensa que é.
 
 **RNF-12 — contagem de operações.** Tempo de parede é dependente de implementação; contagem de operações não. Reportar, por decisão e por tipo: **MACs em ponto flutuante**, **lookups inteiros**, **somas**. É a figura de mérito independente de hardware e é onde a diferença estrutural aparece limpa.
 
@@ -265,11 +265,25 @@ Há **duas** referências, com ordens de grandeza diferentes, e confundi-las inf
 
 | Referência | Arquitetura | Parâmetros | fp32 |
 |---|---|---|---|
-| **MLP pareada** (nosso baseline, arquitetura de Katopodis §5.4) | 31→32→32→2 | ≈ 2 150 | ≈ 8,6 KB |
+| **MLP pareada** (nosso baseline, arquitetura de Katopodis §5.4) | 31→32→32→**3** | ≈ 2 180 | ≈ 8,7 KB |
 | **Ator do MADDPG de Lamenza** | **MEDIDO** dos pesos publicados: `obs → 256 → 256 → 2` | 73 474 / 74 498 / 76 546 | **287,0 / 291,0 / 299,0 KB** (`Na` = 2/4/8) |
-| **WNN (ator)** | `N=48`, `n=12`, ocupado + mapeamento | — | ≈ 5,6 KB (ocupado + tuplas), realizado a medir |
+| **WNN (ator)** | `N=48`, `n=12`, ocupado + mapeamento, **`d = 3`** | — | ≈ 14,8 KB estimado; **133,9 KB medido** (SPEC-03) |
 
-A conta preliminar diz algo desconfortável: contra a **MLP pareada**, a vantagem de tamanho é da ordem de **1,5×**, não de 10×. O fator grande só aparece contra o **ator do MADDPG**. O critério de falsificação de H1 na v2.0 deste PRD ("memória ocupada ≥10× menor") era, portanto, provavelmente inatingível contra o baseline pareado — e ficaria satisfeito trivialmente contra o MADDPG.
+**Duas correções na tabela, e a segunda desmonta a expectativa (SPEC-05, crit. 9).**
+
+*A saída passa de 2 para 3.* A normal projetada da SPEC-05 §4.3 emite `f = (u₁, u₂, μ_s)`: amostra-se em R³ e a ação sai por `θ = atan2(z₂, z₁)`, `s = clip(z₃, 0, 1)`. O gradiente vive em R³, onde não há envoltório, e a topologia circular fica inteiramente no mapa `atan2`. Isto vale para **os dois** aproximadores, então a MLP pareada é `D→32→32→3`. São +33 parâmetros — desprezível no total, mas o número publicado tem de ser o certo. Consequência na contagem de MACs: **2 112** (992 + 1 024 + 96), e não 2 080.
+
+*O `d = 3` triplica a carga útil por posição de memória da WNN.* A estimativa antiga de ≈ 5,6 KB pressupunha posição **escalar**:
+
+```
+2 268 × 3 × 2 B (int16) = 13,6 KB  +  1,2 KB (mapeamento)  ≈ 14,8 KB
+```
+
+Isto **inverte o sinal da comparação preliminar**: contra ≈ 8,7 KB da MLP pareada, o ator WNN estimado é ~1,7× **maior**, não 1,5× menor.
+
+**E a estimativa corrigida ainda errou por 9×.** A SPEC-03 mediu **133,9 KB** realizados. O motivo é independente do fator `d` e vale registrar porque foi a mesma armadilha duas vezes: as 2 268 entradas vinham de um protótipo com **2 variáveis de entrada**, e a observação real tem **25**. Corrigir o `d` não salva uma estimativa cuja base de ocupação estava uma ordem de grandeza errada.
+
+O critério de falsificação de H1 na v2.0 deste PRD ("memória ocupada ≥10× menor") era, portanto, inatingível contra o baseline pareado — e ficaria satisfeito trivialmente contra o MADDPG.
 
 **Critério corrigido para H1:**
 
@@ -371,7 +385,7 @@ Cruzado com o regime de treino: **treino limpo → avaliação ruidosa** vs **tr
 
 **RF-05 (consistência).** NEES/NIS contra o intervalo qui-quadrado **antes** de olhar qualquer resultado de RL. Um KF mal sintonizado produz números plausíveis que envenenam a análise a jusante — foi literalmente o que ocorreu no experimento preliminar.
 
-**RNF-05 (ressalva de custo).** O KF faz MACs, o que arranha a narrativa "sem MACs, embarcável". Medir, não esconder: ~50–80 flops/passo do KF contra os **2 080 MACs** da MLP pareada `31→32→32→2` (992 + 1 024 + 64), ou seja ~3 %. Vai como número na tabela de custo. *(Corrigido: a versão anterior citava ~2 600 MACs de uma "MLP 31→32→2" — o número vinha da MLP 33→64→8 do `PLANO.md` §9.8 e a arquitetura citada não era a pareada. O KF acrescenta ainda **divisões**, que a contagem de operações da §5.5 precisa tratar como categoria própria: num MCU sem FPU, uma divisão custa mais que um MAC.)*
+**RNF-05 (ressalva de custo).** O KF faz MACs, o que arranha a narrativa "sem MACs, embarcável". Medir, não esconder: ~50–80 flops/passo do KF contra os **2 112 MACs** da MLP pareada `31→32→32→3` (992 + 1 024 + 96), ou seja ~3 %. Vai como número na tabela de custo. *(Corrigido: a versão anterior citava ~2 600 MACs de uma "MLP 31→32→2" — o número vinha da MLP 33→64→8 do `PLANO.md` §9.8 e a arquitetura citada não era a pareada. O KF acrescenta ainda **divisões**, que a contagem de operações da §5.5 precisa tratar como categoria própria: num MCU sem FPU, uma divisão custa mais que um MAC.)*
 
 > **Portão G2** — NEES/NIS no intervalo; degrau 4 indistinguível do degrau 0; degrau 4 supera os degraus 2 e 3 com IC separado.
 
@@ -521,7 +535,7 @@ A tabela de custo é barata de produzir — instrumentação, não experimento �
 |---|---|
 | **Ação contínua com n-tuple é menos madura que SARSA discreto** | Katopodis validou n-tuple Actor-Critic em Mountain Car e Hopper, ambos contínuos, superando o AC com MLP. Sintonizar `σ²`, `T` e `n` antes de qualquer outra coisa. Discretizar seria **modificar o problema** e só é admissível como desvio declarado na §5.4, com aprovação |
 | Zero-padding confundido com sensor sobre o UAV | bit de validade por slot no codificador |
-| **A WNN não é menor que a MLP pareada** (conta preliminar: ~5,6 KB vs ~8,6 KB, só 1,5×) | §5.5: reportar contra as duas referências sem escolher a conveniente; migrar o argumento para contagem de operações e ausência de FPU, que é onde a diferença é estrutural |
+| **A WNN não é menor que a MLP pareada** — **CONFIRMADO, e por margem maior que a temida**: com `d = 3` a estimativa vira 14,8 KB vs 8,7 KB (1,7× maior), e o medido da SPEC-03 é 133,9 KB vs 7,6 KB (17,5× maior) | §5.5: reportar contra as duas referências sem escolher a conveniente; migrar o argumento para contagem de operações e ausência de FPU, que é onde a diferença é estrutural |
 | **A WNN perde no p99** por causa do hash | medir também a variante de LUT densa (troca previsibilidade por memória) e reportar o par |
 | Medição de latência da MLP contaminada por overhead de arcabouço | RNF-11: NumPy puro dos dois lados, ou duas colunas |
 | Ocupação das LUTs não satura e "kilobytes" vira alegação com prazo | RNF-08: curva de ocupação obrigatória, com o horizonte declarado |

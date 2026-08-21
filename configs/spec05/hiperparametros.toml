@@ -1,0 +1,156 @@
+# SPEC-05 — faixas iniciais de hiperparâmetros, com a procedência de cada uma.
+#
+# Critério de saída 4: "γ = 0,99 fixo, faixas iniciais dos demais hiperparâmetros
+# registradas em configs/spec05/ com a justificativa de origem (Katopodis,
+# Lamenza, ou varredura própria)".
+#
+# TOML e não YAML porque `tomllib` é biblioteca padrão desde o 3.11: o arquivo é
+# verificável por teste sem acrescentar dependência ao projeto.
+#
+# O campo `origem` é a razão de este arquivo existir. Três valores:
+#
+#   lamenza    do PROBLEMA. Não se negocia — mexer aqui muda o MDP e invalida a
+#              comparação com o baseline publicado.
+#   katopodis  do MÉTODO. Transferível só quando a grandeza é adimensional; ver
+#              `sigma`, que é o contraexemplo medido.
+#   propria    sem âncora na literatura, então exige medição nossa. Toda entrada
+#              com esta origem aponta para o experimento que a fixa.
+
+[gamma]
+valor = 0.99
+origem = "lamenza"
+fixo = true
+nota = """
+Desconto do problema (Lamenza §5). Fixo por critério de saída, não por varredura.
+A pergunta aberta 4 da spec registra que Katopodis usa γ = 1,0 no crítico em três
+das quatro tarefas, e que com episódio de 250 passos (γ^250 ≈ 0,08) um crítico não
+descontado teria menos viés de horizonte — mas isso é desvio do método, não do
+problema, e fica como decisão consciente."""
+
+# -- política contínua ------------------------------------------------------
+
+[sigma]
+faixa = [0.05, 0.10, 0.20]
+origem = "propria"
+fixado_por = "T-05.4(b)"
+melhor_C2 = 0.10
+melhor_C0 = 0.20
+nota = """
+Os valores de Katopodis NÃO são transferíveis, e isto foi verificado. Ele usa
+σ² = 0,5 no Mountain Car, cuja ação vive em [−1, 1]: σ ≈ 0,71, uns 35 % da faixa.
+Nossa ação normalizada vive em [0, 1], então a grandeza transferível é σ/faixa e
+não σ.
+
+A faixa é varrida POR ESQUEMA porque σ significa coisas diferentes nos dois. No C0
+é desvio em θ_norm, e σ = 0,25 são 90° de ruído angular — nenhuma política aponta
+com isso. No C2 é desvio no vetor de R³, e o ruído angular depende de ‖f₁:₂‖, que
+a política pode crescer para encolher o próprio ruído. Varrer só a taxa
+favoreceria um lado, e o portão ficaria sem valor."""
+
+[anelamento_sigma]
+valor = "desligado"
+origem = "propria"
+nota = """
+Desligado, e a razão é um bug encontrado por medição: `decaimento` conta
+TRANSIÇÕES, não episódios. Num brinquedo de 40 passos, `decaimento = 800`
+colapsava σ em ~20 episódios e matava a exploração.
+
+Desligar em vez de reescalar porque a avaliação já é determinística (usa a média,
+Lamenza §7), então ruído residual no treino não contamina nada do que é reportado.
+Isso RESOLVE a pergunta aberta 6 da spec — "σ_s anelada, segundo que cronograma, e
+ele conta como hiperparâmetro varrido ou como protocolo fixo?" — por não haver
+anelamento. Se voltar, o cronograma tem de ser em episódios."""
+
+[d_ator]
+valor = 3
+origem = "propria"
+nota = """
+(u₁, u₂, μ_s) da normal projetada. Não é varrível — é a dimensão que a §4.3
+escolhe. Registrado aqui porque CORRIGE a tabela do PRD §5.5, que dizia d = 2
+(critério de saída 9)."""
+
+# -- rede n-tupla -----------------------------------------------------------
+
+[tamanho_tupla]
+faixa = [8, 10, 12]
+origem = "propria"
+nota = """
+Faixa do PRD. A pergunta aberta 2 da spec registra que ela está TODA abaixo da
+faixa de Katopodis, e que ele mediu o tamanho de tupla dominando o resultado — com
+direção ótima OPOSTA entre as duas tarefas contínuas (maior no Mountain Car, menor
+no Hopper). Com armazenamento esparso o custo de n grande é generalização, não
+memória: a SPEC-03 mediu que tuplas de 16 a 64 são impossíveis com alocação densa
+e triviais com esparsa. Ampliar para {16, 32} custa tempo de SPEC-06, que é o
+recurso escasso."""
+
+[phi]
+valor = 0.85
+origem = "katopodis"
+nota = """
+Fator de esquecimento do crítico (§4.2.1, eqs. 4.8-4.10). Foi o melhor nas QUATRO
+tarefas do apêndice A, que é a evidência mais forte disponível para um único
+valor. Adimensional, portanto transferível — ao contrário de σ."""
+
+[taxa_ator_ntupla]
+faixa = [5.0e-4, 1.0e-3, 2.0e-3, 5.0e-3]
+origem = "propria"
+nota = """
+As taxas do apêndice A de Katopodis (8e-4 no Mountain Car, 2e-5 no Hopper) estão
+na convenção de MÉDIA, que é a que adotamos — então são comparáveis sem dividir
+por N, e a faixa acima as contém. É a razão (i) da decisão da §4.2.
+
+RETRATAÇÃO REGISTRADA: a RNF-01 do PRD prescrevia η = c/N supondo ‖φ‖² = N. Está
+errado — a eq. (4.12) usa a média e a (4.22) normaliza por 1/√N. A regra foi
+retirada e a correção propagada para as SPEC-04, 06, 09 e 10."""
+
+[c_max]
+valor = 0.5
+valor_critico = "nulo"
+origem = "propria"
+nota = """
+Teto do passo em espaço de saída — asserção obrigatória da §4.2, ativa em
+`RedeGradienteFuncional` e coberta por caso que deve abortar (critério de saída 6).
+
+O valor vem do `c ≲ 0,5` da RNF-01, que nasceu de MEDIÇÃO: no protótipo, η = 0,05
+com N = 48 divergiu para NaN. A convenção de média é o que torna o teto exato —
+somar `passo` às N posições endereçadas muda f em EXATAMENTE `passo`, sem fator de
+N escondido. Na convenção de soma o mesmo teto valeria c_max/N e mudaria a cada
+ponto da varredura de N.
+
+No crítico o padrão é nulo: ele acumula G pela eq. (4.8) e não tem taxa, então
+alvo grande é legítimo — limitar rejeitaria dado bom. Lá só a finitude é
+verificada, que nunca é legítima."""
+
+# -- algoritmo --------------------------------------------------------------
+
+[passos_m]
+faixa = [4, 8, 16]
+origem = "propria"
+nota = """
+`m` do m-step SARSA / Algoritmo 4.4. Com dt = 2 s e episódio de 500 s são no
+máximo 250 decisões, então m = 16 é ~6 % do episódio. Faixa própria: o apêndice A
+de Katopodis não reporta m para as tarefas contínuas."""
+
+# -- baseline pareado -------------------------------------------------------
+
+[taxa_mlp]
+faixa = [1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3]
+origem = "propria"
+nota = """
+Do baseline pareado, não do método. Registrado porque a SPEC-03 pagou a lição de
+que a taxa da MLP é NÃO MONOTÔNICA com ótimo agudo: um primeiro palpite de 3e-3
+ficou 30× acima do ótimo e fez a MLP parecer 5× pior que a n-tupla (4,8° contra
+0,9°); no ótimo verdadeiro (1e-4) é empate técnico. Dar ao baseline uma taxa mal
+sintonizada constrói espantalho, e o resultado inverte."""
+
+[arquitetura_mlp]
+valor = "D -> 32 -> 32 -> 3"
+origem = "propria"
+nota = """
+A saída é 3, e não 2, pelo fator d da normal projetada. CORRIGE o PRD §5.5
+(critério de saída 9): são +33 parâmetros, desprezível no total, mas o número
+publicado tem de ser o certo.
+
+Distinto do baseline MADDPG de Lamenza, que a SPEC-02 mediu nos pesos publicados:
+256 × 256, 287-299 KB. Aquele é o baseline do PROBLEMA; este é o controle pareado
+do MÉTODO."""

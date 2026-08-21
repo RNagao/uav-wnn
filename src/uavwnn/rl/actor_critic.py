@@ -254,8 +254,37 @@ class AtorCriticoNTupla:
             self._aplicar(t, g)
         self._buffer.clear()
 
+    def novo_episodio(self) -> None:
+        """Prepara o próximo episódio. **Preserva o que foi aprendido.**
+
+        É esta que se chama entre episódios — e ela existe porque a ausência dela
+        custou uma reprodução inteira. Ver o aviso em `reiniciar`.
+
+        Na prática só esvazia a janela de `m` passos, e mesmo isso é redundante
+        quando o episódio termina por `fim_de_episodio` (que já esvazia). Existe
+        para que o laço de treino tenha uma chamada **óbvia e segura** no início
+        do episódio, em vez de a opção óbvia ser a destrutiva.
+        """
+        self._buffer.clear()
+
     def reiniciar(self) -> None:
-        """Equivalente ao `reset!` do agente: esvazia buffer e as duas redes."""
+        """**APAGA AS DUAS REDES.** Equivalente ao `reset!` do agente.
+
+        > ATENÇÃO: isto **não** é a operação de início de episódio. Para essa, use
+        > `novo_episodio`, que preserva o aprendizado.
+
+        Este aviso é caro. O `scripts/spec05_mountaincar.py` chamava `reiniciar()`
+        no começo de cada episódio, acreditando que ela só esvaziava a janela de
+        `m` passos. O efeito real foi treinar 2000 episódios **independentes**, cada
+        um partindo de uma rede em branco: nunca houve aprendizado ao longo do
+        treino. O sintoma que denunciou foi a ocupação de memória **oscilando** nas
+        centenas (188 → 722 → 283 → …) quando ela só pode crescer — 2 milhões de
+        atualizações deveriam dar centenas de milhares de entradas.
+
+        Use isto apenas para começar uma execução nova de treino, nunca dentro de
+        um laço de episódios. Um teste de regressão guarda esta distinção
+        (`test_actor_critic.py`).
+        """
         self._buffer.clear()
         self.politica.rede.reiniciar()
         self.critico.reiniciar()

@@ -220,3 +220,75 @@ implícitas:
 3. **O termômetro quantil por slot.** É nosso, não do artigo, e portanto não
    tem contra o que ser conferido além das próprias propriedades. A SPEC-01
    mede que ele vence; nenhuma referência externa confirma.
+
+---
+
+## 6. Adendo SPEC-05 (2026-08-21) — o que os testes novos garantem, e em que nível
+
+Três arquivos novos, e vale dizer o nível de garantia de cada um antes do
+conteúdo, porque dois deles são de tipo diferente do resto deste plano.
+
+| Arquivo | Nível | O que garante |
+|---|---|---|
+| `tests/test_pareamento.py` | **C** | encanamento simétrico entre os dois braços; nenhuma referência externa envolvida |
+| `tests/test_barreira.py` | **B** | identidade aritmética do esquecimento, `(φ−1)(a₁−a₂)`, fechada em fórmula |
+| `scripts/spec05_mountaincar.py` | **A** | oráculo **externo publicado** — os quatro números do Katopodis |
+
+### O pareamento é nível C, e isso é uma limitação, não um detalhe
+
+`test_pareamento.py` dirige os dois aproximadores pela **mesma fita** de
+`(observação, recompensa, terminal)` e verifica que consomem as mesmas entradas na
+mesma ordem, com o mesmo número de atualizações nos mesmos instantes.
+
+O que ele **não** faz é comparar trajetórias no ambiente, e não pode: as duas
+políticas emitem ações diferentes, então do segundo passo em diante veriam estados
+diferentes. Exigir igualdade ali seria exigir que os dois aproximadores fossem o
+mesmo — o oposto do que a comparação de H1 quer medir.
+
+A assimetria que **permanece permitida** é o codificador: a n-tupla precisa de bits
+e a MLP de floats. É a assimetria que a §4.8 declara ("os dois recebem a mesma
+observação e cada um a prepara à sua maneira"), e o teste garante que ela é a
+única.
+
+Um teste merece destaque porque cobre o bug mais provável desta spec:
+`test_o_ator_ve_o_estado_da_transicao_nao_o_seguinte`. Desalinhamento de um passo
+entre `x` e a recompensa **não aparece em nenhuma média** e degrada os dois braços
+de forma desigual — é exatamente o tipo de erro que sobreviveria a uma revisão de
+código e inverteria a conclusão.
+
+### A barreira é nível B, e o teste afirma uma desigualdade
+
+`test_a_nao_comutatividade_e_exatamente_a_do_esquecimento` fecha a conta em
+fórmula: duas escritas na mesma posição partindo de virgem dão `φ·a₁ + a₂` numa
+ordem e `φ·a₂ + a₁` na outra, diferença `(φ−1)(a₁−a₂)`, que zera se `φ = 1` (e aí
+recupera a eq. 3.16) ou `a₁ = a₂`.
+
+`test_o_critico_NAO_e_invariante_a_ordem_sob_colisao` **afirma que a igualdade
+falha**. É teste de sentido invertido de propósito: se ele um dia passar a falhar,
+alguém mudou a semântica do esquecimento, e isso precisa ser decisão registrada e
+não efeito colateral de refatoração.
+
+### T-05.4(a) é o único nível A com oráculo *publicado* deste projeto
+
+Os testes diferenciais contra o `Ramnet.jl` são nível A com oráculo **executável**
+— rodamos o código do autor e comparamos bit a bit. O Mountain Car é diferente: o
+oráculo é um **número publicado com IC**, e não há código para executar. Isso o
+torna mais fraco como verificação (não localiza o erro) e mais forte como
+validação (cobre o laço inteiro, que é justamente o que não tem oráculo executável
+— item 1 da §5).
+
+O controle negativo importa tanto quanto o positivo: a MLP deve ficar em ≈ 0, o
+ótimo local de não mover o carro. **Uma MLP que resolva o Mountain Car é falha de
+reprodução, não sucesso** — significaria que não é a MLP do autor, e a comparação
+de H1 deixaria de ser a comparação dele.
+
+### Acrescentar à §5 — uma quarta coisa sem oráculo
+
+4. **O crédito temporal no brinquedo sequencial.** `toy/nav.py` não é resolvido por
+   nenhum dos dois esquemas de política, embora a política ótima analítica faça
+   7,86 passos com 100 % de sucesso. Descartados por medição: anelamento de `σ`,
+   recompensa esparsa, e a maquinaria de atualização (o bandido com a **mesma**
+   maquinaria aprende perfeitamente). O que resta não tem oráculo e fica como
+   pendência TS5 — não bloqueia a SPEC-06, porque o portão foi decidido no bandido
+   contextual, mas se o modo de falha transferir para o horizonte de 250 decisões
+   do ambiente real, aparecerá lá como "não aprende" sem diagnóstico pronto.

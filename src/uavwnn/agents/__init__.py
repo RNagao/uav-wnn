@@ -16,6 +16,14 @@ from .base import (
     Policy,
     PoliticaPrivilegiada,
 )
+from .ac_continuo import (
+    APROXIMADORES,
+    AtorCriticoContinuo,
+    Aproximador,
+    MlpAprox,
+    NTuplaAprox,
+    NTuplaFuncionalAprox,
+)
 from .baselines import (
     BASELINES,
     CaminhadaAleatoria,
@@ -24,9 +32,13 @@ from .baselines import (
     held_karp,
     vizinho_2opt,
 )
+from .mlp_ac import MLP, Adam
+from .politica_continua import D_ATOR, NormalProjetada
 
 __all__ = [
-    "Acao", "AdaptadorRunner", "BASELINES", "CaminhadaAleatoria",
+    "Acao", "Adam", "AdaptadorRunner", "Aproximador", "AtorCriticoContinuo",
+    "APROXIMADORES", "BASELINES", "CaminhadaAleatoria", "D_ATOR", "MLP",
+    "MlpAprox", "NTuplaAprox", "NTuplaFuncionalAprox", "NormalProjetada",
     "ContextoEpisodio", "EstadoVerdadeiro", "Guloso", "KMeansTSP",
     "Observacao", "PADDING", "Policy", "PoliticaPrivilegiada", "V_MAX",
     "held_karp", "vizinho_2opt",

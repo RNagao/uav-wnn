@@ -111,6 +111,20 @@ def mapeamento_particionado(
     return [ordem[i:i + tamanho_tupla] for i in range(0, n_bits, tamanho_tupla)]
 
 
+class TreinoInstavel(RuntimeError):
+    """Divergência detectada durante o treino — asserção obrigatória da §4.2.
+
+    A RNF-01 do PRD nasceu de uma **medição**, não de teoria: no protótipo, `η =
+    0,05` com `N = 48` divergiu para `NaN`. A spec §4.2 registra que *"o modo de
+    falha medido no protótipo foi divergência para NaN; ele precisa de detecção,
+    não de fé"* — esta exceção é essa detecção.
+
+    A mensagem carrega o número do passo e o valor ofensor, porque uma divergência
+    silenciosa numa varredura de hiperparâmetros vira um ponto ruim indistinguível
+    de um ponto legitimamente ruim. Abortar é informação; `NaN` propagado não é.
+    """
+
+
 class _RedeNTupla:
     """Endereçamento comum às duas redes — §3.2.1 (p.22), fig. 3.1 e 3.2.
 
@@ -125,8 +139,33 @@ class _RedeNTupla:
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 seed: int = 0) -> None:
+                 seed: int = 0, c_max: float | None = None) -> None:
         self.n_bits = n_bits
+        self.c_max = c_max
+        """Teto do passo em espaço de saída — asserção da §4.2, `None` desliga.
+
+        PADRÃO `None`, E A RAZÃO NÃO É LENIÊNCIA. Esta classe é primitiva de uso
+        geral, e serve de **oráculo numérico**: os testes diferenciais alimentam
+        gradientes arbitrários para casar bit a bit com o `Ramnet.jl`, e os de
+        identidade usam passo unitário para sondar a estrutura do núcleo (eq.
+        4.16, 4.22). Ligar o teto aqui aborta 13 desses testes por sondas
+        deliberadas de magnitude 1,0 — e a validação contra o Julia é a evidência
+        mais forte que o projeto tem. Uma primitiva não policia quem a chama.
+
+        Quem liga é `NTuplaAprox`, o ponto onde o gradiente de política de fato
+        entra, que é exatamente onde a divergência da RNF-01 foi MEDIDA. Um teste
+        garante que ele não seja desligado por descuido.
+
+        A convenção de **média** da eq. (4.12) é o que torna este teto exato e não
+        heurístico: somar `passo` às `N` posições endereçadas muda `f` em
+        **exatamente** `passo`, porque `f = (1/N) Σ v[i]` e há `N` termos. Então
+        `max|passo| ≤ c_max` É o `η·max|∂c/∂f| ≤ c_max` da spec, sem fator de `N`
+        escondido. Na convenção de soma o mesmo teto valeria `c_max/N` e mudaria
+        a cada ponto da varredura de `N` — o motivo (ii) da decisão da §4.2.
+
+        `0,5` vem do `c ≲ 0,5` da RNF-01.
+        """
+        self._n_passos = 0
         self.tamanho_tupla = tamanho_tupla
         self.n_saidas = n_saidas
         self.mapeamento = mapeamento_particionado(n_bits, tamanho_tupla, seed)
@@ -162,6 +201,157 @@ class _RedeNTupla:
         for i, (tupla, pot) in enumerate(zip(self.mapeamento, self._potencias)):
             saida[:, i] = (bits[:, tupla].astype(np.uint64) * pot).sum(axis=1)
         return saida
+
+    @property
+    def ganho_do_passo(self) -> float:
+        """Quanto `f` muda ao somar `passo` às `N` posições endereçadas.
+
+        `1` na convenção de média (é o que torna o teto da §4.2 exato) e `N` na de
+        soma. Existe para que `c_max` signifique **a mesma coisa** nas duas — o
+        limite é sobre a mudança em `f`, não sobre o número que se escreve na
+        memória.
+        """
+        return 1.0 if getattr(self, "convencao", "media") == "media" else self.n_ram
+
+    def taxa_equivalente(self, taxa: float, para: str) -> float:
+        """Converte uma taxa entre as convenções, preservando o passo em `f`.
+
+        Uma taxa `η` na convenção de soma produz o mesmo deslocamento que `η·N` na
+        de média. É a conversão que a §4.2 diz ser necessária para usar os números
+        do apêndice A do Katopodis — e a que a RNF-01 do PRD errou ao prescrever
+        `η = c/N` supondo `‖φ‖² = N`.
+        """
+        atual = getattr(self, "convencao", "media")
+        if para not in ("media", "soma"):
+            raise ValueError(f"para={para!r}")
+        if atual == para:
+            return float(taxa)
+        return float(taxa * self.n_ram) if para == "media" else float(taxa / self.n_ram)
+
+    def _verificar(self, passo: NDArray[np.float64]) -> None:
+        """Asserção da §4.2, aplicada ao `δ·g` **efetivo** — não ao nominal.
+
+        Verificar o passo efetivo e não `η` é o que importa: `η` pequeno com `δ`
+        explodindo diverge igual, e é justamente o que acontece quando `σ → 0` faz
+        o fator `σ⁻²` da eq. (4.35) crescer sem limite (spec §4.4, razão 3).
+        """
+        self._n_passos += 1
+        if not np.all(np.isfinite(passo)):
+            raise TreinoInstavel(
+                f"passo não finito no passo de treino {self._n_passos}: "
+                f"{passo!r}. Origem provável: δ·∇log π com σ pequena (o fator "
+                f"σ⁻² da eq. 4.35 explode), ou alvo do crítico já contaminado."
+            )
+        if self.c_max is not None:
+            # Multiplica pelo ganho para o teto valer sobre a mudança em `f`, e
+            # não sobre o valor escrito — senão `c_max` significaria coisas
+            # diferentes nas duas convenções.
+            pico = float(np.max(np.abs(passo))) * self.ganho_do_passo
+            if pico > self.c_max:
+                raise TreinoInstavel(
+                    f"passo {pico:.4g} excede c_max={self.c_max} no passo de "
+                    f"treino {self._n_passos}. Pela convenção de média (eq. "
+                    f"4.12) isto é a mudança direta em f, então reduza η ou "
+                    f"recorte δ. Passe c_max=None para desligar a asserção."
+                )
+
+    # -- persistência -------------------------------------------------------
+
+    def _config(self) -> dict:
+        """Tudo que não é conteúdo de memória. Vai junto no arquivo.
+
+        Guardar o **mapeamento** e não a semente é deliberado: `randperm` depende
+        da implementação do gerador, e um `numpy` futuro pode sortear diferente
+        para a mesma semente. Um checkpoint que muda de significado com a versão
+        da biblioteca é pior que um checkpoint grande — e a SPEC-03 já mediu que o
+        mapeamento é ~20 % do footprint, então o custo é conhecido, não surpresa.
+        """
+        return {
+            "classe": type(self).__name__,
+            "n_bits": self.n_bits,
+            "tamanho_tupla": self.tamanho_tupla,
+            "n_saidas": self.n_saidas,
+            "c_max": self.c_max,
+            "convencao": getattr(self, "convencao", "media"),
+            "phi": getattr(self, "phi", None),
+        }
+
+    def salvar(self, caminho) -> None:
+        """Grava num `.npz`, achatando a memória esparsa em vetores paralelos.
+
+        Formato: para cada RAM, os endereços e os valores em arrays separados,
+        mais um vetor de contagens que diz onde cada RAM começa. É o mesmo
+        princípio da `LUTOrdenada` da SPEC-03 — chaves e valores lado a lado —, e
+        deixa o arquivo legível por qualquer coisa que leia `npz`, sem `pickle`.
+        """
+        import json
+
+        enderecos, valores, contadores, tamanhos = [], [], [], []
+        for m in self.memoria:
+            tamanhos.append(len(m))
+            for chave, v in m.items():
+                enderecos.append(chave)
+                if isinstance(v, tuple):          # crítico: (valor, contador)
+                    valores.append(v[0])
+                    contadores.append(v[1])
+                else:
+                    valores.append(v)
+        dados = {
+            "config": np.array(json.dumps(self._config())),
+            "mapeamento": np.concatenate(self.mapeamento).astype(np.int64),
+            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento], np.int64),
+            "tamanhos_ram": np.array(tamanhos, np.int64),
+            "enderecos": np.array(enderecos, np.uint64) if enderecos
+                         else np.zeros(0, np.uint64),
+            "valores": (np.stack(valores) if valores
+                        else np.zeros((0, self.n_saidas))),
+        }
+        if contadores:
+            dados["contadores"] = np.stack(contadores)
+        np.savez_compressed(caminho, **dados)
+
+    @classmethod
+    def carregar(cls, caminho):
+        """Reconstrói a rede. Devolve a **classe gravada**, não `cls`.
+
+        Assim `RedeGradienteFuncional.carregar` sobre um arquivo de crítico
+        devolve o crítico, em vez de montar silenciosamente a rede errada.
+        """
+        import json
+
+        z = np.load(caminho, allow_pickle=False)
+        cfg = json.loads(str(z["config"]))
+        alvo = {c.__name__: c for c in (RedeGradienteFuncional,
+                                        RedeRegressaoEsquecimento)}[cfg["classe"]]
+
+        kwargs = dict(n_bits=cfg["n_bits"], tamanho_tupla=cfg["tamanho_tupla"],
+                      n_saidas=cfg["n_saidas"], c_max=cfg["c_max"])
+        if alvo is RedeGradienteFuncional:
+            kwargs["convencao"] = cfg["convencao"]
+        else:
+            kwargs["phi"] = cfg["phi"]
+        rede = alvo(**kwargs)
+
+        # mapeamento gravado, não re-sorteado
+        corte = np.cumsum(z["tamanhos_tupla"])[:-1]
+        rede.mapeamento = np.split(z["mapeamento"], corte)
+        rede.n_ram = len(rede.mapeamento)
+        rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
+                           for t in rede.mapeamento]
+
+        rede.memoria = [{} for _ in range(rede.n_ram)]
+        tem_cont = "contadores" in z
+        i = 0
+        for r, n in enumerate(z["tamanhos_ram"]):
+            for _ in range(int(n)):
+                chave = int(z["enderecos"][i])
+                if tem_cont:
+                    rede.memoria[r][chave] = (z["valores"][i].copy(),
+                                              z["contadores"][i].copy())
+                else:
+                    rede.memoria[r][chave] = z["valores"][i].copy()
+                i += 1
+        return rede
 
     def entradas_ocupadas(self) -> int:
         """Posições de memória efetivamente escritas, somadas sobre as RAMs.
@@ -256,8 +446,26 @@ class RedeGradienteFuncional(_RedeNTupla):
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 seed: int = 0) -> None:
-        super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
+                 seed: int = 0, c_max: float | None = None,
+                 convencao: str = "media") -> None:
+        super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
+        if convencao not in ("media", "soma"):
+            raise ValueError(f"convencao={convencao!r}, esperado 'media' ou 'soma'")
+        self.convencao = convencao
+        """`media` (eq. 4.12, padrão) ou `soma` — as **duas convenções
+        incompatíveis** que a SPEC-05 §4.2 discute, agora selecionáveis.
+
+            media   `f(x) = (1/N) Σ_i v[i](x)`     somar `η·g` muda `f` em `η·g`
+            soma    `f(x) = Σ_i v[i](x)`           …muda `f` em `η·N·g`
+
+        A média é a da dissertação e é o padrão. A soma existe porque é o que o
+        `NTNModel` do repositório `anbubus/ntn_neurocomputing_v0` faz —
+        `EmbeddingBag(mode='sum')` — e sem ela não é possível comparar as duas
+        famílias sem trocar duas coisas ao mesmo tempo.
+
+        **Consequência que não é cosmética:** as taxas não são transferíveis entre
+        as convenções sem dividir por `N`. A `taxa_equivalente` abaixo faz a
+        conversão explícita, em vez de deixá-la como pegadinha."""
         # Um dicionário por RAM, espelhando `FunctionalNode{D}` do Ramnet.jl:
         #     struct FunctionalNode{D}; memory::Dict{UInt,Vector{Float64}}
         # Posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
@@ -281,7 +489,7 @@ class RedeGradienteFuncional(_RedeNTupla):
                 v = self.memoria[i].get(int(e))
                 if v is not None:
                     saida[m] += v
-        return saida / self.n_ram
+        return saida / self.n_ram if self.convencao == "media" else saida
 
     def atualizar(self, bits: NDArray[np.bool_], passo: NDArray[np.float64]) -> None:
         """Eq. (4.11) crua: soma `passo` às `N` posições endereçadas por `x`.
@@ -301,6 +509,7 @@ class RedeGradienteFuncional(_RedeNTupla):
         (4.17), que unifica os dois casos pelo indicador `M[i]_t`.
         """
         passo = np.atleast_1d(np.asarray(passo, dtype=np.float64))
+        self._verificar(passo)
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             v = self.memoria[i].get(chave)
@@ -402,12 +611,17 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 phi: float = 1.0, seed: int = 0) -> None:
+                 phi: float = 1.0, seed: int = 0,
+                 c_max: float | None = None) -> None:
         # §4.2.1: "the forgetting factor, denoted by φ and defined in the [0,1]
         # interval".
         if not 0.0 <= phi <= 1.0:
             raise ValueError(f"phi={phi} fora de [0, 1]")
-        super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
+        # `c_max=None` por padrão, e isso é deliberado: o crítico **acumula** `G`
+        # pela eq. (4.8) e não tem taxa de aprendizado, então um alvo grande é
+        # legítimo — retorno grande é retorno grande. Limitar aqui rejeitaria
+        # dado bom. O que ainda se verifica é finitude, que nunca é legítima.
+        super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
         self.phi = float(phi)
         # Espelha `RegressionNodeMemoryElement{D}` do Ramnet.jl, que guarda
         # `count::Vector{Int}` e `value::Vector{Float64}` — ambos de comprimento
@@ -463,6 +677,7 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         `treinar_componente`.
         """
         alvo = np.atleast_1d(np.asarray(alvo, dtype=np.float64))
+        self._verificar(alvo)
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             item = self.memoria[i].get(chave)
