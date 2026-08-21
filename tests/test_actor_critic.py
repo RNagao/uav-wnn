@@ -217,3 +217,85 @@ def test_o_critico_estima_o_valor_do_estado():
                         for i in range(3)])
     assert np.all(valores < 0), f"valor deveria ser negativo: {valores}"
     assert np.abs(valores - (-sigma)).max() < 0.15, f"escala errada: {valores}"
+
+
+# ---------------------------------------------------------------------------
+# regressão: o aprendizado tem de ATRAVESSAR episódios
+# ---------------------------------------------------------------------------
+
+
+def test_aprendizado_sobrevive_a_troca_de_episodio():
+    """A ocupação de memória só pode **crescer** ao longo do treino.
+
+    ESTE TESTE EXISTE PORQUE A AUSÊNCIA DELE CUSTOU UMA REPRODUÇÃO INTEIRA.
+
+    O `scripts/spec05_mountaincar.py` chamava `reiniciar()` no começo de cada
+    episódio, acreditando que ela só esvaziava a janela de `m` passos. Ela apaga as
+    duas redes. O efeito foi treinar 2000 episódios **independentes**, cada um
+    partindo do zero — e o resultado (retorno ≈ 0, o ótimo local de "não mover o
+    carro") era indistinguível de "o método não funciona". Passei um bom tempo
+    diagnosticando o método antes de olhar o meu próprio laço.
+
+    O sintoma que denunciou é o que este teste verifica: a ocupação **oscilava**
+    nas centenas (188 → 722 → 283 → …) quando um dicionário que só recebe chaves
+    não pode encolher.
+    """
+    import numpy as np
+
+    from uavwnn.rl.actor_critic import AtorCriticoNTupla
+    from uavwnn.rl.politica import PoliticaGaussiana
+    from uavwnn.wnn.redes import RedeGradienteFuncional, RedeRegressaoEsquecimento
+
+    n_bits, tupla = 64, 8
+    ator = RedeGradienteFuncional(n_bits, tupla, n_saidas=1, seed=0, c_max=None)
+    critico = RedeRegressaoEsquecimento(n_bits, tupla, n_saidas=1, phi=0.85, seed=0)
+    ag = AtorCriticoNTupla(politica=PoliticaGaussiana(ator, 0.5), critico=critico,
+                           passos=4, desconto=1.0, taxa=1e-3,
+                           rng=np.random.default_rng(0))
+
+    g = np.random.default_rng(1)
+    ocupacoes = []
+    for _ in range(6):
+        ag.novo_episodio()                      # a chamada CERTA de início
+        for _ in range(10):
+            bits = g.random(n_bits) > 0.5
+            acao = ag.agir(bits)
+            ag.registrar(bits, acao, float(g.normal()))
+            ag.passo_intermediario(g.random(n_bits) > 0.5)
+        ag.fim_de_episodio()
+        ocupacoes.append(ator.entradas_ocupadas())
+
+    assert ocupacoes == sorted(ocupacoes), (
+        f"a ocupação encolheu entre episódios: {ocupacoes}. Alguma coisa está "
+        f"apagando a rede no meio do treino")
+    assert ocupacoes[-1] > ocupacoes[0], (
+        f"a ocupação não cresceu em 6 episódios: {ocupacoes}")
+
+
+def test_reiniciar_apaga_mesmo_e_isso_e_intencional():
+    """A contraparte: `reiniciar` **deve** zerar, e o contrato fica fixado.
+
+    Sem este teste, alguém poderia "consertar" o `reiniciar` para não apagar — e
+    aí a operação de recomeçar uma execução deixaria de existir.
+    """
+    import numpy as np
+
+    from uavwnn.rl.actor_critic import AtorCriticoNTupla
+    from uavwnn.rl.politica import PoliticaGaussiana
+    from uavwnn.wnn.redes import RedeGradienteFuncional, RedeRegressaoEsquecimento
+
+    ator = RedeGradienteFuncional(64, 8, n_saidas=1, seed=0, c_max=None)
+    critico = RedeRegressaoEsquecimento(64, 8, n_saidas=1, phi=0.85, seed=0)
+    ag = AtorCriticoNTupla(politica=PoliticaGaussiana(ator, 0.5), critico=critico,
+                           passos=4, desconto=1.0, taxa=1e-3,
+                           rng=np.random.default_rng(0))
+    g = np.random.default_rng(2)
+    for _ in range(10):
+        bits = g.random(64) > 0.5
+        ag.registrar(bits, ag.agir(bits), float(g.normal()))
+    ag.fim_de_episodio()
+    assert ator.entradas_ocupadas() > 0
+
+    ag.reiniciar()
+    assert ator.entradas_ocupadas() == 0
+    assert critico.entradas_ocupadas() == 0

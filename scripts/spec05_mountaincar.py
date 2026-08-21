@@ -178,7 +178,7 @@ def rodar_ntupla(episodios: int, seed: int, sigma_como_desvio: bool = False,
     retornos, chegadas = [], []
     for ep in range(episodios):
         obs, _ = env.reset(seed=seed * 100_000 + ep)
-        agente.reiniciar()
+        agente.novo_episodio()
         total, chegou = 0.0, False
         while True:
             bits = cod(obs)

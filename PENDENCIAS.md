@@ -454,7 +454,7 @@ por construção: `scripts/spec02_maddpg_*.py` importam `torch` porque é o que 
 pesos publicados de Lamenza. O que a RNF-11 protege é **`src/uavwnn/`**, que está
 limpo e agora tem teste. O critério estava escrito mais forte do que se pretende.
 
-### T-05.4(a) fechada com discrepância — e o que ela deixa de garantir
+### ~~T-05.4(a) fechada com discrepância~~ — RETRATADO, ver abaixo
 
 A reprodução do Katopodis no `MountainCarContinuous-v0` rodou com o orçamento
 publicado (2000 episódios × 10 sementes, §5.4 p.65):
@@ -507,3 +507,72 @@ quatro pontos, e a de treino não sobe com `n`.
 A recomendação de incluir `n = 16` na varredura da SPEC-06 **continua válida**, mas
 pelo argumento de fidelidade à referência — Katopodis usa `n ∈ {16,32,64}` em tarefa
 contínua e o PRD varre `{8,10,12}` — e **não** por esta medição.
+
+---
+
+## Adendo — 2026-08-21 (b): T-05.4(a) reproduz; a "falha" era bug nosso
+
+**Retrata o adendo anterior por inteiro.** O n-tuple **resolve o Mountain Car**:
+
+| | antes | depois da correção | publicado |
+|---|---|---|---|
+| retorno (avaliação) | −0,199 | **96,72** [96,70; 96,75] | 93,3 (92,9; 93,8) |
+| chegada à bandeira | 0,00 % | **100,0 %** (10/10 sementes) | — |
+| MLP (controle negativo) | −0,037 | −0,04 | −0,02 (−0,03; −0,02) |
+
+O excesso é **para cima**: gastamos 3,28 de energia contra 6,70 dele. A explicação
+econômica é que o número dele inclui ~3 % de episódios que não chegam — a conta é
+robusta ao valor assumido para a falha (96,5 % a 97,5 % de chegada implicada), mas
+não é verificável porque ele não publica a taxa.
+
+### O bug, e por que ele passou tanto tempo escondido
+
+`AtorCriticoNTupla.reiniciar()` **apaga as duas redes**. O laço de treino do
+`spec05_mountaincar.py` a chamava a **cada episódio**, acreditando que só esvaziava a
+janela de `m` passos. Foram 2000 episódios independentes, cada um de rede em branco.
+
+O que torna isso perigoso: o resultado — retorno ≈ 0, o ótimo local de "não mover o
+carro" — **é indistinguível de "o método não funciona"**, e é um ótimo local que o
+próprio artigo descreve para a MLP. A falha imitava um resultado plausível.
+
+O sintoma que denunciou não foi métrica de RL nenhuma: foi a **ocupação de memória
+oscilando** (188 → 722 → 283 → …) numa estrutura *append-only*, que não pode
+encolher.
+
+Corrigido: `novo_episodio()` para a operação de início de episódio, aviso na
+docstring do `reiniciar()`, e **teste de regressão** que exige ocupação
+monotonicamente crescente entre episódios — mais o par que fixa o contrato
+destrutivo do `reiniciar` para ninguém "consertá-lo".
+
+### Retratações
+
+- **~~TS5~~ pode não ser o que eu disse.** Registrei que `toy/nav.py` falha por
+  crédito temporal nos dois braços. Aquele brinquedo usa laço inline do
+  `spec05_circular.py`, não o `AtorCriticoNTupla`, então **não** compartilha este
+  bug — mas a lição se aplica: antes de concluir "crédito temporal", auditar o
+  ponto de chamada. Fica **reaberta para reexame**, não fechada.
+- **A varredura de tamanho de tupla está inválida.** Rodou com o bug, medindo
+  aprendizado de um episódio só. A monotonia observada era convergência ao ótimo
+  local dentro do episódio. Refeita.
+- **"O primeiro suspeito é o laço do Algoritmo 4.4" está retirado.** A lista de
+  eliminação estava correta — protocolo, hiperparâmetros, codificador, mapeamento,
+  orçamento, redes —, mas faltava nela **o nosso próprio código de chamada**, que
+  não é componente do método e por isso não estava sendo auditado.
+
+### O que a T-05.4(a) agora entrega
+
+O propósito escrito era *"sem isto, nenhum resultado negativo da SPEC-06 é
+atribuível ao problema"*. **Agora entrega.** O laço continua sem oráculo diferencial
+(`PLANO-TESTES.md` §5, item 1), mas atravessa uma validação de ponta a ponta contra
+número publicado — evidência muito mais forte que inspeção de código.
+
+**TS7 continua aberta:** os dois braços do `spec05_mountaincar.py` usam laços
+diferentes, violando a §4.8. Não invalida a reprodução (cada braço é comparado ao
+**seu** número publicado), mas invalida comparações **entre** os braços.
+
+### A lição, que é a da SPEC-03 outra vez
+
+Antes de atribuir uma discrepância ao método, esgotar as hipóteses sobre o arnês —
+**e o arnês inclui o código de chamada, não só as bibliotecas.** Auditei sete
+componentes do método com evidência documental, extraindo provas do PDF, e o erro
+estava numa linha do meu laço de treino.

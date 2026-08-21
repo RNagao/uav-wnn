@@ -15,7 +15,7 @@ leitura generosa é pior que um critério aberto.
 
 | # | Critério | Estado |
 |---|---|---|
-| 1 | T-05.4(a) — os quatro números do Katopodis | **FECHADO com discrepância diagnosticada**, que é o que o critério admite. O controle negativo (MLP) reproduz o fenômeno: −0,0370 contra −0,02 publicado. O n-tuple **falha**: −0,1989 contra 93,3, com 0,00 % de chegada à bandeira. `reports/spec05-mountaincar.md` — ver (e) |
+| 1 | T-05.4(a) — os quatro números do Katopodis | **FECHADO, e o fenômeno reproduz nos dois braços.** n-tuple **96,72** com **100 % de chegada à bandeira** (publicado 93,3); MLP −0,04 (publicado −0,02). A "falha" anterior era **bug meu no ponto de chamada** — ver (e) |
 | 2 | T-05.4(b) — C2 > C0 com IC separado | **FECHADO.** `Δ = −13,45°`, IC95 % `[−14,53; −12,43]`, 12× o MDE. `reports/spec05-circular.md` |
 | 3 | Pareamento auditável | **FECHADO.** `tests/test_pareamento.py` |
 | 4 | `γ = 0,99` fixo e faixas com procedência | **FECHADO.** `configs/spec05/hiperparametros.toml`, verificado por teste |
@@ -82,7 +82,51 @@ ordem canônica (índice crescente), que é o que `make repro` precisa. A distin
 está em `tests/test_barreira.py`, incluindo um teste que **afirma a desigualdade**
 para que mudá-la seja decisão e não efeito colateral.
 
-### (e) T-05.4(a) não entrega a atribuição que ela existia para garantir
+### (e) T-05.4(a) reproduz — depois de quatro erros nossos, o último deles caro
+
+**O n-tuple resolve o Mountain Car em 100 % dos episódios de avaliação, nas dez
+sementes, com retorno 96,72 contra os 93,3 publicados** — e o excesso é para cima:
+gastamos 3,28 de energia contra 6,70 dele. A MLP fica no ótimo local de não mover o
+carro (−0,04 contra −0,02), que é o contraste que o artigo descreve.
+
+**O erro que custou mais.** `AtorCriticoNTupla.reiniciar()` apaga as duas redes, e o
+laço de treino do script a chamava a **cada episódio**, acreditando que ela só
+esvaziava a janela de `m` passos. Resultado: 2000 episódios **independentes**, cada
+um de rede em branco — e o retorno ≈ 0 que isso produz é **indistinguível de "o
+método não funciona"**.
+
+O sintoma que denunciou não foi nenhuma das métricas de RL: foi a **ocupação de
+memória oscilando** (188 → 722 → 283 → …) numa estrutura que só recebe chaves e
+portanto não pode encolher. Corrigido com `novo_episodio()`, aviso na docstring do
+`reiniciar()`, e teste de regressão que exige ocupação monotonicamente crescente
+entre episódios.
+
+| | antes | depois |
+|---|---|---|
+| retorno (avaliação) | −0,199 | **96,72** |
+| chegada à bandeira | 0,00 % | **100,0 %** |
+
+**Os outros três**, todos corrigidos antes: retornos de treino em vez de avaliação
+determinística (com `Σ = 0,4` o ruído custa `−39,96` por episódio, então o `−0,02`
+publicado é inatingível sob ruído — a MLP foi de −31,86 para −0,04); sinal trocado
+no alvo publicado da nossa própria tabela; e orçamento a 37 % do publicado.
+
+**Confirmação independente do protocolo.** Com o bug corrigido os dois protocolos
+podem ser comparados de frente, e um se refuta: avaliação erra no máximo **3,4**
+(n-tuple +3,4, MLP +0,02); treino erra **31,7** (a MLP o desmonta). O treino é
+tentador — 92,47 fica a 0,43 do limite inferior do n-tuple — e é aí que engana.
+
+**RETRATAÇÕES.** A varredura de tamanho de tupla que eu havia reportado rodou com o
+bug e está **inválida** — media aprendizado de um episódio só. E a conclusão *"o
+primeiro suspeito é o laço do Algoritmo 4.4"* está **retirada**: a lista de
+eliminação estava correta, mas faltava nela o meu próprio ponto de chamada, que não
+é componente do método e por isso não estava sendo auditado.
+
+**A lição, que é a da SPEC-03 outra vez:** antes de atribuir uma discrepância ao
+método, esgotar as hipóteses sobre o arnês — **e o arnês inclui o código de chamada,
+não só as bibliotecas.**
+
+### (e-bis) O que continua sem oráculo, e o que mudou
 
 O propósito escrito do critério 1 é: *"sem isto, nenhum resultado negativo da
 SPEC-06 é atribuível ao problema"*. **Ele entrega isso em parte, e a parte que falta
@@ -129,11 +173,18 @@ com um único ponto de truncamento por episódio. Como o alvo que a MLP reproduz
 ótimo local degenerado que quase qualquer esquema de crédito encontra, reproduzi-lo
 **não é evidência** de que a atribuição de crédito funciona.
 
-**Mitigação levada para a SPEC-06:** o ambiente de Lamenza tem recompensa muito mais
-densa que o Mountain Car — `R_t = (Σ visited − Ns)/Ns` muda a cada coleta —, então o
-regime de quase-ausência de sinal que domina aqui pode não transferir. Isso é razão
-para esperança, não evidência: **se a SPEC-06 der resultado negativo no braço
-n-tuple, a atribuição fica em aberto e o primeiro suspeito é o laço.**
+O laço do Algoritmo 4.4 continua **sem oráculo diferencial** (item 1 da
+`PLANO-TESTES.md` §5), e isso não muda. Mas agora ele atravessa uma validação **de
+ponta a ponta contra número publicado**, o que é evidência muito mais forte que a
+inspeção de código que havia antes.
+
+**O que a T-05.4(a) agora entrega:** um resultado negativo da SPEC-06 no braço
+n-tuple **é** atribuível ao problema, que era o propósito escrito do critério.
+
+**O que continua aberto (TS7):** os dois braços deste script usam laços diferentes,
+violando o *"a única diferença é `f(·)`"* da §4.8. Isso não invalida a reprodução —
+cada braço é comparado ao **seu** número publicado — mas invalida qualquer
+comparação **entre** os braços deste script.
 
 ### Perguntas em aberto que a execução resolveu
 
