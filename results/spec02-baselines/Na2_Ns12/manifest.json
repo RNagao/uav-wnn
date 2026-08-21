@@ -1,0 +1,49 @@
+{
+  "raiz_sementes": 20260809,
+  "n_episodios": 500,
+  "config_env": {
+    "num_drones": 2,
+    "num_sensors": 12,
+    "algorithm_iteration_interval": 0.5,
+    "scenario_size": 100.0,
+    "max_episode_length": 500.0,
+    "max_seconds_stalled": 30,
+    "communication_range": 20.0,
+    "state_num_closest_sensors": 12,
+    "state_num_closest_drones": null,
+    "state_mode": "relative",
+    "id_on_state": true,
+    "min_sensor_priority": 1.0,
+    "max_sensor_priority": 1.0,
+    "full_random_drone_position": false,
+    "reward": "punish",
+    "speed_action": true,
+    "end_when_all_collected": true
+  },
+  "politicas": {
+    "random_uniforme": {
+      "deterministica": false,
+      "familia": "piso"
+    },
+    "guloso": {
+      "deterministica": true,
+      "familia": "heuristica",
+      "velocidade_ms": 15.0
+    },
+    "kmeans_tsp": {
+      "deterministica": true,
+      "familia": "planejador",
+      "reinicios_kmeans": 10,
+      "limite_exato": 12,
+      "gap_heuristico_vs_exato": null,
+      "t_plan_por_agente": {
+        "0": 10.077737678794247,
+        "1": 11.38013260281432
+      }
+    }
+  },
+  "git_commit": "c1267aa",
+  "parede_s": 46.56,
+  "modo": "desempenho",
+  "nota_formato": "episodios em CSV, n\u00e3o parquet \u2014 desvio declarado no docstring de eval/harness.py"
+}

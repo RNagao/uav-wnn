@@ -19,3 +19,7 @@ runs/
 checkpoints/
 *.parquet
 .pytest_cache/
+
+# SPEC-02: grão fino de episódios — dado de máquina, cresce, não vai para o git.
+# `agregado.csv` e `comparacoes.csv` VÃO, para `make repro` dar diff inspecionável.
+results/**/episodios.csv
