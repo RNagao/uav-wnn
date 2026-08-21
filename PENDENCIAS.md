@@ -553,7 +553,8 @@ destrutivo do `reiniciar` para ninguém "consertá-lo".
   ponto de chamada. Fica **reaberta para reexame**, não fechada.
 - **A varredura de tamanho de tupla está inválida.** Rodou com o bug, medindo
   aprendizado de um episódio só. A monotonia observada era convergência ao ótimo
-  local dentro do episódio. Refeita.
+  local dentro do episódio. **Refeita** — ver abaixo, e ela agora responde a
+  pergunta aberta 2.
 - **"O primeiro suspeito é o laço do Algoritmo 4.4" está retirado.** A lista de
   eliminação estava correta — protocolo, hiperparâmetros, codificador, mapeamento,
   orçamento, redes —, mas faltava nela **o nosso próprio código de chamada**, que
@@ -576,3 +577,39 @@ Antes de atribuir uma discrepância ao método, esgotar as hipóteses sobre o ar
 **e o arnês inclui o código de chamada, não só as bibliotecas.** Auditei sete
 componentes do método com evidência documental, extraindo provas do PDF, e o erro
 estava numa linha do meu laço de treino.
+
+### ~~Pergunta aberta 2~~ (faixa de `n`) — RESPONDIDA com a varredura refeita
+
+`n ∈ {8, 16, 32, 64}`, 2000 episódios × 3 sementes, no Mountain Car:
+
+| `n` | N RAMs | retorno | energia | sementes que resolvem |
+|---|---|---|---|---|
+| 8 | 32 | 30,35 | 4,80 | **2 de 3** (uma em −99,37, 0 % de chegada) |
+| 16 | 16 | 96,09 | 3,91 | 3 de 3 |
+| 32 | 8 | 96,55 | 3,45 | 3 de 3 |
+| 64 | 4 | **97,42** | **2,58** | 3 de 3 |
+
+**A média esconde o achado.** O 30,35 de `n = 8` são duas sementes resolvendo e
+**uma falhando por completo** — energia ~99 em 999 passos, isto é `|a| ≈ 1,0`,
+acelerador no fundo sem chegar. É falha de **confiabilidade**, não de qualidade
+média.
+
+**Dois eixos independentes desfavorecem a faixa `{8, 10, 12}` do PRD:**
+
+- *pelo `n`:* `n = 8` foi o único a falhar; `n ≥ 16` foi uniformemente confiável. A
+  faixa do PRD está na borda que quebrou.
+- *pelo `N`:* a falha aqui foi com `N = 32`. No nosso problema (`B ≈ 800`, 25 dims) a
+  faixa do PRD dá `N ∈ {66, 80, 100}` — mais fundo ainda na região que falhou.
+
+**Recomendação para a SPEC-06:** incluir `n = 16` e `n = 32`; tratar `n = 8` como
+ponto de risco a monitorar, não como padrão.
+
+Ressalva de transferência, mantida: 2 dimensões contra as nossas 25, e com 25 pode
+ser *necessário* ter mais RAMs para cobrir a entrada. Katopodis mediu direção
+**oposta** entre Mountain Car e Hopper, então o sinal não é universal. Os dois eixos
+concordarem é o mais forte que uma medição em tarefa auxiliar consegue ser.
+
+E agora a direção reproduz de fato o achado da §5.3 dele — *"much more benefited from
+greater model capacity than generalization ability"* — com o significado certo, porque
+os retornos representam **resolver** e não assentar num ótimo local. (A versão
+anterior desta varredura tinha o mesmo sinal e significado oposto.)

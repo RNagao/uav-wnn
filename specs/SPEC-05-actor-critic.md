@@ -117,7 +117,15 @@ podem ser comparados de frente, e um se refuta: avaliação erra no máximo **3,
 tentador — 92,47 fica a 0,43 do limite inferior do n-tuple — e é aí que engana.
 
 **RETRATAÇÕES.** A varredura de tamanho de tupla que eu havia reportado rodou com o
-bug e está **inválida** — media aprendizado de um episódio só. E a conclusão *"o
+bug e está **inválida** — media aprendizado de um episódio só. **Refeita**, ela
+responde a pergunta aberta 2: `n = 8` (32 RAMs) foi o único a falhar — 1 das 3
+sementes em −99,37 com 0 % de chegada —, e `n ≥ 16` resolveu em 100 % das avaliações
+nas três sementes, com energia caindo de 3,91 (`n=16`) para 2,58 (`n=64`).
+**A faixa `{8, 10, 12}` do PRD está na borda que quebrou** — e pelo eixo do número de
+RAMs é pior ainda: no nosso problema (`B ≈ 800`) ela dá `N ∈ {66, 80, 100}`, contra
+os 32 que falharam aqui. Recomendação: **incluir `n = 16` e `n = 32`**, e tratar
+`n = 8` como ponto de risco. Ressalva de transferência mantida: 2 dimensões contra
+as nossas 25, e Katopodis mediu direção oposta entre Mountain Car e Hopper. E a conclusão *"o
 primeiro suspeito é o laço do Algoritmo 4.4"* está **retirada**: a lista de
 eliminação estava correta, mas faltava nela o meu próprio ponto de chamada, que não
 é componente do método e por isso não estava sendo auditado.

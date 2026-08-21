@@ -142,7 +142,7 @@ distância entre os dois é da ordem de 97 pontos de retorno.
 **A varredura de tamanho de tupla que reportei antes está inválida.** Ela rodou com
 o bug, então media aprendizado de **um episódio só**, e a monotonia que observei
 (−1,73 → −0,01 com `n` crescente) era convergência para o ótimo local dentro de um
-episódio, não desempenho de tarefa. Refeita com a correção; ver `spec05-mountaincar-tupla.json`.
+episódio, não desempenho de tarefa. Refeita; ver a seção seguinte.
 
 **A conclusão "o primeiro suspeito é o laço do Algoritmo 4.4" está retirada.** Eu a
 escrevi depois de eliminar protocolo, hiperparâmetros, codificador, mapeamento,
@@ -156,6 +156,70 @@ avaliações.
 `PLANO-TESTES.md` §5). Mas agora há uma validação **de ponta a ponta contra número
 publicado** que ele atravessa, o que é evidência bem mais forte que a inspeção de
 código que eu tinha antes.
+
+## A varredura de tamanho de tupla, refeita com dados válidos
+
+2000 episódios × 3 sementes por ponto, hiperparâmetros da A.3 salvo `tamanho_tupla`:
+
+| `n` | N RAMs | retorno | energia | chegada | sementes que resolvem | pior semente |
+|---|---|---|---|---|---|---|
+| 8 | 32 | 30,35 | 4,80 | 66,7 % | **2 de 3** | **−99,37** |
+| 16 | 16 | 96,09 | 3,91 | 100 % | 3 de 3 | 95,76 |
+| 32 | 8 | 96,55 | 3,45 | 100 % | 3 de 3 | 95,97 |
+| 64 | 4 | **97,42** | **2,58** | 100 % | 3 de 3 | 97,25 |
+
+Duas leituras, e a segunda é a que interessa.
+
+**A média esconde o achado.** O `30,35` de `n = 8` não é "desempenho intermediário":
+são duas sementes resolvendo (94,99 e 95,42) e **uma falhando por completo**
+(−99,37, com 0 % de chegada). Energia ~99 em 999 passos significa `|a| ≈ 1,0` — o
+acelerador no fundo, oscilando sem nunca chegar. É falha de **confiabilidade**, não
+de qualidade média, e reportar só a média a tornaria invisível.
+
+**Entre as configurações confiáveis, tupla maior é levemente mais eficiente**: a
+energia gasta cai de 3,91 para 2,58 indo de `n = 16` a `n = 64`. Agora sim a direção
+reproduz o achado da §5.3 do Katopodis — *"agents are much more benefited from
+greater model capacity than generalization ability"* —, e desta vez com o
+significado certo, porque os retornos representam **resolver a tarefa** e não
+assentar num ótimo local.
+
+Ressalva de amostra: 3 sementes por ponto é pouco para afirmar confiabilidade. O que
+se pode dizer é que `n = 8` produziu uma falha total e `n ≥ 16` não produziu nenhuma,
+em 9 execuções.
+
+## Isto responde a pergunta aberta 2 — e a resposta desfavorece a faixa do PRD
+
+> *"`n` deve ser estendido para 16 ou 32 na varredura da SPEC-06? O PRD varre
+> `{8, 10, 12}`, todo abaixo da faixa dele."*
+
+**Sim, e por dois caminhos independentes que apontam para o mesmo lado.**
+
+*Pelo eixo `n` (capacidade por RAM, `2^n`):* `n = 8` foi o único a falhar; `n ≥ 16`
+foi uniformemente confiável. A faixa `{8, 10, 12}` do PRD está justamente na borda
+que quebrou.
+
+*Pelo eixo `N` (número de RAMs):* a falha aqui aconteceu com `N = 32`. No nosso
+problema, com `B ≈ 800` bits em 25 dimensões, a faixa do PRD dá:
+
+| `n` | N no nosso problema |
+|---|---|
+| 8 | 100 |
+| 10 | 80 |
+| **12** | **66** |
+| 16 | 50 |
+| 32 | 25 |
+
+Toda a faixa do PRD cai **mais fundo** na região que falhou aqui — `n = 12` já dá 66
+RAMs, o dobro dos 32 que quebraram.
+
+**A ressalva de transferência continua séria e é o motivo de isto não ser
+conclusivo:** foram 2 dimensões contra as nossas 25, e com 25 dimensões pode ser
+*necessário* ter mais RAMs para cobrir a entrada. Katopodis mediu direção **oposta**
+entre as duas tarefas contínuas dele (maior no Mountain Car, menor no Hopper), então
+o sinal não é universal. Mas os dois eixos concordarem é o mais forte que uma
+medição em tarefa auxiliar consegue ser, e a recomendação fica: **incluir `n = 16` e
+`n = 32` na varredura da SPEC-06, e tratar `n = 8` como ponto de risco a monitorar,
+não como padrão.**
 
 ## Um defeito de pareamento que continua aberto (TS7)
 
