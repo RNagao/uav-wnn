@@ -63,7 +63,12 @@ class Aproximador(Protocol):
     um passo de Adam sobre perda quadrática."""
 
     def custo(self) -> dict[str, Any]: ...
-    """Instrumentação de T1/T3 — parâmetros, bytes, multiplicações fp."""
+    """Instrumentação de T1/T3 — **vinda do harness da SPEC-03** (T-05.7).
+
+    Os dois lados chamam `uavwnn.custo`, e não uma contagem própria. O motivo é
+    concreto: duas implementações da mesma grandeza divergem em silêncio, e a
+    que fica no relatório é a que alguém lembrou de atualizar. Aqui há uma só.
+    """
 
 
 # --------------------------------------------------------------------------
@@ -103,14 +108,30 @@ class MlpAprox:
         self._opt_c.passo(self.critico.parametros(),
                           self.critico.gradientes(x, np.array([[erro]])))
 
+    @property
+    def camadas(self) -> list[int]:
+        return [self.n_bits_ou_dim, self.oculta, self.oculta, D_ATOR]
+
     def custo(self) -> dict[str, Any]:
+        """T1 e T3 pelo harness da SPEC-03. `custo_mlp` conta pesos **e vieses**;
+        `operacoes_mlp` é reportada nas mesmas duas linhas do lado n-tupla, para
+        que a comparação de `mult_fp_aproximador` seja entre iguais."""
+        from ..custo import custo_mlp, operacoes_mlp
+
+        mem = custo_mlp(self.camadas, rotulo="MLP pareada (ator)")
+        so_rede = operacoes_mlp(self.camadas, incluir_amostragem=False)
+        ops = operacoes_mlp(self.camadas)
         return {
             "familia": "mlp",
+            "arquitetura": "→".join(str(c) for c in self.camadas),
             "params_ator": self.ator.n_parametros(),
-            "bytes_ator_fp32": self.ator.bytes_fp32(),
             "params_critico": self.critico.n_parametros(),
-            "mult_fp_ator": self.ator.multiplicacoes_fp(),
-            "arquitetura": f"{self.n_bits_ou_dim}→{self.oculta}→{self.oculta}→{D_ATOR}",
+            "bytes_persistente": mem.persistente,
+            "bytes_residente": mem.residente,
+            "mult_fp_aproximador": so_rede.mult_fp,
+            "soma_fp_aproximador": so_rede.soma_fp,
+            "mult_fp_caminho_completo": ops.mult_fp,    # o MESMO amostrador
+            "detalhe_memoria": mem.detalhe,
         }
 
 
@@ -125,12 +146,33 @@ class NTuplaAprox:
     """`φ = 0,85` foi o melhor nas quatro tarefas do apêndice A."""
     taxa_ator: float = 2e-3
     seed: int = 0
+    c_max: float | None = 0.5
+    """Asserção de estabilidade da §4.2, **ligada aqui** e não na rede.
+
+    É neste ponto que o gradiente de política entra na tabela, e é exatamente
+    onde a divergência da RNF-01 foi medida (`η = 0,05` com `N = 48` divergindo
+    para NaN no protótipo). O `0,5` vem do `c ≲ 0,5` de lá; a convenção de média
+    da eq. (4.12) é o que torna o teto exato, porque somar `passo` às `N`
+    posições endereçadas muda `f` em exatamente `passo`.
+
+    `None` desliga, e desligar tem de ser decisão explícita de quem monta o
+    agente — não o padrão."""
+    variante_lut: str = "hash"
+    """Estratégia de armazenamento, das três medidas na SPEC-03. `hash` é o
+    padrão porque é a que o RNF-10 discute; `ordenado` mediu ~2× menos."""
+    n_dims_codificador: int = 0
+    limiares_por_dim: int = 0
+    """Do codificador, que vive FORA do aproximador. Zero por padrão, e isso é
+    uma lacuna declarada: os limiares do termômetro quantil (E2) são estado
+    persistente, e omiti-los **infla a nossa vantagem**. Quem monta o agente com
+    um codificador ajustado tem de preencher os dois."""
 
     def __post_init__(self) -> None:
         from ..wnn import RedeGradienteFuncional, RedeRegressaoEsquecimento
 
         self.ator = RedeGradienteFuncional(
-            self.n_bits, self.tamanho_tupla, n_saidas=D_ATOR, seed=self.seed)
+            self.n_bits, self.tamanho_tupla, n_saidas=D_ATOR, seed=self.seed,
+            c_max=self.c_max)
         self.critico = RedeRegressaoEsquecimento(
             self.n_bits, self.tamanho_tupla, n_saidas=1, phi=self.phi,
             seed=self.seed)
@@ -152,14 +194,53 @@ class NTuplaAprox:
         self.critico.treinar(np.atleast_2d(x), np.array([float(alvo)]))
 
     def custo(self) -> dict[str, Any]:
+        """T1 e T3 pelo harness da SPEC-03, via a porta esparsa de T-05.7.
+
+        A contagem sai em TRÊS linhas, e a separação não é cosmética — é o que o
+        PRD §5.5 exige depois de a alegação ter sido reescrita:
+
+        > A alegação verificável é sobre multiplicações, e sobre **o
+        > aproximador** — o codificador e o amostrador entram na conta em linhas
+        > próprias.
+
+        `mult_fp_aproximador` é **zero**, e é a alegação central de H1. O caminho
+        completo não é zero: o amostrador faz Box-Muller (`sqrt`, `log`, `sin`,
+        `cos`) e um `atan2`, e isso é **comum aos dois braços** — atribuí-lo à
+        n-tupla ou omiti-lo do lado da MLP falsearia a comparação nas duas
+        direções. O codificador domina o resto, como a SPEC-01 T-01.7 previu.
+        """
+        from ..custo import custo_ntuple_de_rede, operacoes_ntuple
+
+        mem = custo_ntuple_de_rede(
+            self.ator, variante=self.variante_lut,
+            n_dims=self.n_dims_codificador,
+            limiares_por_dim=self.limiares_por_dim,
+            rotulo="n-tuple (ator)")
+        so_rede = operacoes_ntuple(
+            self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+            incluir_codificador=False, incluir_amostragem=False)
+        ops = operacoes_ntuple(
+            self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+            n_dims=self.n_dims_codificador, n_niveis=self.limiares_por_dim,
+            incluir_codificador=self.limiares_por_dim > 0)
         return {
             "familia": "n-tuple",
-            "ocupadas_ator": self.ator.entradas_ocupadas(),
-            "ocupadas_critico": self.critico.entradas_ocupadas(),
             "n_ram": self.ator.n_ram,
             "tamanho_tupla": self.tamanho_tupla,
-            "mult_fp_ator": 0,
             "phi": self.phi,
+            "variante_lut": self.variante_lut,
+            "ocupadas_ator": self.ator.entradas_ocupadas(),
+            "ocupadas_critico": self.critico.entradas_ocupadas(),
+            "bytes_persistente": mem.persistente,
+            "bytes_residente": mem.residente,
+            "mult_fp_aproximador": so_rede.mult_fp,     # a alegação de H1: zero
+            "soma_fp_aproximador": so_rede.soma_fp,
+            "mult_fp_caminho_completo": ops.mult_fp,    # inclui o amostrador
+            "comparacoes_caminho_completo": ops.comparacoes,
+            "lookups_ator": ops.lookups,
+            "op_bits_ator": ops.op_bits,
+            "codificador_contado": self.limiares_por_dim > 0,
+            "detalhe_memoria": mem.detalhe,
         }
 
 

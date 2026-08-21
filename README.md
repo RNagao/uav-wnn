@@ -244,6 +244,9 @@ uv run pytest -q                    # 18 testes, ~1 min
 | `spec03_custo.py` | harness de custo: T1 (tamanho) e T3 (operações) |
 | `spec04_diferencial.py` · `spec04_diferencial_redes.py` | testes diferenciais contra o `Ramnet.jl` do Katopodis |
 | `replica_katopodis_52.py` | replica §5.2.2 da dissertação: circular vs termômetro |
+| **`spec05_circular.py`** | **portão da SPEC-05**: normal projetada contra gaussiana simples, em três instrumentos. Sai com código 0 só se o C2 vencer com IC separado |
+| **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
+| **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
 | **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
 | **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
 | **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |
@@ -253,6 +256,13 @@ uv run python scripts/spec00_demo.py --policy smart --plot traj.png
 uv run python scripts/spec00_demo.py --compare greedy-vs-smart.png
 uv run python scripts/spec00_demo.py --agents 2 --sensors 12 --estilo lamenza --plot path-a2s12.png
 uv run python scripts/spec00_visualizar.py --policy greedy
+
+# SPEC-05 — o portão da ação circular. Código de saída 0 só se o C2 vencer.
+uv run python scripts/spec05_circular.py --sementes 3 --tentativas 20000
+
+# SPEC-05 — reprodução do Katopodis e canal de identidade (rodam em ~1 h cada)
+uv run python scripts/spec05_mountaincar.py --episodios 1500 --sementes 5
+uv run python scripts/spec05_identidade.py --tentativas 15000 --sementes 3
 
 # baseline MADDPG (ver a seção própria acima)
 uv run --group baseline python scripts/spec02_maddpg_campanha.py --so-resumo

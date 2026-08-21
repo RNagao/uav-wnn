@@ -7,6 +7,100 @@
 ---
 
 
+## 0-quater. Fechamento da spec (2026-08-21)
+
+Estado por critério de saída, e **quatro correções que a execução impôs aos
+próprios critérios**. Elas estão aqui em cima porque um critério satisfeito por
+leitura generosa é pior que um critério aberto.
+
+| # | Critério | Estado |
+|---|---|---|
+| 1 | T-05.4(a) — os quatro números do Katopodis | `scripts/spec05_mountaincar.py`, hiperparâmetros A.3/A.6 verbatim; discrepância diagnosticada por escrito |
+| 2 | T-05.4(b) — C2 > C0 com IC separado | **FECHADO.** `Δ = −13,45°`, IC95 % `[−14,53; −12,43]`, 12× o MDE. `reports/spec05-circular.md` |
+| 3 | Pareamento auditável | **FECHADO.** `tests/test_pareamento.py` |
+| 4 | `γ = 0,99` fixo e faixas com procedência | **FECHADO.** `configs/spec05/hiperparametros.toml`, verificado por teste |
+| 5 | Sem PyTorch fora de `tests/` | **FECHADO com redação corrigida** — ver (b) |
+| 6 | Asserção de estabilidade ativa, com caso que aborta | **FECHADO.** `TreinoInstavel`; ligada em `NTuplaAprox`, não na rede — ver (c) |
+| 7 | Determinismo com `Na > 1` e ordens diferentes | **FECHADO em parte, com achado** — ver (d) |
+| 8 | Relatório curto | `reports/spec05-circular.md`, `spec05-identidade.md`, `spec05-mountaincar.md` |
+| 9 | PRD atualizado em dois pontos | **FECHADO.** `PRD.md` §5.5, RNF-05, RNF-11 e a linha de risco |
+
+### (a) O primeiro portão media exploração, não parametrização
+
+A T-05.4(b) começou apenas no brinquedo sequencial `toy/nav.py` e deu
+**inconclusivo com os dois braços piores que rumo aleatório** (150° de erro, 3–8 %
+de sucesso). Diagnóstico: `δ ≈ −19` constante, porque com sucesso quase nulo o
+retorno vale ≈ −60 **qualquer que seja o rumo** e o gradiente não carrega direção.
+
+O portão foi decomposto em três instrumentos — bandido fixo, bandido contextual,
+nav sequencial — e **só o contextual decide**, porque é o único em que os dois
+braços demonstravelmente aprendem. Um braço que não aprende não é evidência sobre
+o outro, e um empate entre dois fracassos não é empate.
+
+O nav sequencial permanece **pendência aberta**: a política ótima analítica faz
+7,86 passos com 100 % de sucesso, então o brinquedo é resolvível e a falha é de
+crédito temporal — nos dois braços. Fica registrado, fora do veredito.
+
+### (b) O critério 5 estava escrito mais forte do que se pretende
+
+"Nenhuma dependência de PyTorch fora de `tests/`" é violado **por construção**:
+`scripts/spec02_maddpg_*.py` importam `torch` porque é o que lê os pesos publicados
+de Lamenza, e o baseline MADDPG não existe sem eles. O que a regra protege é a
+**nossa** implementação, e `src/uavwnn/` está limpo — verificado por teste
+(`test_src_nao_importa_torch`), que é a leitura que RNF-11 de fato exige.
+
+### (c) A asserção da §4.2 não pode viver na rede
+
+Ligar `c_max = 0,5` em `RedeGradienteFuncional` **aborta 13 testes existentes**: os
+diferenciais alimentam gradientes arbitrários para casar bit a bit com o
+`Ramnet.jl`, e os de identidade usam passo unitário para sondar as eqs. (4.16) e
+(4.22). Essa validação contra o Julia é a evidência mais forte do projeto.
+
+A asserção foi movida para `NTuplaAprox` — o ponto onde o gradiente de política de
+fato entra na tabela, e onde a divergência da RNF-01 foi **medida**. A rede é
+primitiva de uso geral e não policia quem a chama. Um teste garante que o padrão
+não seja invertido por descuido.
+
+### (d) Invariância à ordem é inatingível para o crítico com esquecimento
+
+O critério 7 pede tabelas idênticas "inclusive com `Na > 1` e **ordens de evento
+diferentes**". Medido, isso é impossível, e a razão é aritmética:
+
+    ator      `v ← v + passo`        soma, COMUTA
+    crítico   `v ← φ·v + alvo`       NÃO comuta
+
+Com dois agentes escrevendo na mesma posição no mesmo tique,
+`(φv + a₁)φ + a₂ ≠ (φv + a₂)φ + a₁`, e a diferença é exatamente `(φ−1)(a₁−a₂)`.
+**A colisão é o regime normal, não o de canto:** com `Na = 4` e `R = 1`, só 18 %
+das RAMs leem bit de índice, então nas outras 82 % dois agentes com a mesma
+observação posicional endereçam a mesma posição.
+
+Invariância exigiria acumular os alvos por endereço dentro do tique e aplicar `φ`
+uma vez só — o que muda a eq. (4.8) de "por observação" para "por tique", desvio
+de método e não detalhe de implementação. **O que se entrega é determinismo** com
+ordem canônica (índice crescente), que é o que `make repro` precisa. A distinção
+está em `tests/test_barreira.py`, incluindo um teste que **afirma a desigualdade**
+para que mudá-la seja decisão e não efeito colateral.
+
+### Perguntas em aberto que a execução resolveu
+
+- **Nº 3** (variância do Hopper, 0,2 ou 0,3): a tabela A.3 diz **0,3**. A
+  inconsistência é entre o texto da §5.3 e o apêndice, não dentro do apêndice.
+  Qual reproduz o número publicado fica sem resposta sem rodar o Hopper (MuJoCo,
+  fora do orçamento — a própria T-05.4(a) o trata como condicional).
+- **Nº 6** (cronograma do anelamento de `σ_s`): **não há anelamento.** Medido um
+  bug na primeira tentativa — `decaimento` conta transições, não episódios, e num
+  brinquedo de 40 passos colapsava `σ` em ~20 episódios. Desligado, porque a
+  avaliação já é determinística (Lamenza §7) e ruído residual de treino não
+  contamina o que é reportado.
+- **T-05.5, cobertura do canal:** a fórmula `p = 1 − (1 − R·Na/B)^n` da §4.7 supõe
+  amostragem **com reposição** por RAM — o que gerou o achado C4. Com mapeamento
+  particionado a conta certa é **hipergeométrica**,
+  `1 − C(B−K,n)/C(B,n)`. Medido, a hipergeométrica bate melhor em 5 das 6
+  configurações; a binomial fica registrada como aproximação, não identidade.
+
+---
+
 ## 0-ter. A dissertação corrige o código do autor em dois pontos (2026-08-15)
 
 A §0-bis tratava o `ContinousFunctionalAC.jl` como referência. Com a leitura da
@@ -420,9 +514,45 @@ Hiperparâmetros do apêndice A.3/A.6 dele, verbatim. O alvo do AC com MLP no Mo
 
 Estender o brinquedo de T-05.4(b) para `Na ∈ {2, 4}` com 4 sensores. Medir:
 
+> **Implementado** em `scripts/spec05_identidade.py`, relatório em
+> `reports/spec05-identidade.md`. Usa o **bandido contextual** de T-05.4(b), e não
+> o `nav` sequencial, porque aquele tem pendência aberta de crédito temporal que
+> afetaria as duas condições e mascararia o efeito de `R`.
+>
+> O brinquedo **exige** diferenciação em vez de só permiti-la: `Na` agentes veem a
+> observação **idêntica** exceto o índice, e o rumo correto do agente `k` é o do
+> sensor `k`. Sem usar o índice, nenhuma política acerta mais de uma das `Na`
+> respostas — então "o canal passou" e "o canal não passou" são separáveis sem
+> ambiguidade.
+
 - `p = 1 − (1 − R·Na/B)^n` teórico contra a fração medida de RAMs que leem ao menos um bit de índice, para `R ∈ {1, 4, 16}`;
+
+> **Correção medida:** esta fórmula supõe que cada RAM sorteie seus `n` bits **com
+> reposição** — a mesma suposição do `NTupleRegressor` do protótipo, que gerou o
+> achado **C4** (bits sem nenhuma RAM lendo). O `mapeamento_particionado` da
+> SPEC-04 **particiona** (`randperm` fatiado, cobertura 1,0 por construção), então
+> a distribuição certa é **hipergeométrica**:
+>
+>     p = 1 − C(B − K, n) / C(B, n),    K = R·Na
+>
+> Amostragem sem reposição contra com reposição. A diferença é pequena quando
+> `K, n ≪ B`, e medida ela favorece a hipergeométrica em 5 das 6 configurações. A
+> binomial fica registrada como **aproximação**, não identidade.
 - efeito de `R` sobre a diferenciação de comportamento (dispersão dos rumos escolhidos por agentes na mesma observação, exceto o índice);
 - determinismo da barreira: mesma semente, duas ordens de evento diferentes → tabelas idênticas bit a bit (**teste automatizado**).
+
+> **Este item é impossível como escrito, e a medição está em
+> `tests/test_barreira.py`.** O ator é invariante à ordem sempre (`v ← v + passo`
+> comuta); o crítico **não pode ser**, porque `v ← φ·v + alvo` não comuta e a
+> diferença entre duas ordens é exatamente `(φ−1)(a₁−a₂)`. A colisão de endereço é
+> o **regime normal**: com `Na = 4` e `R = 1`, apenas 18 % das RAMs leem bit de
+> índice, então nas outras 82 % dois agentes com a mesma observação posicional
+> escrevem na mesma posição.
+>
+> O que se entrega é **determinismo** com ordem canônica (índice crescente), que é
+> o que `make repro` precisa. A distinção entre *determinístico* e *invariante à
+> ordem* está escrita, com um teste que **afirma a desigualdade** para que mudá-la
+> seja decisão consciente e não efeito colateral. Ver §0-quater (d).
 
 ### T-05.6 — Varredura mínima de hiperparâmetros no brinquedo
 

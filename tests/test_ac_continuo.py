@@ -241,10 +241,31 @@ def test_contagem_de_parametros_da_mlp_pareada():
 
 
 def test_wnn_faz_zero_multiplicacoes_e_a_mlp_nao():
-    """O contraste central de T3, agora com os dois lados no mesmo laço."""
+    """O contraste central de T3, agora com os dois lados no mesmo laço.
+
+    A CHAVE MUDOU DE NOME, E A MUDANÇA É SUBSTANTIVA. Este teste checava
+    `mult_fp_ator == 0`, e essa contagem **incluía o amostrador** — Box-Muller
+    (`sqrt`, `log`, `sin`, `cos`) e o `atan2` da normal projetada, que fazem 4
+    multiplicações em ponto flutuante e são **comuns aos dois braços**. O zero
+    passava por acidente da implementação anterior.
+
+    O PRD §5.5 já exige a separação: *"a alegação verificável é sobre
+    multiplicações, e sobre o aproximador — o codificador e o amostrador entram
+    na conta em linhas próprias"*. Então a comparação certa é entre
+    `mult_fp_aproximador`, e o caminho completo é reportado ao lado, não escondido
+    nem atribuído a um dos lados.
+    """
     term = TermometroArtigo(-1.0, 1.0, 8)
-    assert NTuplaAprox(term.n_bits_para(25)).custo()["mult_fp_ator"] == 0
-    assert MlpAprox(25).custo()["mult_fp_ator"] > 1000
+    nt = NTuplaAprox(term.n_bits_para(25)).custo()
+    mlp = MlpAprox(25).custo()
+
+    assert nt["mult_fp_aproximador"] == 0          # a alegação de H1
+    assert mlp["mult_fp_aproximador"] > 1000
+
+    # O amostrador é o MESMO nos dois, e não é zero em nenhum.
+    amostrador_nt = nt["mult_fp_caminho_completo"] - nt["mult_fp_aproximador"]
+    amostrador_mlp = mlp["mult_fp_caminho_completo"] - mlp["mult_fp_aproximador"]
+    assert amostrador_nt == amostrador_mlp > 0
 
 
 # --- pareamento auditável — T-05.6 §3 ----------------------------------

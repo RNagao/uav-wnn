@@ -111,6 +111,20 @@ def mapeamento_particionado(
     return [ordem[i:i + tamanho_tupla] for i in range(0, n_bits, tamanho_tupla)]
 
 
+class TreinoInstavel(RuntimeError):
+    """Divergência detectada durante o treino — asserção obrigatória da §4.2.
+
+    A RNF-01 do PRD nasceu de uma **medição**, não de teoria: no protótipo, `η =
+    0,05` com `N = 48` divergiu para `NaN`. A spec §4.2 registra que *"o modo de
+    falha medido no protótipo foi divergência para NaN; ele precisa de detecção,
+    não de fé"* — esta exceção é essa detecção.
+
+    A mensagem carrega o número do passo e o valor ofensor, porque uma divergência
+    silenciosa numa varredura de hiperparâmetros vira um ponto ruim indistinguível
+    de um ponto legitimamente ruim. Abortar é informação; `NaN` propagado não é.
+    """
+
+
 class _RedeNTupla:
     """Endereçamento comum às duas redes — §3.2.1 (p.22), fig. 3.1 e 3.2.
 
@@ -125,8 +139,33 @@ class _RedeNTupla:
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 seed: int = 0) -> None:
+                 seed: int = 0, c_max: float | None = None) -> None:
         self.n_bits = n_bits
+        self.c_max = c_max
+        """Teto do passo em espaço de saída — asserção da §4.2, `None` desliga.
+
+        PADRÃO `None`, E A RAZÃO NÃO É LENIÊNCIA. Esta classe é primitiva de uso
+        geral, e serve de **oráculo numérico**: os testes diferenciais alimentam
+        gradientes arbitrários para casar bit a bit com o `Ramnet.jl`, e os de
+        identidade usam passo unitário para sondar a estrutura do núcleo (eq.
+        4.16, 4.22). Ligar o teto aqui aborta 13 desses testes por sondas
+        deliberadas de magnitude 1,0 — e a validação contra o Julia é a evidência
+        mais forte que o projeto tem. Uma primitiva não policia quem a chama.
+
+        Quem liga é `NTuplaAprox`, o ponto onde o gradiente de política de fato
+        entra, que é exatamente onde a divergência da RNF-01 foi MEDIDA. Um teste
+        garante que ele não seja desligado por descuido.
+
+        A convenção de **média** da eq. (4.12) é o que torna este teto exato e não
+        heurístico: somar `passo` às `N` posições endereçadas muda `f` em
+        **exatamente** `passo`, porque `f = (1/N) Σ v[i]` e há `N` termos. Então
+        `max|passo| ≤ c_max` É o `η·max|∂c/∂f| ≤ c_max` da spec, sem fator de `N`
+        escondido. Na convenção de soma o mesmo teto valeria `c_max/N` e mudaria
+        a cada ponto da varredura de `N` — o motivo (ii) da decisão da §4.2.
+
+        `0,5` vem do `c ≲ 0,5` da RNF-01.
+        """
+        self._n_passos = 0
         self.tamanho_tupla = tamanho_tupla
         self.n_saidas = n_saidas
         self.mapeamento = mapeamento_particionado(n_bits, tamanho_tupla, seed)
@@ -162,6 +201,30 @@ class _RedeNTupla:
         for i, (tupla, pot) in enumerate(zip(self.mapeamento, self._potencias)):
             saida[:, i] = (bits[:, tupla].astype(np.uint64) * pot).sum(axis=1)
         return saida
+
+    def _verificar(self, passo: NDArray[np.float64]) -> None:
+        """Asserção da §4.2, aplicada ao `δ·g` **efetivo** — não ao nominal.
+
+        Verificar o passo efetivo e não `η` é o que importa: `η` pequeno com `δ`
+        explodindo diverge igual, e é justamente o que acontece quando `σ → 0` faz
+        o fator `σ⁻²` da eq. (4.35) crescer sem limite (spec §4.4, razão 3).
+        """
+        self._n_passos += 1
+        if not np.all(np.isfinite(passo)):
+            raise TreinoInstavel(
+                f"passo não finito no passo de treino {self._n_passos}: "
+                f"{passo!r}. Origem provável: δ·∇log π com σ pequena (o fator "
+                f"σ⁻² da eq. 4.35 explode), ou alvo do crítico já contaminado."
+            )
+        if self.c_max is not None:
+            pico = float(np.max(np.abs(passo)))
+            if pico > self.c_max:
+                raise TreinoInstavel(
+                    f"passo {pico:.4g} excede c_max={self.c_max} no passo de "
+                    f"treino {self._n_passos}. Pela convenção de média (eq. "
+                    f"4.12) isto é a mudança direta em f, então reduza η ou "
+                    f"recorte δ. Passe c_max=None para desligar a asserção."
+                )
 
     def entradas_ocupadas(self) -> int:
         """Posições de memória efetivamente escritas, somadas sobre as RAMs.
@@ -256,8 +319,8 @@ class RedeGradienteFuncional(_RedeNTupla):
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 seed: int = 0) -> None:
-        super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
+                 seed: int = 0, c_max: float | None = None) -> None:
+        super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
         # Um dicionário por RAM, espelhando `FunctionalNode{D}` do Ramnet.jl:
         #     struct FunctionalNode{D}; memory::Dict{UInt,Vector{Float64}}
         # Posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
@@ -301,6 +364,7 @@ class RedeGradienteFuncional(_RedeNTupla):
         (4.17), que unifica os dois casos pelo indicador `M[i]_t`.
         """
         passo = np.atleast_1d(np.asarray(passo, dtype=np.float64))
+        self._verificar(passo)
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             v = self.memoria[i].get(chave)
@@ -402,12 +466,17 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 phi: float = 1.0, seed: int = 0) -> None:
+                 phi: float = 1.0, seed: int = 0,
+                 c_max: float | None = None) -> None:
         # §4.2.1: "the forgetting factor, denoted by φ and defined in the [0,1]
         # interval".
         if not 0.0 <= phi <= 1.0:
             raise ValueError(f"phi={phi} fora de [0, 1]")
-        super().__init__(n_bits, tamanho_tupla, n_saidas, seed)
+        # `c_max=None` por padrão, e isso é deliberado: o crítico **acumula** `G`
+        # pela eq. (4.8) e não tem taxa de aprendizado, então um alvo grande é
+        # legítimo — retorno grande é retorno grande. Limitar aqui rejeitaria
+        # dado bom. O que ainda se verifica é finitude, que nunca é legítima.
+        super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
         self.phi = float(phi)
         # Espelha `RegressionNodeMemoryElement{D}` do Ramnet.jl, que guarda
         # `count::Vector{Int}` e `value::Vector{Float64}` — ambos de comprimento
@@ -463,6 +532,7 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         `treinar_componente`.
         """
         alvo = np.atleast_1d(np.asarray(alvo, dtype=np.float64))
+        self._verificar(alvo)
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
             item = self.memoria[i].get(chave)

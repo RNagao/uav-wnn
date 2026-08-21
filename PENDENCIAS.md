@@ -369,3 +369,87 @@ quase tudo; se aprender só roteamento, ganha 8 %.
 **T-02.9 §7 — sensibilidade a `communication_range`.** O motivo original era
 decidir entre candidatos da P1, que foi fechada na SPEC-00 com o valor lido do
 código (20 m). Continua valendo como análise de robustez.
+
+---
+
+## Adendo — 2026-08-21: SPEC-05 fechada, C1 resolvida por medição
+
+### ~~C1~~ — ação circular. **FECHADA.**
+
+A pendência mais antiga da classe C. Estava marcada como *"falta só validar
+empiricamente"*, e a validação aconteceu — com o critério escrito para **falsificar
+a nossa própria decisão**:
+
+```
+C2 (normal projetada) − C0 (gaussiana simples), erro angular, pareado por alvo
+    Δ = −13,45°    IC95 % [−14,53; −12,43]    MDE 1,06°    n = 400
+    vitória do C2 em 98,5 % dos alvos      Wilcoxon p = 4,4·10⁻⁶⁷
+```
+
+O IC está a 12 MDEs de zero, e o C0 recebeu **quatro concessões** contra
+espantalho: varredura própria de `σ` (que significa coisas diferentes nos dois
+esquemas), varredura própria de taxa, variante centrada em 0,5 (que foi de fato a
+melhor dele e é a que entrou na comparação), e `d = 2` contra `d = 3`.
+
+**O mecanismo, medido em isolamento.** No bandido de alvo fixo o C0 resolve
+*apenas* o alvo em 0° — e a sua curva de recompensa é **exatamente `cos(alvo)`**,
+isto é, ele aponta sempre para 0° e recebe o que a sorte do alvo der. Com `f₁`
+abaixo de zero com margem, **toda** amostra recorta na mesma ação, a recompensa
+deixa de variar, `(r − b) → 0` e o gradiente morre. É zona absorvente: não é
+convergência lenta, é ausência de sinal, e nenhuma quantidade de episódios sai de
+lá.
+
+Consequência a jusante já propagada: `d = 3` para os dois aproximadores, o que
+corrige o PRD §5.5 (arquitetura pareada `D→32→32→3`) e triplica a carga útil por
+posição de memória da WNN.
+
+### Nova — TS5: crédito temporal no brinquedo sequencial
+
+`toy/nav.py` não é resolvido por nenhum dos dois braços (0–8 % de sucesso), embora
+a política ótima analítica faça **7,86 passos com 100 % de sucesso**. Descartados
+por medição: anelamento de `σ` (persiste com `σ` fixa), recompensa esparsa
+(persiste com termo denso de progresso), e a maquinaria de atualização (o bandido
+com a mesma maquinaria aprende perfeitamente).
+
+Resta crédito temporal. **Não bloqueia a SPEC-06** — o portão foi decidido no
+bandido contextual, onde os dois braços aprendem —, mas fica registrado porque o
+ambiente real tem horizonte muito maior (250 decisões) e, se o modo de falha
+transferir, aparecerá lá como "não aprende" sem diagnóstico pronto.
+
+### Nova — TS6: invariância à ordem é inatingível com esquecimento
+
+O critério de saída 7 da SPEC-05 pede tabelas idênticas "inclusive com `Na > 1` e
+**ordens de evento diferentes**". Medido: impossível para o crítico, por aritmética.
+`v ← φ·v + alvo` não comuta, e a diferença entre duas ordens é exatamente
+`(φ−1)(a₁−a₂)`.
+
+E **a colisão de endereço é o regime normal**: com `Na = 4` e `R = 1`, só 18 % das
+RAMs leem bit de índice, então nas outras 82 % dois agentes com a mesma observação
+posicional escrevem na mesma posição.
+
+O que se entrega é **determinismo** com ordem canônica (índice crescente), que é o
+que `make repro` precisa. Invariância exigiria acumular alvos por endereço dentro
+do tique e aplicar `φ` uma vez só — desvio da eq. (4.8), não detalhe de
+implementação. Decisão a tomar se a SPEC-08/09 precisar de replay paralelo.
+
+### Perguntas do artigo resolvidas de passagem
+
+- **Variância do Hopper (0,2 ou 0,3):** a tabela A.3 diz **0,3**. A inconsistência
+  é entre o texto da §5.3 e o apêndice, não dentro do apêndice. Qual reproduz o
+  número publicado só se decide rodando o Hopper (MuJoCo, fora de escopo).
+- **Cronograma do anelamento de `σ_s`:** **não há anelamento.** A primeira
+  tentativa tinha um bug — `decaimento` conta transições, não episódios, e num
+  brinquedo de 40 passos colapsava `σ` em ~20 episódios. Desligado, porque a
+  avaliação já é determinística (Lamenza §7).
+- **Cobertura do canal de identidade:** a fórmula `p = 1 − (1 − R·Na/B)^n` da
+  SPEC-05 §4.7 supõe amostragem **com reposição** por RAM — a mesma suposição que
+  gerou o achado C4. Com mapeamento particionado a conta é **hipergeométrica**.
+  Medida, ela bate melhor em 5 das 6 configurações; a binomial fica como
+  aproximação, não identidade.
+
+### Correção de redação, não de fato
+
+O critério de saída 5 ("nenhuma dependência de PyTorch fora de `tests/`") é violado
+por construção: `scripts/spec02_maddpg_*.py` importam `torch` porque é o que lê os
+pesos publicados de Lamenza. O que a RNF-11 protege é **`src/uavwnn/`**, que está
+limpo e agora tem teste. O critério estava escrito mais forte do que se pretende.

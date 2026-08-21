@@ -178,3 +178,73 @@ class NormalProjetada:
         """
         f = np.asarray(f, float).ravel()
         return float(np.hypot(f[0], f[1]))
+
+
+@dataclass
+class GaussianaSimples:
+    """**C0** — gaussiana direta sobre `(θ_norm, s_norm)`, com recorte.
+
+    É o esquema ingênuo, e existe para ser **comparado e batido**. Só faz sentido
+    manter no repositório porque o critério de saída da SPEC-05 exige que a
+    normal projetada o supere com IC separado: *"se C2 não vencer, a §4.3 estava
+    errada e a decisão precisa ser revista antes da SPEC-06 — não depois"*.
+
+    O MODO DE FALHA, que é específico e mensurável
+
+    Uma política que quer rumo perto de `θ_norm = 0` (ou de 1) tem **metade da
+    massa de probabilidade recortada** na fronteira. Ela não consegue expressar
+    "aponte para leste" sem perder metade das amostras, e o gradiente ali fica
+    viesado para dentro do intervalo — empurrando o rumo para longe da fronteira
+    em vez de para o alvo.
+
+    Com alvos uniformes no círculo, uma fração fixa dos cenários cai exatamente
+    nessa região. É o que o brinquedo de `toy/nav.py` mede.
+
+    Note que `d = 2` aqui, contra `d = 3` da normal projetada. A comparação
+    portanto **favorece o C0 em custo** — uma cabeça de menos por posição de
+    memória —, o que torna uma vitória do C2 mais forte, não mais fraca.
+    """
+
+    sigma: float = 0.10
+    sigma_min: float | None = None
+    decaimento: int = 1
+    _n: int = field(default=0, init=False)
+
+    D = 2
+
+    @property
+    def sigma_corrente(self) -> float:
+        if self.sigma_min is None:
+            return self.sigma
+        frac = min(1.0, self._n / max(1, self.decaimento))
+        return (1 - frac) * self.sigma + frac * self.sigma_min
+
+    def contar_atualizacao(self) -> None:
+        self._n += 1
+
+    @staticmethod
+    def para_acao(z: NDArray[np.float64]) -> Acao:
+        """Recorta as duas componentes em `[0,1]`. **É aqui que o C0 perde.**"""
+        z = np.asarray(z, float).ravel()
+        return Acao(theta_norm=float(np.clip(z[0], 0.0, 1.0)),
+                    s_norm=float(np.clip(z[1], 0.0, 1.0)))
+
+    def media(self, f: NDArray[np.float64]) -> Acao:
+        return self.para_acao(f)
+
+    def amostrar(self, f, rng: np.random.Generator):
+        f = np.asarray(f, float).ravel()
+        z = f + self.sigma_corrente * rng.standard_normal(self.D)
+        return self.para_acao(z), z
+
+    def grad_log(self, f, z) -> NDArray[np.float64]:
+        f = np.asarray(f, float).ravel()
+        z = np.asarray(z, float).ravel()
+        s = self.sigma_corrente
+        return (z - f) / (s * s)
+
+    @staticmethod
+    def concentracao(f: NDArray[np.float64]) -> float:
+        """Não há noção de concentração aqui — `σ` é o único controle. Devolve
+        `nan` para o diagnóstico da §4.3 não fingir que existe."""
+        return float("nan")
