@@ -202,6 +202,32 @@ class _RedeNTupla:
             saida[:, i] = (bits[:, tupla].astype(np.uint64) * pot).sum(axis=1)
         return saida
 
+    @property
+    def ganho_do_passo(self) -> float:
+        """Quanto `f` muda ao somar `passo` às `N` posições endereçadas.
+
+        `1` na convenção de média (é o que torna o teto da §4.2 exato) e `N` na de
+        soma. Existe para que `c_max` signifique **a mesma coisa** nas duas — o
+        limite é sobre a mudança em `f`, não sobre o número que se escreve na
+        memória.
+        """
+        return 1.0 if getattr(self, "convencao", "media") == "media" else self.n_ram
+
+    def taxa_equivalente(self, taxa: float, para: str) -> float:
+        """Converte uma taxa entre as convenções, preservando o passo em `f`.
+
+        Uma taxa `η` na convenção de soma produz o mesmo deslocamento que `η·N` na
+        de média. É a conversão que a §4.2 diz ser necessária para usar os números
+        do apêndice A do Katopodis — e a que a RNF-01 do PRD errou ao prescrever
+        `η = c/N` supondo `‖φ‖² = N`.
+        """
+        atual = getattr(self, "convencao", "media")
+        if para not in ("media", "soma"):
+            raise ValueError(f"para={para!r}")
+        if atual == para:
+            return float(taxa)
+        return float(taxa * self.n_ram) if para == "media" else float(taxa / self.n_ram)
+
     def _verificar(self, passo: NDArray[np.float64]) -> None:
         """Asserção da §4.2, aplicada ao `δ·g` **efetivo** — não ao nominal.
 
@@ -217,7 +243,10 @@ class _RedeNTupla:
                 f"σ⁻² da eq. 4.35 explode), ou alvo do crítico já contaminado."
             )
         if self.c_max is not None:
-            pico = float(np.max(np.abs(passo)))
+            # Multiplica pelo ganho para o teto valer sobre a mudança em `f`, e
+            # não sobre o valor escrito — senão `c_max` significaria coisas
+            # diferentes nas duas convenções.
+            pico = float(np.max(np.abs(passo))) * self.ganho_do_passo
             if pico > self.c_max:
                 raise TreinoInstavel(
                     f"passo {pico:.4g} excede c_max={self.c_max} no passo de "
@@ -319,8 +348,26 @@ class RedeGradienteFuncional(_RedeNTupla):
     """
 
     def __init__(self, n_bits: int, tamanho_tupla: int, n_saidas: int = 1,
-                 seed: int = 0, c_max: float | None = None) -> None:
+                 seed: int = 0, c_max: float | None = None,
+                 convencao: str = "media") -> None:
         super().__init__(n_bits, tamanho_tupla, n_saidas, seed, c_max)
+        if convencao not in ("media", "soma"):
+            raise ValueError(f"convencao={convencao!r}, esperado 'media' ou 'soma'")
+        self.convencao = convencao
+        """`media` (eq. 4.12, padrão) ou `soma` — as **duas convenções
+        incompatíveis** que a SPEC-05 §4.2 discute, agora selecionáveis.
+
+            media   `f(x) = (1/N) Σ_i v[i](x)`     somar `η·g` muda `f` em `η·g`
+            soma    `f(x) = Σ_i v[i](x)`           …muda `f` em `η·N·g`
+
+        A média é a da dissertação e é o padrão. A soma existe porque é o que o
+        `NTNModel` do repositório `anbubus/ntn_neurocomputing_v0` faz —
+        `EmbeddingBag(mode='sum')` — e sem ela não é possível comparar as duas
+        famílias sem trocar duas coisas ao mesmo tempo.
+
+        **Consequência que não é cosmética:** as taxas não são transferíveis entre
+        as convenções sem dividir por `N`. A `taxa_equivalente` abaixo faz a
+        conversão explícita, em vez de deixá-la como pegadinha."""
         # Um dicionário por RAM, espelhando `FunctionalNode{D}` do Ramnet.jl:
         #     struct FunctionalNode{D}; memory::Dict{UInt,Vector{Float64}}
         # Posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
@@ -344,7 +391,7 @@ class RedeGradienteFuncional(_RedeNTupla):
                 v = self.memoria[i].get(int(e))
                 if v is not None:
                     saida[m] += v
-        return saida / self.n_ram
+        return saida / self.n_ram if self.convencao == "media" else saida
 
     def atualizar(self, bits: NDArray[np.bool_], passo: NDArray[np.float64]) -> None:
         """Eq. (4.11) crua: soma `passo` às `N` posições endereçadas por `x`.

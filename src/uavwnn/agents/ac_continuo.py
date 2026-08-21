@@ -244,6 +244,132 @@ class NTuplaAprox:
         }
 
 
+@dataclass
+class NTuplaFuncionalAprox:
+    """**A segunda família WNN** — gradiente funcional nos DOIS lados, convenção
+    de soma. Portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`.
+
+    Existe para que a comparação contra o MADDPG tenha **duas** opções de rede sem
+    peso, e não uma. E não é a nossa com outra roupa: difere em três pontos
+    substantivos, todos verificados no código-fonte deles.
+
+    O QUE VEM DELES, E POR QUE CADA COISA IMPORTA
+
+    1. **Crítico da mesma família do ator.** Eles usam `EmbeddingBag` para os dois
+       (`policy_mem` e `vf_mem`), treinados por autograd. A dissertação usa modelos
+       **diferentes**: gradiente funcional no ator (§4.3.1) e regressão com
+       esquecimento no crítico (§4.2.1) — o que foi o achado que fechou a pendência
+       **C2**. A razão da divergência é o algoritmo: o PPO deles treina ator e
+       crítico por gradiente, então um modelo só serve; o Algoritmo 4.4 acumula
+       retorno no crítico pela eq. (4.8), que é outra operação.
+
+       A §4.5 desta spec já previa esta variante: *"NTRN com esquecimento como
+       primária (fidelidade a D6), variante funcional atrás de uma flag, ambas
+       medidas em T-05.6"*. É esta a variante.
+
+    2. **Convenção de soma**, `mode='sum'`. Ver `RedeGradienteFuncional.convencao`.
+       A consequência prática é que **as taxas deles não são transferíveis** para a
+       nossa convenção de média sem dividir por `N` — `taxa_equivalente` faz a
+       conversão explícita.
+
+    3. **Alocação densa.** `num_embeddings = n_nodes · 2^n` no código deles, o que
+       impõe um teto duro em `n`: com `n = 32` seriam 4,3·10⁹ posições por RAM. É
+       por isso que as configurações deles usam `tuple_size = 8`. Aqui a estrutura
+       é esparsa como a nossa, e a diferença de custo é **medida** pelo harness da
+       SPEC-03 em vez de assumida — `variante_lut="denso"` reproduz o custo deles.
+
+    O QUE **NÃO** VEM DELES, E É DECISÃO DECLARADA
+
+    O `NTNModel` emite `num_outputs`, que no PPO contínuo do RLlib é
+    `2 · dim(ação)` — média **e `log σ`**, isto é, **variância aprendida** (o
+    trecho comentado deles inicializando o segundo bloco em `log(0,5)` confirma).
+    Nós mantemos `σ` fixa, pelas quatro razões da §4.4, e **a política é a mesma
+    nas duas famílias de propósito**: trocar aproximador e política ao mesmo tempo
+    mediria duas coisas. A variância aprendida fica registrada como a diferença
+    remanescente, não importada.
+    """
+
+    n_bits: int
+    tamanho_tupla: int = 8
+    """Padrão 8, que é o que as configurações do repositório deles usam — e o teto
+    prático da alocação densa que eles têm."""
+    taxa_ator: float = 2e-4
+    taxa_critico: float = 2e-4
+    """Na convenção de **soma**. Divida por `N` para comparar com as taxas do
+    apêndice A do Katopodis, que estão na de média."""
+    seed: int = 0
+    c_max: float | None = 0.5
+    variante_lut: str = "hash"
+    """`denso` reproduz o custo de memória da implementação deles (`n_nodes · 2^n`
+    posições alocadas), que é o que limita `n` lá."""
+    n_dims_codificador: int = 0
+    limiares_por_dim: int = 0
+
+    def __post_init__(self) -> None:
+        from ..wnn import RedeGradienteFuncional
+
+        comum = dict(n_bits=self.n_bits, tamanho_tupla=self.tamanho_tupla,
+                     c_max=self.c_max, convencao="soma")
+        # Mesmo mapeamento nos dois, como no `NTNModel`: um `randperm` só, e as
+        # duas `EmbeddingBag` endereçadas pelas MESMAS chaves.
+        self.ator = RedeGradienteFuncional(n_saidas=D_ATOR, seed=self.seed, **comum)
+        self.critico = RedeGradienteFuncional(n_saidas=1, seed=self.seed, **comum)
+
+    def f(self, x):
+        return self.ator.prever(np.atleast_2d(x))[0]
+
+    def v(self, x) -> float:
+        return float(self.critico.prever(np.atleast_2d(x))[0, 0])
+
+    def ascender_ator(self, x, direcao) -> None:
+        self.ator.atualizar(np.atleast_2d(x), self.taxa_ator * np.asarray(direcao))
+
+    def regredir_critico(self, x, alvo: float) -> None:
+        """Passo de gradiente, **não** acumulação.
+
+        É aqui que a diferença de família aparece na aritmética: o crítico da
+        dissertação faz `v ← φ·v + G` (eq. 4.8) e não tem taxa; este faz
+        `Δ = −η(v − alvo)`, que é descida de gradiente sobre erro quadrático — o
+        que o autograd do PPO deles calcularia.
+        """
+        erro = self.v(x) - float(alvo)
+        self.critico.atualizar(np.atleast_2d(x), np.array([-self.taxa_critico * erro]))
+
+    def custo(self) -> dict[str, Any]:
+        from ..custo import custo_ntuple_de_rede, operacoes_ntuple
+
+        mem = custo_ntuple_de_rede(
+            self.ator, variante=self.variante_lut,
+            n_dims=self.n_dims_codificador,
+            limiares_por_dim=self.limiares_por_dim,
+            rotulo="n-tuple funcional (ator)")
+        so_rede = operacoes_ntuple(self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+                                   incluir_codificador=False,
+                                   incluir_amostragem=False)
+        ops = operacoes_ntuple(
+            self.ator.n_ram, self.tamanho_tupla, D_ATOR,
+            n_dims=self.n_dims_codificador, n_niveis=self.limiares_por_dim,
+            incluir_codificador=self.limiares_por_dim > 0)
+        return {
+            "familia": "n-tuple-funcional",
+            "procedencia": "anbubus/ntn_neurocomputing_v0 (NTNModel)",
+            "convencao": "soma",
+            "critico_mesma_familia": True,
+            "n_ram": self.ator.n_ram,
+            "tamanho_tupla": self.tamanho_tupla,
+            "variante_lut": self.variante_lut,
+            "ocupadas_ator": self.ator.entradas_ocupadas(),
+            "ocupadas_critico": self.critico.entradas_ocupadas(),
+            "bytes_persistente": mem.persistente,
+            "bytes_residente": mem.residente,
+            "mult_fp_aproximador": so_rede.mult_fp,
+            "soma_fp_aproximador": so_rede.soma_fp,
+            "mult_fp_caminho_completo": ops.mult_fp,
+            "taxa_ator_em_media": self.ator.taxa_equivalente(self.taxa_ator, "media"),
+            "detalhe_memoria": mem.detalhe,
+        }
+
+
 # --------------------------------------------------------------------------
 
 
@@ -345,3 +471,31 @@ class AtorCriticoContinuo:
             g = r + self.desconto * g
             self._aplicar(x, z, g)
         self._buffer.clear()
+
+
+# --------------------------------------------------------------------------
+
+
+APROXIMADORES = {
+    "mlp": MlpAprox,
+    "ntupla": NTuplaAprox,
+    "ntupla_funcional": NTuplaFuncionalAprox,
+}
+"""As opções selecionáveis por nome, para a comparação contra o MADDPG.
+
+Existe para que escolher aproximador seja **parâmetro**, e não edição de código —
+que é o que garante que os três atravessem o MESMO laço do Algoritmo 4.4, a mesma
+política, a mesma censura e o mesmo bootstrap. Trocar o laço junto com o
+aproximador mediria duas coisas, e é o erro que a §4.8 nomeia.
+
+    mlp                MLP densa, NumPy puro — o controle pareado do MÉTODO
+    ntupla             a nossa: gradiente funcional (§4.3.1) + NTRN com
+                       esquecimento (§4.2.1). **Duas** famílias, convenção de
+                       média, fidelidade à dissertação (pendência C2)
+    ntupla_funcional   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`:
+                       gradiente funcional nos dois lados, convenção de soma
+
+O baseline do PROBLEMA é outro e não entra aqui: o MADDPG de Lamenza, medido dos
+pesos publicados na SPEC-02 (256 × 256, 287-299 KB). Estes três são variações do
+MÉTODO, e a comparação contra o MADDPG usa cada um deles como um braço.
+"""

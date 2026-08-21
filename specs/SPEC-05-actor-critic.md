@@ -485,6 +485,43 @@ Há uma alternativa: usar a **rede funcional** também como crítico, com perda 
 
 **Decisão:** NTRN com esquecimento como **primária** (fidelidade a D6), variante funcional atrás de uma *flag*, ambas medidas em T-05.6. O custo marginal é baixo porque o núcleo esparso é o mesmo.
 
+> **A variante funcional foi implementada (2026-08-21), e ela tem procedência.** É a
+> portagem do `NTNModel` de `anbubus/ntn_neurocomputing_v0` — o repositório do artigo
+> *"Functional gradient descent for n-tuple regression"* (Neurocomputing 500, 2022).
+> Fica como `NTuplaFuncionalAprox`, selecionável por
+> `APROXIMADORES["ntupla_funcional"]`, para a comparação contra o MADDPG ter **duas**
+> opções de rede sem peso em vez de uma.
+>
+> **Três diferenças substantivas**, todas lidas no código-fonte deles:
+>
+> 1. **Crítico da mesma família do ator** — `EmbeddingBag` nos dois (`policy_mem` e
+>    `vf_mem`), treinados por autograd. A dissertação usa modelos **diferentes**
+>    (§4.3.1 no ator, §4.2.1 no crítico), que foi o achado que fechou a pendência
+>    **C2**. A divergência vem do algoritmo: o PPO deles treina os dois por
+>    gradiente; o Algoritmo 4.4 **acumula** retorno no crítico pela eq. (4.8).
+> 2. **Convenção de soma** (`mode='sum'`), contra a de média da eq. (4.12). Agora
+>    selecionável em `RedeGradienteFuncional(convencao=...)`, com
+>    `taxa_equivalente()` fazendo a conversão explícita — e a conta é grande: os
+>    `2·10⁻⁴` deles equivalem a **0,02** na convenção de média, 25× a taxa do
+>    apêndice A.
+> 3. **Alocação densa** — `num_embeddings = n_nodes · 2^n`, o que impõe teto duro em
+>    `n` (com `n = 32` seriam 4,3·10⁹ posições por RAM). É por isso que as
+>    configurações deles usam `tuple_size = 8`. Aqui a estrutura é esparsa, e
+>    `variante_lut="denso"` reproduz o custo deles para medição.
+>
+> **O que NÃO foi importado, e é decisão declarada:** o `NTNModel` emite
+> `2 · dim(ação)` saídas — média **e `log σ`**, isto é **variância aprendida** (o
+> trecho comentado deles inicializando o segundo bloco em `log(0,5)` confirma). Nós
+> mantemos `σ` fixa pelas quatro razões da §4.4, e a política é **a mesma nas duas
+> famílias de propósito**: trocar aproximador e política ao mesmo tempo mediria duas
+> coisas. Fica registrada como a diferença remanescente.
+>
+> **Portagem provada fiel** por teste diferencial contra o PyTorch deles
+> (`tests/test_anbubus.py`, 11 casos): endereçamento idêntico **exato** (inteiros),
+> saída idêntica na convenção de soma, o autograd do `EmbeddingBag` **é** a eq.
+> (4.11), e o `Thermometer` deles **é** o nosso `TermometroArtigo`. O `torch` fica
+> só em `tests/` (grupo `baseline`), e o teste é pulado sem ele.
+
 **Modo de falha do crítico frio.** Uma entrada vista uma única vez tem `s = 1` e devolve o retorno bruto daquela visita: `V` de altíssima variância, e a vantagem `δ = G − V` herda essa variância multiplicada por `η·σ⁻²` no ator. Mitigações a instrumentar: (i) **aquecimento** — `K_warmup` passos com o crítico atualizando e o ator congelado; (ii) encolhimento por confiança para `c` baixo; (iii) monitorar a fração de leituras do crítico que caem em entradas com `c < c_min` por decisão. Entrada nunca endereçada devolve `0`, que na nossa escala de recompensa é **otimista** (estados valem números negativos) — otimismo diante da incerteza, que pode ajudar a exploração ou desestabilizar. É comportamento a medir, não a assumir.
 
 ### 4.6 Interface `Policy` e a ponte

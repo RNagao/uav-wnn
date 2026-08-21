@@ -247,6 +247,27 @@ uv run pytest -q                    # 18 testes, ~1 min
 | **`spec05_circular.py`** | **portão da SPEC-05**: normal projetada contra gaussiana simples, em três instrumentos. Sai com código 0 só se o C2 vencer com IC separado |
 | **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
 | **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
+
+### Os três aproximadores comparáveis contra o MADDPG
+
+`uavwnn.agents.APROXIMADORES` seleciona por nome, e os três atravessam **o mesmo**
+laço do Algoritmo 4.4, a mesma política e o mesmo bootstrap — trocar o laço junto
+com o aproximador mediria duas coisas.
+
+| nome | o que é | crítico | convenção |
+|---|---|---|---|
+| `mlp` | MLP densa `D→32→32→3`, NumPy puro | MLP | — |
+| `ntupla` | **a nossa**: gradiente funcional (§4.3.1) | NTRN com esquecimento (§4.2.1) | média (eq. 4.12) |
+| `ntupla_funcional` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
+
+O baseline do **problema** é outro e não entra nessa tabela: o MADDPG de Lamenza,
+medido dos pesos publicados (256 × 256, 287–299 KB). Estes três são variações do
+**método**, e cada um é um braço da comparação contra ele.
+
+```bash
+# a portagem do NTNModel é verificada contra o PyTorch deles (torch é só de teste)
+uv run --group baseline pytest tests/test_anbubus.py -q
+```
 | **`spec02_baseline_maddpg.py`** | baseline MADDPG: tamanho e latência dos pesos publicados (**precisa `--group baseline`**) |
 | **`spec02_maddpg_rollout.py`** | baseline MADDPG: tempo de conclusão e trajetórias |
 | **`spec02_maddpg_campanha.py`** | baseline MADDPG: `R` runs por cenário, média ± desvio, CSV como cache |
