@@ -10,6 +10,7 @@ controle (Etapa 2) e interseção de covariância entre UAVs (Etapa 3, ainda a
 implementar na SPEC-09), mais a validação NEES/NIS.
 """
 
+from .ambiente_ruidoso import criar_ambiente_ruidoso
 from .bancada import (
     ResultadoFiltragem,
     Trajetoria,
@@ -84,4 +85,5 @@ __all__ = [
     "rodar_filtro",
     "trajetoria_b1",
     "trajetoria_b2",
+    "criar_ambiente_ruidoso",
 ]

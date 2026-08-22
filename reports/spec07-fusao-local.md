@@ -231,11 +231,15 @@ entregue a regra e o `σ_filtrado`; a tabela `T*(σ, degrau)` sai lá.
 
 ## 7. O que não foi feito, e por quê
 
-- **Integração com o `gradysim` (T-07.12, `[C]`).** O ponto de inserção é
-  subclasse do `GrADySEnvironment` sobrescrevendo `observe_simulation_relative_positions`
-  (ARQUITETURA §3). Tudo aqui roda na bancada; a subclasse e o invariante V-7.1
-  (KS sobre o resíduo `e_k` entre B2 e o simulador) entram na SPEC-08, que já
-  precisa da política treinada.
+- **Integração com o `gradysim` (T-07.12).** ✅ **Feita** — a subclasse
+  `criar_ambiente_ruidoso` (`fusion/ambiente_ruidoso.py`) sobrescreve
+  `observe_simulation_relative_positions` sem tocar na física de Lamenza (guard
+  `σ=0` bit-idêntico). Exercitada com o **MADDPG sob ruído** em
+  `reports/spec07-maddpg-ruido.md`, que já é o filtro rodando no ambiente real
+  numa política forte — e onde o detector achou que `Q=0` fica **otimista** no
+  simulador (erro de execução que a bancada não tinha), com `q_w≈1` restaurando a
+  consistência. O invariante V-7.1 (KS sobre o resíduo `e_k` entre a bancada e o
+  simulador) e a sintonia de `Q` por célula ficam para a SPEC-08.
 - **Ablação de inércia.** A configuração nominal é mobilidade sem massa (zero
   desvios). A inércia — que torna `Q` um objeto medido em vez de resíduo de
   discretização — é a ablação declarada de T-07.5, e roda com a política, na
