@@ -132,6 +132,64 @@ RAZAO_CRITICO = (0.25, 1.0, 4.0, 16.0)
 # cobertura, e é isso que o torna uma escolha de orçamento em vez de um atalho.
 
 GRADE = {
+    # --- grade de DESEMPATE: a decisão não decidiu, e disse por quê ---------
+    #
+    # A grade `decisao` (108 corridas) deu Δ = +0,7 pp com IC [-2,9; +3,8] — inclui
+    # zero. Mas separando por regime de estabilidade o quadro é nítido:
+    #
+    #   estável   (passo ≤ 5e-4)   Δ = +4,3 pp  IC [+2,0; +6,3]  11/12 pontos
+    #   instável  (passo = 1,5e-3) Δ = -6,7 pp  IC [-12,3; -1,3]  1/6 pontos
+    #
+    # e o instável não é média comparável: morreram 13/18 corridas da dissertação
+    # contra 8/18 do anbubus, e as mortas entram com a cobertura do momento da
+    # morte. Cada eixo abaixo responde a um achado daquela grade.
+    #
+    # O QUE ENTRA, E POR QUÊ
+    #
+    # `passo` de 3e-4 a 3e-3, cinco níveis. É o eixo da INTERAÇÃO: a dissertação
+    #   pica em 5e-4 e cai; o anbubus sobe monotonicamente (7,7 -> 15,9 -> 18,5 %)
+    #   e ainda estava subindo no topo da faixa. Bracketa os dois ótimos em vez de
+    #   um só — foi exatamente esse viés que fez as 192 corridas antigas (passo =
+    #   2e-4, o único nível onde a dissertação domina os seis pontos) parecerem
+    #   veredito geral.
+    #
+    # `crítico` volta com três níveis, e é o eixo que mais importa aqui: é o único
+    #   em que as duas famílias diferem por construção (φ acumulativo contra taxa
+    #   de descida), nunca foi variado, e é o suspeito da mortalidade. O crítico da
+    #   dissertação acumula pela eq. (4.8), o que produz picos de δ maiores — e é
+    #   δ·∇log π que a assertiva mede. Se for isso, φ = 0,70 estabiliza.
+    #
+    # `T` e `n` voltam com dois níveis. Fixá-los em (16, 12) na grade de decisão
+    #   limitou o melhor ponto a 31 % de cobertura, contra 77,5 % que a grade de
+    #   dois eixos tinha alcançado com outro (T, n).
+    #
+    # O QUE SAI, E A ECONOMIA É MERECIDA
+    #
+    # `normalizar` sai, fixado em False: medido, ele PIORA os dois (dissertação
+    #   15,8 -> 13,5 %, anbubus 14,9 -> 13,2 %). A hipótese de que a estagnação do
+    #   anbubus era artefato do nosso codificador está refutada — era o passo. Sair
+    #   corta a grade pela metade, e essa é a economia paga pela medição.
+    #
+    # `m` fica fixo em 8 e isso é uma LIMITAÇÃO DECLARADA, não uma conclusão: ele
+    #   entra em δ, que é o que dispara a assertiva, então poderia interagir com a
+    #   mortalidade. Cruzá-lo dobraria para 27 h. Fica para a coordenada da T-06.4.
+    #
+    # ORÇAMENTO: 200 mil passos, não 75 mil. Na grade de decisão o SR foi 0 % nas
+    # 108 corridas — ninguém completou um episódio, então ela mediu "quem chega
+    # mais longe antes de desistir", não quem resolve a tarefa. A grade de dois
+    # eixos chegou a 34 % de SR com 200 mil.
+    #
+    #   5 × 2 × 2 × 2 × 3 = 120 pontos × 2 modelos × 3 sementes = 720 corridas
+    #   a 13 min/corrida medidos em 12 processos -> ~13,5 h
+    "desempate": {
+        "passo_efetivo": (3e-4, 5e-4, 8e-4, 1.5e-3, 3e-3),
+        "sigma": (0.20, 0.35),
+        "resolucao": (16, 32),
+        "tupla": (12, 24),
+        "passos_m": (8,),
+        "idx_critico": (0, 1, 2),
+        "normalizar": (False,),
+    },
     # --- grade de DECISÃO: só para escolher entre os dois modelos -----------
     #
     # Não é triagem de hiperparâmetro; é um teste pareado com um objetivo único.
@@ -310,7 +368,8 @@ def uma(args: tuple) -> dict:
         return {"aproximador": aprox, **amostra, "seed_train": seed_train,
                 "abortou": f"montagem: {type(e).__name__}: {e}", "cobertura": 0.0,
                 "sr": 0.0, "ct_cens": float(cfg_av.max_episode_length),
-                "val_cobertura": 0.0, "passos": 0, "parede_s": 0.0}
+                "val_cobertura": 0.0, "passos": 0, "parede_s": 0.0,
+                "b_sweep": b}
 
     cfg_corrida = {"busca": True, "replica": replica, "aproximador": aprox,
                    "na": 1, "ns": 12, "b_sweep": b, **amostra, **det}
@@ -384,6 +443,7 @@ def uma(args: tuple) -> dict:
     final = avaliar(cfg_av, pol, ctx_av, test)
     corrida.gravar_eval_test(final["por_episodio"])
     return {"aproximador": aprox, **amostra, **det, "seed_train": seed_train,
+            "b_sweep": b,
             "passos": passos, "val_cobertura": float(melhor),
             "cobertura": final["cobertura"], "sr": final["sr"],
             "ct_cens": final["ct_cens"], "ct_succ": final["ct_succ"],
@@ -392,6 +452,79 @@ def uma(args: tuple) -> dict:
             "checkpoint_mb": round(sum(
                 f.stat().st_size for f in (corrida.dir / "checkpoints").rglob("*")
                 if f.is_file()) / 1e6, 3)}
+
+
+_EIXOS = frozenset({"id", "passo_efetivo", "sigma", "resolucao", "tupla",
+                    "passos_m", "idx_critico", "normalizar"})
+"""Os eixos que identificam uma corrida, e **só** eles.
+
+O registro de progresso guarda muito mais — `phi`, `taxa_ator`, `n_ram`, as métricas
+— e nada disso pode entrar na chave: `phi` e `taxa_ator` são **derivados** do eixo de
+crítico e do passo por família, então incluí-los faria a chave depender do modelo e
+duas corridas do mesmo ponto nunca casariam. `id` entra porque a busca aleatória
+numera os sorteios e dois sorteios podem coincidir nos valores.
+"""
+
+
+def _chave(rec: dict, eixos) -> tuple:
+    """Identidade de uma corrida: modelo × semente × eixos.
+
+    Ordena os eixos para que a chave não dependa da ordem de inserção do dict — em
+    Python ela é estável, mas o JSON de um arquivo escrito por outra versão do
+    script não precisa preservá-la.
+    """
+    return (rec["aproximador"], rec["seed_train"],
+            tuple(sorted((k, rec[k]) for k in eixos)))
+
+
+def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
+    """Lê o progresso existente e devolve só o que serve para ESTA grade.
+
+    Três filtros, e cada um evita um jeito diferente de contaminar o resultado:
+
+    1. **Orçamento.** Um registro treinado por outro `b_sweep` é outra corrida —
+       o `config_hash` da §4.7 já separa as pastas por isso. Registros sem o campo
+       `b_sweep` vêm de uma versão anterior do script, que não o gravava; são
+       recusados em vez de presumidos, porque presumir aqui misturaria corridas de
+       75 mil passos com as de 200 mil e o comparativo cairia por terra.
+    2. **Pertinência.** Um registro cuja chave não está nas tarefas desta grade
+       sobrou de outra e não entra no relatório final.
+    3. **Duplicidade.** Se o arquivo tem a mesma corrida duas vezes (retomada de
+       retomada), vale a última.
+
+    Corridas ABORTADAS contam como concluídas e **não** são refeitas: o aborto é
+    determinação, não falha de infraestrutura — mesma semente, mesmo ponto, mesmo
+    estouro da assertiva de estabilidade.
+    """
+    alvos = {_chave({"aproximador": t[0], **t[1], "seed_train": t[2]}, t[1].keys())
+             for t in tarefas}
+    bons, notas = {}, []
+    sem_campo = fora_orc = alheios = 0
+    for linha in progresso.read_text().splitlines():
+        if not linha.strip():
+            continue
+        try:
+            x = json.loads(linha)
+        except json.JSONDecodeError:
+            continue          # última linha truncada por um Ctrl-C no meio da escrita
+        if "b_sweep" not in x:
+            sem_campo += 1
+            continue
+        if x["b_sweep"] != b_sweep:
+            fora_orc += 1
+            continue
+        k = _chave(x, x.keys() & _EIXOS)
+        if k not in alvos:
+            alheios += 1
+            continue
+        bons[k] = x
+    if sem_campo:
+        notas.append(f"{sem_campo} sem campo b_sweep (versão antiga) descartadas")
+    if fora_orc:
+        notas.append(f"{fora_orc} de outro orçamento descartadas")
+    if alheios:
+        notas.append(f"{alheios} de outra grade descartadas")
+    return list(bons.values()), " · ".join(notas)
 
 
 def main() -> int:
@@ -412,6 +545,9 @@ def main() -> int:
     ap.add_argument("--seed-busca", type=int, default=20260921)
     ap.add_argument("--raiz", default="runs")
     ap.add_argument("--saida", default="reports/spec06-busca.json")
+    ap.add_argument("--retomar", action="store_true",
+                    help="pula corridas já concluídas no .progresso.jsonl "
+                         "existente, em vez de truncá-lo e refazer tudo")
     a = ap.parse_args()
 
     modelos = a.modelos.split(",")
@@ -460,9 +596,21 @@ def main() -> int:
     # esperar as horas todas.
     progresso = Path(a.saida).with_suffix(".progresso.jsonl")
     progresso.parent.mkdir(parents=True, exist_ok=True)
-    progresso.write_text("")
-    t0 = time.perf_counter()
     res = []
+    if a.retomar and progresso.exists():
+        res, desc = _retomar(progresso, tarefas, a.b_sweep)
+        feitas = {_chave(x, x.keys() & _EIXOS) for x in res}
+        antes = len(tarefas)
+        tarefas = [t for t in tarefas
+                   if _chave({"aproximador": t[0], **t[1], "seed_train": t[2]},
+                             t[1].keys()) not in feitas]
+        print(f"RETOMANDO: {len(res)} corridas aproveitadas de "
+              f"{antes} · {len(tarefas)} a fazer" + (f" · {desc}" if desc else ""))
+        if not tarefas:
+            print("nada a fazer — a grade já está completa.")
+    else:
+        progresso.write_text("")
+    t0 = time.perf_counter()
     with mp.Pool(a.processos) as pool:
         for i, x in enumerate(pool.imap_unordered(uma, tarefas, chunksize=1), 1):
             res.append(x)
