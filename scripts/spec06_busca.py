@@ -108,6 +108,61 @@ RAZAO_CRITICO = (0.25, 1.0, 4.0, 16.0)
 — é o eixo de crítico daquela família."""
 
 
+# --- a grade fatorial, em dois níveis de cardinalidade ---------------------
+#
+# O custo é aritmética, e ele decide o desenho (12 núcleos, ~6,5 min/corrida a
+# 200 mil passos):
+#
+#   completo  passo(3)×σ(3)×T(3)×n(5)×m(4)×crítico(4) = 2 160 pontos
+#             × 2 modelos × 1 semente =  4 320 corridas ->   39 h
+#             × 2 modelos × 3 sementes = 12 960 corridas ->  117 h
+#   reduzido  passo(3)×σ(3)×T(2)×n(3)×m(2)×crítico(2) =   216 pontos
+#             × 2 modelos × 1 semente =    432 corridas ->  3,9 h
+#             × 2 modelos × 3 sementes =  1 296 corridas -> 11,7 h
+#
+# Os dois são **fatoriais completos** — o reduzido não é uma amostra do completo,
+# é o mesmo cruzamento com menos níveis por eixo. A diferença é resolução, não
+# cobertura, e é isso que o torna uma escolha de orçamento em vez de um atalho.
+
+GRADE = {
+    "reduzido": {
+        "passo_efetivo": (2e-4, 5e-4, 1.5e-3),
+        "sigma": (0.20, 0.35, 0.50),
+        "resolucao": (16, 32),
+        "tupla": (8, 12, 24),
+        "passos_m": (8, 16),
+        "idx_critico": (1, 2),
+    },
+    "completo": {
+        # `passo` centrado no vencedor da primeira grade (5e-4 efetivo)
+        "passo_efetivo": (2e-4, 5e-4, 1.5e-3),
+        # `σ` a partir de 0,20, que era o TETO da faixa anterior e onde estava o
+        # degrau — a faixa antiga já foi medida como estrangulada
+        "sigma": (0.20, 0.35, 0.50),
+        "resolucao": (16, 32, 64),
+        "tupla": (8, 12, 16, 24, 32),
+        "passos_m": (4, 8, 16, 32),
+        "idx_critico": (0, 1, 2, 3),
+    },
+}
+
+
+def grade(nivel: str) -> list[dict]:
+    """Produto cartesiano dos seis eixos — a grade **completa** naquele nível.
+
+    Os pontos são **compartilhados** pelos dois modelos, como na busca aleatória:
+    cada configuração tem par exato no outro modelo, e a comparação é pareada por
+    configuração e não só por orçamento.
+    """
+    import itertools
+    eixos = GRADE[nivel]
+    chaves = list(eixos)
+    fora = []
+    for i, combo in enumerate(itertools.product(*(eixos[k] for k in chaves))):
+        fora.append({"id": i, **dict(zip(chaves, combo))})
+    return fora
+
+
 def amostrar(n: int, seed: int = 20260921) -> list[dict]:
     """Sorteia `n` configurações, **compartilhadas** pelos dois modelos.
 
@@ -203,6 +258,18 @@ def uma(args: tuple) -> dict:
             passos += int(info["passos"])
             m = avaliar(cfg_av, pol, ctx_av, val)
             melhor = max(melhor, m["cobertura"])
+            # A curva por avaliação, que a primeira grade NÃO gravava — eu escrevi
+            # um laço próprio e esqueci o `registrar`. Sem ela não há como
+            # distinguir "estabilizou baixo" de "ainda subia quando o orçamento
+            # acabou", que é exatamente o que se precisa saber de um ponto ruim.
+            from uavwnn.campanha import Avaliacao
+            corrida.registrar(Avaliacao(
+                passo=passos, recompensa_media=float(m.get("recompensa_media", 0.0)),
+                sr=float(m["sr"]), ct_cens=float(m["ct_cens"]),
+                ct_succ=float(m["ct_succ"]), cobertura=float(m["cobertura"]),
+                ocupadas=int(ap.ator.entradas_ocupadas()),
+                parede_s=time.perf_counter() - t0,
+                passos_por_s=passos / max(1e-9, time.perf_counter() - t0)))
             if parada.registrar(m["cobertura"]):
                 break
     except Exception as e:
@@ -224,8 +291,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b")
     ap.add_argument("--modelos", default="ntupla,ntupla_funcional")
+    ap.add_argument("--modo", choices=("grade", "aleatoria"), default="grade",
+                    help="`grade` = fatorial completo; `aleatoria` = sorteio")
+    ap.add_argument("--niveis", choices=tuple(GRADE), default="reduzido",
+                    help="cardinalidade da grade fatorial — ver o custo impresso")
     ap.add_argument("--amostras", type=int, default=24,
-                    help="configurações sorteadas, COMPARTILHADAS pelos modelos")
+                    help="só no modo `aleatoria`: sorteios COMPARTILHADOS")
     ap.add_argument("--sementes", type=int, default=3)
     ap.add_argument("--b-sweep", type=int, default=400_000)
     ap.add_argument("--n-val", type=int, default=20)
@@ -237,26 +308,50 @@ def main() -> int:
     a = ap.parse_args()
 
     modelos = a.modelos.split(",")
-    amostras = amostrar(a.amostras, a.seed_busca)
+    if a.modo == "grade":
+        amostras = grade(a.niveis)
+    else:
+        amostras = amostrar(a.amostras, a.seed_busca)
+    # MODELO NO LAÇO INTERNO: o `pool` despacha em ordem, então com o modelo no
+    # laço externo a primeira rede rodaria inteira antes de a segunda começar. O
+    # total seria o mesmo, mas nenhuma leitura parcial seria comparativa —
+    # medido: 15 corridas concluídas, 15 da mesma rede. `chunksize` não resolve:
+    # ele muda o lote, não a ordem.
     tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
-               for m in modelos for s in amostras for sd in range(a.sementes)]
+               for s in amostras for sd in range(a.sementes) for m in modelos]
 
-    print(f"busca aleatória pareada · réplica {a.replica} · Na=1 Ns=12 · sem ruído")
-    print(f"6 eixos · {a.amostras} sorteios COMPARTILHADOS · {len(modelos)} modelos "
+    rot = (f"grade fatorial COMPLETA ({a.niveis})" if a.modo == "grade"
+           else f"busca aleatória ({a.amostras} sorteios)")
+    print(f"{rot} · réplica {a.replica} · Na=1 Ns=12 · sem ruído")
+    print(f"{len(amostras)} pontos COMPARTILHADOS × {len(modelos)} modelos "
           f"× {a.sementes} sementes = {len(tarefas)} corridas")
-    print(f"B_sweep = {a.b_sweep:,} · {a.processos} processos\n")
-    print("espaço: passo_efetivo log-U(5e-5, 4e-3) · σ U(0,15, 0,60) · "
-          f"T {RESOLUCAO} · n {TUPLA} · m {PASSOS_M}")
-    print(f"        crítico: φ {PHI} (dissertação) | razão {RAZAO_CRITICO} (anbubus)\n")
+    print(f"B_sweep = {a.b_sweep:,} · {a.processos} processos")
+    if a.modo == "grade":
+        print("eixos: " + " × ".join(f"{k}({len(v)})" for k, v in
+                                     GRADE[a.niveis].items()))
+    est = len(tarefas) * 6.5 * (a.b_sweep / 200_000) / a.processos / 60
+    print(f"estimativa: ~{est:.1f} h de parede")
+    print(f"progresso ao vivo: {Path(a.saida).with_suffix('.progresso.jsonl')}\n")
 
+    # `imap_unordered` e não `map`: os resultados chegam **à medida que terminam**,
+    # em vez de só no fim. É o que permite gravar o progresso e ler parciais sem
+    # esperar as horas todas.
+    progresso = Path(a.saida).with_suffix(".progresso.jsonl")
+    progresso.parent.mkdir(parents=True, exist_ok=True)
+    progresso.write_text("")
     t0 = time.perf_counter()
+    res = []
     with mp.Pool(a.processos) as pool:
-        # `chunksize=1` de propósito. O padrão fatia a lista em blocos contíguos, e
-        # a lista está ordenada por modelo — o que faria a `ntupla` rodar inteira
-        # antes de a `ntupla_funcional` começar. O total seria o mesmo, mas por uma
-        # hora só um modelo teria resultado, e nenhuma leitura parcial seria
-        # comparativa. Com blocos de 1 os dois avançam juntos.
-        res = pool.map(uma, tarefas, chunksize=1)
+        for i, x in enumerate(pool.imap_unordered(uma, tarefas, chunksize=1), 1):
+            res.append(x)
+            with open(progresso, "a") as f:
+                f.write(json.dumps(x) + "\n")
+            if i % 5 == 0 or i == len(tarefas):
+                dec = time.perf_counter() - t0
+                resta = dec / i * (len(tarefas) - i)
+                print(f"  [{i:>5}/{len(tarefas)}] {i/len(tarefas):>5.1%} · "
+                      f"decorrido {dec/60:>5.1f} min · resta ~{resta/60:>5.1f} min",
+                      flush=True)
     parede = time.perf_counter() - t0
 
     import collections
