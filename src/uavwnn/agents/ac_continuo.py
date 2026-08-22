@@ -160,7 +160,26 @@ class MlpAprox:
 
 
 @dataclass
-class NTuplaDissertacaoAprox:
+class _PrefixoCheckpoint:
+    """Nome de arquivo do checkpoint derivado da FAMÍLIA, não fixo.
+
+    As duas famílias n-tupla gravavam `ntupla-ator.npz` — o mesmo nome. Isso não
+    causava erro porque cada corrida tem diretório próprio, mas tornava um
+    checkpoint indistinguível do outro fora do contexto dele: carregar o do
+    `anbubus` com a classe da dissertação leria a convenção errada (soma contra
+    média), e o modelo prediria valores `N` vezes fora de escala **sem erro**.
+
+    O `familia.txt` já registrava a procedência, mas depender de um arquivo
+    auxiliar para saber o que o `.npz` é deixa a proteção fora do caminho de
+    carregamento. O prefixo põe a informação no próprio nome.
+    """
+
+    def _prefixo_checkpoint(self) -> str:
+        return self.custo()["familia"].replace("-", "_")
+
+
+@dataclass
+class NTuplaDissertacaoAprox(_PrefixoCheckpoint):
     """Ator de gradiente funcional (§4.3.1) e crítico NTRN com esquecimento
     (§4.2.1) — as duas redes da dissertação, validadas contra o `Ramnet.jl`."""
 
@@ -221,8 +240,9 @@ class NTuplaDissertacaoAprox:
     def salvar(self, diretorio) -> None:
         from pathlib import Path
         d = Path(diretorio); d.mkdir(parents=True, exist_ok=True)
-        self.ator.salvar(d / "ntupla-ator.npz")
-        self.critico.salvar(d / "ntupla-critico.npz")
+        prefixo = self._prefixo_checkpoint()
+        self.ator.salvar(d / f"{prefixo}-ator.npz")
+        self.critico.salvar(d / f"{prefixo}-critico.npz")
         (d / "familia.txt").write_text(self.custo()["familia"])
 
     def carregar(self, diretorio) -> None:
@@ -236,8 +256,12 @@ class NTuplaDissertacaoAprox:
 
         from ..wnn.redes import RedeGradienteFuncional
         d = Path(diretorio)
-        self.ator = RedeGradienteFuncional.carregar(d / "ntupla-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / "ntupla-critico.npz")
+        prefixo = self._prefixo_checkpoint()
+        # `carregar` devolve a CLASSE GRAVADA, então o crítico volta como
+        # `RedeRegressaoEsquecimento` na família da dissertação e como
+        # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
+        self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
+        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
 
     def custo(self) -> dict[str, Any]:
         """T1 e T3 pelo harness da SPEC-03, via a porta esparsa de T-05.7.
@@ -261,7 +285,7 @@ class NTuplaDissertacaoAprox:
             self.ator, variante=self.variante_lut,
             n_dims=self.n_dims_codificador,
             limiares_por_dim=self.limiares_por_dim,
-            rotulo="n-tuple (ator)")
+            rotulo="n-tuple dissertação (ator)")
         so_rede = operacoes_ntuple(
             self.ator.n_ram, self.tamanho_tupla, self.d_saida,
             incluir_codificador=False, incluir_amostragem=False)
@@ -270,7 +294,7 @@ class NTuplaDissertacaoAprox:
             n_dims=self.n_dims_codificador, n_niveis=self.limiares_por_dim,
             incluir_codificador=self.limiares_por_dim > 0)
         return {
-            "familia": "n-tuple",
+            "familia": "ntupla_dissertacao",
             "n_ram": self.ator.n_ram,
             "tamanho_tupla": self.tamanho_tupla,
             "phi": self.phi,
@@ -291,7 +315,7 @@ class NTuplaDissertacaoAprox:
 
 
 @dataclass
-class NTuplaAnbubusAprox:
+class NTuplaAnbubusAprox(_PrefixoCheckpoint):
     """**A segunda família WNN** — gradiente funcional nos DOIS lados, convenção
     de soma. Portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`.
 
@@ -386,8 +410,9 @@ class NTuplaAnbubusAprox:
     def salvar(self, diretorio) -> None:
         from pathlib import Path
         d = Path(diretorio); d.mkdir(parents=True, exist_ok=True)
-        self.ator.salvar(d / "ntupla-ator.npz")
-        self.critico.salvar(d / "ntupla-critico.npz")
+        prefixo = self._prefixo_checkpoint()
+        self.ator.salvar(d / f"{prefixo}-ator.npz")
+        self.critico.salvar(d / f"{prefixo}-critico.npz")
         (d / "familia.txt").write_text(self.custo()["familia"])
 
     def carregar(self, diretorio) -> None:
@@ -401,8 +426,12 @@ class NTuplaAnbubusAprox:
 
         from ..wnn.redes import RedeGradienteFuncional
         d = Path(diretorio)
-        self.ator = RedeGradienteFuncional.carregar(d / "ntupla-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / "ntupla-critico.npz")
+        prefixo = self._prefixo_checkpoint()
+        # `carregar` devolve a CLASSE GRAVADA, então o crítico volta como
+        # `RedeRegressaoEsquecimento` na família da dissertação e como
+        # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
+        self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
+        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
 
     def custo(self) -> dict[str, Any]:
         from ..custo import custo_ntuple_de_rede, operacoes_ntuple
@@ -411,7 +440,7 @@ class NTuplaAnbubusAprox:
             self.ator, variante=self.variante_lut,
             n_dims=self.n_dims_codificador,
             limiares_por_dim=self.limiares_por_dim,
-            rotulo="n-tuple funcional (ator)")
+            rotulo="n-tuple anbubus (ator)")
         so_rede = operacoes_ntuple(self.ator.n_ram, self.tamanho_tupla, D_ATOR,
                                    incluir_codificador=False,
                                    incluir_amostragem=False)
@@ -420,7 +449,7 @@ class NTuplaAnbubusAprox:
             n_dims=self.n_dims_codificador, n_niveis=self.limiares_por_dim,
             incluir_codificador=self.limiares_por_dim > 0)
         return {
-            "familia": "n-tuple-funcional",
+            "familia": "ntupla_anbubus",
             "procedencia": "anbubus/ntn_neurocomputing_v0 (NTNModel)",
             "convencao": "soma",
             "critico_mesma_familia": True,
