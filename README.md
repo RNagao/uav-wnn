@@ -261,7 +261,7 @@ com o aproximador mediria duas coisas.
 |---|---|---|---|
 | `mlp` | MLP densa `D→32→32→3`, NumPy puro | MLP | — |
 | `ntupla` | **a nossa**: gradiente funcional (§4.3.1) | NTRN com esquecimento (§4.2.1) | média (eq. 4.12) |
-| `ntupla_funcional` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
+| `ntupla_anbubus` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
 
 O baseline do **problema** é outro e não entra nessa tabela: o MADDPG de Lamenza,
 medido dos pesos publicados (256 × 256, 287–299 KB). Estes três são variações do
@@ -320,7 +320,7 @@ uv run --isolated --with "ray[rllib]" --with torch --with pettingzoo --with nump
 uv run python scripts/spec06_importar_ppo.py     reports/ckpt/ppo-a2s12-bruto.npz reports/ckpt/ppo-a2s12
 
 # 3. campanha, como qualquer outro checkpoint
-uv run python scripts/spec06_campanha_wnn.py --aproximador ntupla_funcional     --checkpoint reports/ckpt/ppo-a2s12 --celulas 2:12 --runs 1000
+uv run python scripts/spec06_campanha_wnn.py --aproximador ntupla_anbubus     --checkpoint reports/ckpt/ppo-a2s12 --celulas 2:12 --runs 1000
 ```
 
 A fronteira por arquivo coincide com o que a **RNF-11** já exigia: torch no treino,

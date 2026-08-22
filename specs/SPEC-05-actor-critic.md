@@ -20,7 +20,7 @@ leitura generosa é pior que um critério aberto.
 | 3 | Pareamento auditável | **FECHADO.** `tests/test_pareamento.py` |
 | 4 | `γ = 0,99` fixo e faixas com procedência | **FECHADO.** `configs/spec05/hiperparametros.toml`, verificado por teste |
 | 5 | Sem PyTorch fora de `tests/` | **FECHADO com redação corrigida** — ver (b) |
-| 6 | Asserção de estabilidade ativa, com caso que aborta | **FECHADO.** `TreinoInstavel`; ligada em `NTuplaAprox`, não na rede — ver (c) |
+| 6 | Asserção de estabilidade ativa, com caso que aborta | **FECHADO.** `TreinoInstavel`; ligada em `NTuplaDissertacaoAprox`, não na rede — ver (c) |
 | 7 | Determinismo com `Na > 1` e ordens diferentes | **FECHADO em parte, com achado** — ver (d) |
 | 8 | Relatório curto | `reports/spec05-circular.md`, `spec05-identidade.md`, `spec05-mountaincar.md` |
 | 9 | PRD atualizado em dois pontos | **FECHADO.** `PRD.md` §5.5, RNF-05, RNF-11 e a linha de risco |
@@ -56,7 +56,7 @@ diferenciais alimentam gradientes arbitrários para casar bit a bit com o
 `Ramnet.jl`, e os de identidade usam passo unitário para sondar as eqs. (4.16) e
 (4.22). Essa validação contra o Julia é a evidência mais forte do projeto.
 
-A asserção foi movida para `NTuplaAprox` — o ponto onde o gradiente de política de
+A asserção foi movida para `NTuplaDissertacaoAprox` — o ponto onde o gradiente de política de
 fato entra na tabela, e onde a divergência da RNF-01 foi **medida**. A rede é
 primitiva de uso geral e não policia quem a chama. Um teste garante que o padrão
 não seja invertido por descuido.
@@ -488,8 +488,8 @@ Há uma alternativa: usar a **rede funcional** também como crítico, com perda 
 > **A variante funcional foi implementada (2026-08-21), e ela tem procedência.** É a
 > portagem do `NTNModel` de `anbubus/ntn_neurocomputing_v0` — o repositório do artigo
 > *"Functional gradient descent for n-tuple regression"* (Neurocomputing 500, 2022).
-> Fica como `NTuplaFuncionalAprox`, selecionável por
-> `APROXIMADORES["ntupla_funcional"]`, para a comparação contra o MADDPG ter **duas**
+> Fica como `NTuplaAnbubusAprox`, selecionável por
+> `APROXIMADORES["ntupla_anbubus"]`, para a comparação contra o MADDPG ter **duas**
 > opções de rede sem peso em vez de uma.
 >
 > **Três diferenças substantivas**, todas lidas no código-fonte deles:

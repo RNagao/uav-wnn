@@ -98,7 +98,7 @@ SIGMAS = (0.20, 0.35, 0.50)
 A grade original varria `σ ∈ {0,10; 0,20}` e o resultado foi um **degrau**, não um
 gradiente: em `σ = 0,10` **todos** os pontos das duas famílias n-tuple ficaram em
 3,3-3,9 % de cobertura — o nível da caminhada aleatória —, e em `σ = 0,20` os melhores
-saltaram para 72 % (`ntupla`) e 43 % (`ntupla_funcional`).
+saltaram para 72 % (`ntupla`) e 43 % (`ntupla_anbubus`).
 
 Um degrau no **teto** da faixa é evidência de que o ótimo está fora dela, e a T-06.4
 prescreve exatamente isto: *"após a descida, repetir os dois eixos de maior efeito
@@ -112,10 +112,10 @@ paga, e a faixa que servia ao brinquedo estrangulava o problema real."""
 
 TAXAS = {
     # convenção de MÉDIA (eq. 4.12): o passo em `f` é exatamente `α`
-    "ntupla": (5e-4, 2e-3, 8e-3),
+    "ntupla_dissertacao": (5e-4, 2e-3, 8e-3),
     # convenção de SOMA: o passo em `f` é `α·N`. Com N = 67 estes são os
     # equivalentes exatos dos de cima — ver `taxa_equivalente`.
-    "ntupla_funcional": (7.5e-6, 3.0e-5, 1.2e-4),
+    "ntupla_anbubus": (7.5e-6, 3.0e-5, 1.2e-4),
     # Adam: a taxa nominal não é o deslocamento. Faixa em torno do ótimo que a
     # SPEC-03 mediu (~1e-4), cobrindo a mesma razão de 16×.
     "mlp": (1e-4, 4e-4, 1.6e-3),
@@ -135,7 +135,7 @@ def _montar(aprox: str, cfg, sem: PapeisDeSemente, corpus, taxa: float, sigma: f
         kw = dict(n_bits=termo.n_bits, seed=sem.seed_tuple,
                   tamanho_tupla=TAMANHO_TUPLA, taxa_ator=taxa,
                   n_dims_codificador=d_obs, limiares_por_dim=BITS_POR_ESCALAR)
-        if aprox == "ntupla_funcional":
+        if aprox == "ntupla_anbubus":
             kw["taxa_critico"] = taxa
         ap = APROXIMADORES[aprox](**kw)
         codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
@@ -207,7 +207,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b",
                     help="1b é O PROBLEMA (eq. 5-6, CT_cens); 1a é o exploratório")
-    ap.add_argument("--modelos", default="ntupla,ntupla_funcional",
+    ap.add_argument("--modelos", default="ntupla,ntupla_anbubus",
                     help="a MLP NÃO entra por padrão — ver a nota sobre o baseline")
     ap.add_argument("--sementes", type=int, default=3, help="`R` da §4.3")
     ap.add_argument("--b-sweep", type=int, default=500_000)

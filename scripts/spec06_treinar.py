@@ -258,7 +258,7 @@ def avaliar(cfg: EnvConfig, politica, ctx, sementes) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1a")
-    ap.add_argument("--aproximador", choices=sorted(APROXIMADORES), default="ntupla")
+    ap.add_argument("--aproximador", choices=sorted(APROXIMADORES), default="ntupla_dissertacao")
     ap.add_argument("--celulas", default="1:12")
     ap.add_argument("--sementes", type=int, default=5, help="`R` da §4.3")
     ap.add_argument("--b-max", type=int, default=19_500_000,

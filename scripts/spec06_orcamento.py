@@ -153,7 +153,7 @@ def medir_celula(na: int, ns: int, aii: float, episodios: int,
 
     # -- 3. aprendizado: forward + atualização, por família ----------------
     aprendizado = {}
-    for nome in ("ntupla", "mlp"):
+    for nome in ("ntupla_dissertacao", "mlp"):
         if nome == "mlp":
             ap = APROXIMADORES[nome](n_bits_ou_dim=d_obs)
             entradas = [v for v in amostra]
@@ -180,10 +180,10 @@ def medir_celula(na: int, ns: int, aii: float, episodios: int,
         "s_ambiente": por_passo_env,
         "s_montagem_obs": t_obs / max(1, n_obs),
         "s_codificacao": t_cod,
-        "s_aprendizado_ntupla": aprendizado["ntupla"],
+        "s_aprendizado_ntupla": aprendizado["ntupla_dissertacao"],
         "s_aprendizado_mlp": aprendizado["mlp"],
         "vazao_ambiente": 1.0 / por_passo_env if por_passo_env else float("nan"),
-        "vazao_wnn": 1.0 / (por_passo_env + t_cod + aprendizado["ntupla"]),
+        "vazao_wnn": 1.0 / (por_passo_env + t_cod + aprendizado["ntupla_dissertacao"]),
         "vazao_mlp": 1.0 / (por_passo_env + aprendizado["mlp"]),
     }
 

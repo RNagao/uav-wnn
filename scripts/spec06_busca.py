@@ -70,7 +70,14 @@ from spec06_treinar import REPLICAS, _cfgs, _ctx, avaliar, corpus_de_observacoes
 from uavwnn.agents import APROXIMADORES  # noqa: E402
 from uavwnn.agents.ac_continuo import AtorCriticoContinuo  # noqa: E402
 from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
-from uavwnn.campanha import RECOMPENSAS, Corrida, PapeisDeSemente, carregar_bancos  # noqa: E402
+from uavwnn.campanha import (  # noqa: E402
+    FAIXA_PADRONIZADA,
+    RECOMPENSAS,
+    Corrida,
+    NormalizadorMovel,
+    PapeisDeSemente,
+    carregar_bancos,
+)
 from uavwnn.campanha.treino import ParadaAntecipada  # noqa: E402
 from uavwnn.encoding import TermometroQuantil  # noqa: E402
 from uavwnn.refenv.runner import EnvConfig  # noqa: E402
@@ -132,6 +139,7 @@ GRADE = {
         "tupla": (8, 12, 24),
         "passos_m": (8, 16),
         "idx_critico": (1, 2),
+        "normalizar": (False, True),
     },
     "completo": {
         # `passo` centrado no vencedor da primeira grade (5e-4 efetivo)
@@ -143,8 +151,20 @@ GRADE = {
         "tupla": (8, 12, 16, 24, 32),
         "passos_m": (4, 8, 16, 32),
         "idx_critico": (0, 1, 2, 3),
+        "normalizar": (False, True),
     },
 }
+"""O eixo `normalizar` carrega o **par coerente** de cada pipeline, e não a
+normalização isolada — ver `campanha.normalizacao` para por que isolar não é
+possível:
+
+    False   `TermometroQuantil` ajustado ao corpus cru        (nosso)
+    True    normalização móvel + termômetro de faixa fixa     (do `anbubus`)
+
+Ele existe porque o braço `ntupla_anbubus` **estagnou** em ~37 % de cobertura (+0,8
+pontos ao dobrar o orçamento, contra +14 do outro braço) usando o nosso codificador,
+enquanto todas as configurações dos autores usam `MeanStdFilter`. Sem este eixo, não
+há como distinguir "saturou" de "codificador errado"."""
 
 
 def grade(nivel: str) -> list[dict]:
@@ -182,6 +202,7 @@ def amostrar(n: int, seed: int = 20260921) -> list[dict]:
             "passos_m": int(g.choice(PASSOS_M)),
             # os índices do eixo de crítico são compartilhados; cada família traduz
             "idx_critico": int(g.integers(len(PHI))),
+            "normalizar": bool(g.integers(2)),
         })
     return fora
 
@@ -189,8 +210,20 @@ def amostrar(n: int, seed: int = 20260921) -> list[dict]:
 def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
     """Instancia o modelo, convertendo a taxa para a convenção da família."""
     d_obs = cfg.observation_size
-    termo = TermometroQuantil(amostra["resolucao"]).ajustar(
-        corpus_de_observacoes(cfg))
+    corpus = corpus_de_observacoes(cfg)
+    normaliza = bool(amostra.get("normalizar", False))
+    if normaliza:
+        # Pipeline do `anbubus`: normalização móvel + faixa FIXA. O normalizador é
+        # semeado no corpus para não começar de estatística vazia — com `n = 1` o
+        # desvio é 1 por convenção e as primeiras observações sairiam sem escala.
+        nz = NormalizadorMovel(d_obs)
+        for v in corpus:
+            nz.atualizar(v)
+        termo = TermometroQuantil(amostra["resolucao"]).ajustar(
+            np.tile(np.linspace(*FAIXA_PADRONIZADA, 512)[:, None], (1, d_obs)))
+    else:
+        nz = None
+        termo = TermometroQuantil(amostra["resolucao"]).ajustar(corpus)
     comum = dict(n_bits=termo.n_bits, tamanho_tupla=amostra["tupla"],
                  seed=sem.seed_tuple, n_dims_codificador=d_obs,
                  limiares_por_dim=amostra["resolucao"])
@@ -200,7 +233,7 @@ def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
     n_ram = RedeGradienteFuncional(termo.n_bits, amostra["tupla"], seed=0).n_ram
     passo = amostra["passo_efetivo"]
 
-    if aprox == "ntupla":
+    if aprox == "ntupla_dissertacao":
         ap = APROXIMADORES[aprox](taxa_ator=passo, phi=PHI[amostra["idx_critico"]],
                                   **comum)
         detalhe = {"phi": PHI[amostra["idx_critico"]], "taxa_ator": passo}
@@ -210,12 +243,21 @@ def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
         ap = APROXIMADORES[aprox](taxa_ator=taxa, taxa_critico=taxa * razao, **comum)
         detalhe = {"razao_critico": razao, "taxa_ator": taxa}
 
-    codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
+    if nz is None:
+        codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
+    else:
+        # `atualizar` segue a fase: no treino a estatística acompanha a deriva; na
+        # avaliação ela congela, senão o agente se calibraria nos episódios de
+        # avaliação — vazamento.
+        def codificar(v, _t=termo, _n=nz):
+            return _t.codificar(_n.aplicar(v, atualizar=not _n.congelado)[None, :])[0]
+
     pol = AtorCriticoContinuo(aproximador=ap, codificar=codificar,
                               politica=NormalProjetada(amostra["sigma"], None),
                               passos=amostra["passos_m"], id=f"busca_{aprox}",
                               treinando=True)
-    return ap, termo, pol, {**detalhe, "n_ram": n_ram, "n_bits": termo.n_bits}
+    return ap, termo, pol, {**detalhe, "n_ram": n_ram, "n_bits": termo.n_bits,
+                            "normalizador": nz}
 
 
 def uma(args: tuple) -> dict:
@@ -229,6 +271,7 @@ def uma(args: tuple) -> dict:
 
     try:
         ap, termo, pol, det = _montar(aprox, cfg_tr, sem, amostra)
+        nz = det.pop("normalizador", None)
     except Exception as e:
         return {"aproximador": aprox, **amostra, "seed_train": seed_train,
                 "abortou": f"montagem: {type(e).__name__}: {e}", "cobertura": 0.0,
@@ -256,7 +299,11 @@ def uma(args: tuple) -> dict:
                 cfg_tr, pol, ctx_tr, recompensa, rng_cen,
                 min(intervalo, b - passos), r["escala_recompensa"])
             passos += int(info["passos"])
+            if nz is not None:
+                nz.congelar()
             m = avaliar(cfg_av, pol, ctx_av, val)
+            if nz is not None:
+                nz.descongelar()
             melhor = max(melhor, m["cobertura"])
             # A curva por avaliação, que a primeira grade NÃO gravava — eu escrevi
             # um laço próprio e esqueci o `registrar`. Sem ela não há como
@@ -277,6 +324,8 @@ def uma(args: tuple) -> dict:
         # busca. É o que faz a fronteira de estabilidade aparecer no resultado.
         abortou = f"{type(e).__name__}: {e}"
 
+    if nz is not None:
+        nz.congelar()
     final = avaliar(cfg_av, pol, ctx_av, test)
     corrida.gravar_eval_test(final["por_episodio"])
     return {"aproximador": aprox, **amostra, **det, "seed_train": seed_train,
@@ -290,7 +339,7 @@ def uma(args: tuple) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b")
-    ap.add_argument("--modelos", default="ntupla,ntupla_funcional")
+    ap.add_argument("--modelos", default="ntupla,ntupla_anbubus")
     ap.add_argument("--modo", choices=("grade", "aleatoria"), default="grade",
                     help="`grade` = fatorial completo; `aleatoria` = sorteio")
     ap.add_argument("--niveis", choices=tuple(GRADE), default="reduzido",

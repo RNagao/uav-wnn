@@ -152,7 +152,7 @@ class _RedeNTupla:
         deliberadas de magnitude 1,0 — e a validação contra o Julia é a evidência
         mais forte que o projeto tem. Uma primitiva não policia quem a chama.
 
-        Quem liga é `NTuplaAprox`, o ponto onde o gradiente de política de fato
+        Quem liga é `NTuplaDissertacaoAprox`, o ponto onde o gradiente de política de fato
         entra, que é exatamente onde a divergência da RNF-01 foi MEDIDA. Um teste
         garante que ele não seja desligado por descuido.
 

@@ -171,7 +171,7 @@ def main() -> int:
 
     print(f"\ncheckpoint: {destino}")
     print(f"  use com: uv run python scripts/spec06_campanha_wnn.py "
-          f"--aproximador ntupla_funcional --checkpoint {destino} "
+          f"--aproximador ntupla_anbubus --checkpoint {destino} "
           f"--celulas {celula[0]}:{celula[1]}")
     return 0
 

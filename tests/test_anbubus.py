@@ -1,6 +1,6 @@
 """Teste diferencial contra o `NTNModel` de `anbubus/ntn_neurocomputing_v0`.
 
-Prova que a nossa `NTuplaFuncionalAprox` é uma **portagem fiel** daquele modelo, e
+Prova que a nossa `NTuplaAnbubusAprox` é uma **portagem fiel** daquele modelo, e
 não uma reimplementação com o mesmo nome. É o mesmo padrão dos testes contra o
 `Ramnet.jl`: um oráculo executável, comparação numérica, tolerância declarada.
 
@@ -29,7 +29,7 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch é opcional (grupo `baseline`)")
 
-from uavwnn.agents.ac_continuo import NTuplaFuncionalAprox  # noqa: E402
+from uavwnn.agents.ac_continuo import NTuplaAnbubusAprox  # noqa: E402
 from uavwnn.encoding.artigo import TermometroArtigo  # noqa: E402
 from uavwnn.wnn.redes import RedeGradienteFuncional  # noqa: E402
 
@@ -196,10 +196,10 @@ def test_as_duas_familias_diferem_onde_deve_e_concordam_onde_deve():
     Não é teste de igualdade: é de que as diferenças são **as declaradas**, e só
     elas. Se alguém alinhar as duas por acidente, a comparação perde o objeto.
     """
-    from uavwnn.agents.ac_continuo import NTuplaAprox
+    from uavwnn.agents.ac_continuo import NTuplaDissertacaoAprox
 
-    nossa = NTuplaAprox(n_bits=128, tamanho_tupla=8)
-    deles = NTuplaFuncionalAprox(n_bits=128, tamanho_tupla=8)
+    nossa = NTuplaDissertacaoAprox(n_bits=128, tamanho_tupla=8)
+    deles = NTuplaAnbubusAprox(n_bits=128, tamanho_tupla=8)
 
     # DIFEREM: convenção, e a família do crítico
     assert nossa.ator.convencao == "media"

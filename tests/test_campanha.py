@@ -262,7 +262,7 @@ def test_os_tres_modelos_recebem_o_mesmo_numero_de_pontos():
     g = _grid()
     tamanhos = {m: len(t) * len(g.SIGMAS) for m, t in g.TAXAS.items()}
     assert len(set(tamanhos.values())) == 1, tamanhos
-    assert set(g.TAXAS) == {"ntupla", "ntupla_funcional", "mlp"}
+    assert set(g.TAXAS) == {"ntupla_dissertacao", "ntupla_anbubus", "mlp"}
 
 
 def test_a_taxa_do_anbubus_e_a_equivalente_na_convencao_de_soma():
@@ -282,7 +282,7 @@ def test_a_taxa_do_anbubus_e_a_equivalente_na_convencao_de_soma():
     n_bits = 25 * g.BITS_POR_ESCALAR
     n_ram = RedeGradienteFuncional(n_bits, g.TAMANHO_TUPLA, seed=0).n_ram
 
-    for media, soma in zip(g.TAXAS["ntupla"], g.TAXAS["ntupla_funcional"]):
+    for media, soma in zip(g.TAXAS["ntupla_dissertacao"], g.TAXAS["ntupla_anbubus"]):
         esperado = media / n_ram
         assert soma == pytest.approx(esperado, rel=0.02), (
             f"taxa de soma {soma:.3e} não equivale a {media:.3e} da média "
@@ -297,3 +297,97 @@ def test_as_faixas_cobrem_a_mesma_razao():
     g = _grid()
     razoes = {m: max(t) / min(t) for m, t in g.TAXAS.items()}
     assert max(razoes.values()) / min(razoes.values()) < 1.05, razoes
+
+
+# --- normalização móvel da observação (o MeanStdFilter deles) --------------
+
+
+def test_normalizador_estima_media_e_desvio():
+    """Welford, não soma dos quadrados: com milhões de passos a forma acumulada
+    perde precisão quando a média é grande em relação ao desvio."""
+    from uavwnn.campanha import NormalizadorMovel
+
+    g = np.random.default_rng(0)
+    nz = NormalizadorMovel(3)
+    for _ in range(4000):
+        nz.atualizar(g.normal(loc=[5.0, -2.0, 100.0], scale=[3.0, 0.5, 0.1], size=3))
+    assert np.allclose(nz.media, [5.0, -2.0, 100.0], atol=0.15)
+    assert np.allclose(nz.desvio, [3.0, 0.5, 0.1], rtol=0.1)
+
+
+def test_congelar_impede_vazamento_na_avaliacao():
+    """A estatística é estado TREINADO. Se ela seguisse acumulando durante a
+    avaliação, o agente se calibraria nos episódios de reporte — vazamento pela
+    porta de trás, sem tocar em pesos."""
+    from uavwnn.campanha import NormalizadorMovel
+
+    nz = NormalizadorMovel(2)
+    g = np.random.default_rng(1)
+    for _ in range(50):
+        nz.atualizar(g.normal(size=2))
+    n_antes, media_antes = nz.n, nz.media.copy()
+
+    nz.congelar()
+    for _ in range(500):
+        nz.aplicar(g.normal(loc=99.0, size=2))     # distribuição MUITO diferente
+    assert nz.n == n_antes
+    assert np.array_equal(nz.media, media_antes)
+
+    nz.descongelar()
+    nz.aplicar(g.normal(size=2))
+    assert nz.n == n_antes + 1
+
+
+def test_normalizador_persiste_bit_a_bit(tmp_path):
+    """Vai no checkpoint: um modelo carregado sem a estatística veria a observação
+    numa escala diferente da que treinou."""
+    from uavwnn.campanha import NormalizadorMovel
+
+    g = np.random.default_rng(2)
+    nz = NormalizadorMovel(5)
+    for _ in range(300):
+        nz.atualizar(g.normal(loc=3.0, scale=2.0, size=5))
+    x = g.normal(size=5)
+    antes = nz.aplicar(x, atualizar=False)
+
+    nz.salvar(tmp_path / "nz.npz")
+    outro = NormalizadorMovel.carregar(tmp_path / "nz.npz")
+    assert np.array_equal(outro.aplicar(x, atualizar=False), antes)
+    assert outro.congelado, "carregar deve devolver congelado — é avaliação"
+
+
+def _busca():
+    """Carrega `spec06_busca.py` — onde vive `GRADE`.
+
+    Distinto de `_grid()`, que carrega `spec06_grid.py` (a varredura de dois eixos).
+    Confundir os dois foi o que quebrou este teste na primeira escrita.
+    """
+    import importlib.util
+    import pathlib
+    import sys
+
+    caminho = (pathlib.Path(__file__).resolve().parents[1] / "scripts"
+               / "spec06_busca.py")
+    spec = importlib.util.spec_from_file_location("_busca", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_busca"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_o_eixo_de_normalizacao_esta_nas_duas_grades():
+    """O eixo existe porque o braço do `anbubus` estagnou com o NOSSO codificador
+    enquanto todas as configurações dos autores usam `MeanStdFilter`. Sem ele não há
+    como distinguir "saturou" de "codificador errado"."""
+    grade = _busca().GRADE
+    for nivel in ("reduzido", "completo"):
+        assert "normalizar" in grade[nivel]
+        assert set(grade[nivel]["normalizar"]) == {False, True}
+
+
+def test_a_faixa_padronizada_e_a_dos_autores():
+    """`min: -1.5, max: 1.5` em TODAS as configurações do `anbubus`, e a faixa só
+    faz sentido junto com a normalização: são ±1,5 DESVIOS."""
+    from uavwnn.campanha import FAIXA_PADRONIZADA
+
+    assert FAIXA_PADRONIZADA == (-1.5, 1.5)

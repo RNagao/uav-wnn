@@ -1,11 +1,11 @@
 """Actor-Critic contínuo como `Policy` — SPEC-05 T-05.1, T-05.3 e §4.8.
 
 **O pareamento de H1 mora aqui.** Um laço só — o Algoritmo 4.4 — servido por dois
-aproximadores atrás da mesma interface. Trocar `NTuplaAprox` por `MlpAprox` muda
+aproximadores atrás da mesma interface. Trocar `NTuplaDissertacaoAprox` por `MlpAprox` muda
 *apenas* o aproximador; algoritmo, política, censura, bootstrap e tabela são os
 mesmos. Se a comparação não for assim, ela mede duas coisas ao mesmo tempo.
 
-    NTuplaAprox   rede de gradiente funcional (§4.3.1) + NTRN com esquecimento (§4.2.1)
+    NTuplaDissertacaoAprox   rede de gradiente funcional (§4.3.1) + NTRN com esquecimento (§4.2.1)
     MlpAprox      D → 32 → 32 → 3  e  D → 32 → 32 → 1, NumPy puro, Adam
 
 UMA ASSIMETRIA QUE PRECISA SER DECLARADA, NÃO ESCONDIDA
@@ -160,7 +160,7 @@ class MlpAprox:
 
 
 @dataclass
-class NTuplaAprox:
+class NTuplaDissertacaoAprox:
     """Ator de gradiente funcional (§4.3.1) e crítico NTRN com esquecimento
     (§4.2.1) — as duas redes da dissertação, validadas contra o `Ramnet.jl`."""
 
@@ -291,7 +291,7 @@ class NTuplaAprox:
 
 
 @dataclass
-class NTuplaFuncionalAprox:
+class NTuplaAnbubusAprox:
     """**A segunda família WNN** — gradiente funcional nos DOIS lados, convenção
     de soma. Portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`.
 
@@ -547,8 +547,8 @@ class AtorCriticoContinuo:
 
 APROXIMADORES = {
     "mlp": MlpAprox,
-    "ntupla": NTuplaAprox,
-    "ntupla_funcional": NTuplaFuncionalAprox,
+    "ntupla_dissertacao": NTuplaDissertacaoAprox,
+    "ntupla_anbubus": NTuplaAnbubusAprox,
 }
 """As opções selecionáveis por nome, para a comparação contra o MADDPG.
 
@@ -561,7 +561,7 @@ aproximador mediria duas coisas, e é o erro que a §4.8 nomeia.
     ntupla             a nossa: gradiente funcional (§4.3.1) + NTRN com
                        esquecimento (§4.2.1). **Duas** famílias, convenção de
                        média, fidelidade à dissertação (pendência C2)
-    ntupla_funcional   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`:
+    ntupla_anbubus   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`:
                        gradiente funcional nos dois lados, convenção de soma
 
 O baseline do PROBLEMA é outro e não entra aqui: o MADDPG de Lamenza, medido dos

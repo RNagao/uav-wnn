@@ -12,7 +12,7 @@ TRÊS APROXIMADORES, UM LAÇO
     mlp                MLP densa `D→32→32→3`, NumPy puro — controle do MÉTODO
     ntupla             a nossa: gradiente funcional (§4.3.1) + NTRN com
                        esquecimento (§4.2.1); convenção de média
-    ntupla_funcional   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`;
+    ntupla_anbubus   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`;
                        gradiente funcional nos dois lados, convenção de soma
 
 O baseline do **problema** é outro e não sai daqui: o MADDPG de Lamenza, medido dos

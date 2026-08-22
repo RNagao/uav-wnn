@@ -12,10 +12,11 @@ from .bancos import (
     gerar_bancos,
     horizonte_permissivo,
 )
+from .normalizacao import FAIXA_PADRONIZADA, NormalizadorMovel
 from .recompensas import RECOMPENSAS, eq_5_6, eq_7_2
 from .sementes import PapeisDeSemente
 from .treino import Avaliacao, Corrida, ParadaAntecipada, treinar
 
-__all__ = ["Avaliacao", "Banco", "BancoPar", "Corrida", "ParadaAntecipada",
+__all__ = ["Avaliacao", "Banco", "FAIXA_PADRONIZADA", "NormalizadorMovel", "BancoPar", "Corrida", "ParadaAntecipada",
            "PapeisDeSemente", "RECOMPENSAS", "carregar_bancos", "eq_5_6", "eq_7_2",
            "gerar_bancos", "horizonte_permissivo", "treinar"]
