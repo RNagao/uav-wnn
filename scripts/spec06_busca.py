@@ -132,6 +132,40 @@ RAZAO_CRITICO = (0.25, 1.0, 4.0, 16.0)
 # cobertura, e é isso que o torna uma escolha de orçamento em vez de um atalho.
 
 GRADE = {
+    # --- grade de DECISÃO: só para escolher entre os dois modelos -----------
+    #
+    # Não é triagem de hiperparâmetro; é um teste pareado com um objetivo único.
+    # Por isso varre apenas os eixos em que a evidência anterior era fina ou
+    # confundida, e **fixa** os demais em valores defensáveis:
+    #
+    #   varridos   passo (3) × σ (3) × normalizar (2) = 18 pontos
+    #   fixos      T = 16, n = 12 (N = 34, custo médio-baixo)
+    #              m = 8  (o mais barato dos dois níveis)
+    #              crítico: φ = 0,85 (o melhor nas 4 tarefas do apêndice A) e
+    #                       razão = 1,0 (crítico na mesma taxa do ator, o default)
+    #
+    # POR QUE ESTES TRÊS EIXOS
+    #
+    # `passo` e `σ` são os dominantes medidos, e as 192 corridas anteriores
+    # cobriam **um único nível de cada** (2e-4 e 0,20) — o resultado pareado
+    # valia para um canto do espaço. `normalizar` entra porque a estagnação do
+    # anbubus pode ser artefato do nosso codificador, e sem cruzá-lo com passo e
+    # σ não há como separar "saturou" de "pipeline errado".
+    #
+    # RESSALVA REGISTRADA: `α` e `σ` continuam **confundidos** — o passo efetivo é
+    # `~α·δ/σ`, então variar `σ` muda exploração E tamanho do passo. Para ESTA
+    # pergunta isso é tolerável, porque o confundimento é idêntico nos dois braços
+    # (mesma política, mesmo σ) e portanto não favorece nenhum. Para concluir qual
+    # `σ` é melhor, seria preciso reparametrizar.
+    "decisao": {
+        "passo_efetivo": (2e-4, 5e-4, 1.5e-3),
+        "sigma": (0.20, 0.35, 0.50),
+        "resolucao": (16,),
+        "tupla": (12,),
+        "passos_m": (8,),
+        "idx_critico": (1,),
+        "normalizar": (False, True),
+    },
     "reduzido": {
         "passo_efetivo": (2e-4, 5e-4, 1.5e-3),
         "sigma": (0.20, 0.35, 0.50),
