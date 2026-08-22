@@ -284,6 +284,21 @@ def uma(args: tuple) -> dict:
                       sementes=sem, bancos=bancos, raiz=Path(raiz))
     corrida.preparar()
 
+    def salvar_checkpoint(rotulo: str) -> None:
+        """Grava ator, crítico, termômetro **e** normalizador.
+
+        Os três últimos são estado **treinado**, não configuração: os limiares do
+        termômetro quantil vêm de um corpus, e a estatística do normalizador vem do
+        treino. Um checkpoint sem eles carregaria o modelo com a entrada em outra
+        escala — erro silencioso, com predições fora de faixa e nenhuma exceção.
+        """
+        dest = corrida.dir / "checkpoints" / rotulo
+        dest.mkdir(parents=True, exist_ok=True)
+        ap.salvar(dest)
+        termo.salvar(dest / "termometro.npz")
+        if nz is not None:
+            nz.salvar(dest / "normalizador.npz")
+
     rng_cen = sem.rng_cenarios_treino()
     recompensa = RECOMPENSAS[r["recompensa"]]
     # `// 40` e não `// 20`: com 20 avaliações a guarda de MINIMO_AVALIACOES=20
@@ -304,7 +319,12 @@ def uma(args: tuple) -> dict:
             m = avaliar(cfg_av, pol, ctx_av, val)
             if nz is not None:
                 nz.descongelar()
-            melhor = max(melhor, m["cobertura"])
+            if m["cobertura"] > melhor:
+                melhor = m["cobertura"]
+                # Checkpoint de MELHOR validação, como a §4.4 manda — não o último.
+                # Sem isto a grade produzia métricas e nenhum modelo, e escolher o
+                # vencedor obrigaria a retreinar cada finalista do zero.
+                salvar_checkpoint("melhor")
             # A curva por avaliação, que a primeira grade NÃO gravava — eu escrevi
             # um laço próprio e esqueci o `registrar`. Sem ela não há como
             # distinguir "estabilizou baixo" de "ainda subia quando o orçamento
@@ -326,6 +346,7 @@ def uma(args: tuple) -> dict:
 
     if nz is not None:
         nz.congelar()
+    salvar_checkpoint("final")
     final = avaliar(cfg_av, pol, ctx_av, test)
     corrida.gravar_eval_test(final["por_episodio"])
     return {"aproximador": aprox, **amostra, **det, "seed_train": seed_train,
@@ -333,13 +354,16 @@ def uma(args: tuple) -> dict:
             "cobertura": final["cobertura"], "sr": final["sr"],
             "ct_cens": final["ct_cens"], "ct_succ": final["ct_succ"],
             "abortou": abortou, "parede_s": time.perf_counter() - t0,
-            "dir": str(corrida.dir)}
+            "dir": str(corrida.dir),
+            "checkpoint_mb": round(sum(
+                f.stat().st_size for f in (corrida.dir / "checkpoints").rglob("*")
+                if f.is_file()) / 1e6, 3)}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b")
-    ap.add_argument("--modelos", default="ntupla,ntupla_anbubus")
+    ap.add_argument("--modelos", default="ntupla_dissertacao,ntupla_anbubus")
     ap.add_argument("--modo", choices=("grade", "aleatoria"), default="grade",
                     help="`grade` = fatorial completo; `aleatoria` = sorteio")
     ap.add_argument("--niveis", choices=tuple(GRADE), default="reduzido",
@@ -418,14 +442,17 @@ def main() -> int:
         cob = float(np.mean([x["cobertura"] for x in g]))
         sr = float(np.mean([x["sr"] for x in g]))
         ab = sum(x["abortou"] is not None for x in g)
+        # `None` quando a corrida abortou na MONTAGEM: o retorno curto não tem
+        # `phi` nem `razao_critico`, porque o modelo nunca chegou a existir.
         crit = a0.get("phi", a0.get("razao_critico"))
+        crit_txt = "—" if crit is None else f"{crit:g}"
         linhas.append({"modelo": m, "id": i, "cobertura": cob, "sr": sr,
                        "abortos": ab, "n": len(g), **{k: a0[k] for k in
                        ("passo_efetivo", "sigma", "resolucao", "tupla", "passos_m")},
                        "critico": crit, "n_ram": a0.get("n_ram")})
         print(f"{m:>18} {i:>3} {a0['passo_efetivo']:>8.1e} {a0['sigma']:>5.2f} "
               f"{a0['resolucao']:>4} {a0['tupla']:>3} {a0['passos_m']:>3} "
-              f"{crit:>6} {a0.get('n_ram', 0):>4} {cob:>6.1%} {sr:>5.1%} "
+              f"{crit_txt:>6} {a0.get('n_ram') or 0:>4} {cob:>6.1%} {sr:>5.1%} "
               f"{ab:>2}/{len(g)}")
 
     print(f"\n{'MELHOR POR MODELO':>40}")
@@ -434,9 +461,10 @@ def main() -> int:
         if not cand:
             continue
         b = max(cand, key=lambda l: l["cobertura"])
+        b_crit = "—" if b["critico"] is None else f"{b['critico']:g}"
         print(f"  {m}: passo {b['passo_efetivo']:.2e} · σ {b['sigma']:.3f} · "
               f"T {b['resolucao']} · n {b['tupla']} · m {b['passos_m']} · "
-              f"crítico {b['critico']} · N {b['n_ram']}")
+              f"crítico {b_crit} · N {b['n_ram'] or 0}")
         print(f"      -> cobertura {b['cobertura']:.1%}, SR {b['sr']:.1%}, "
               f"abortos {b['abortos']}/{b['n']}")
 

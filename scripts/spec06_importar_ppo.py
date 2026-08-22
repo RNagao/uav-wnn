@@ -148,7 +148,7 @@ def main() -> int:
                      f"(tolerância {a.tolerancia:.0e}). O checkpoint NÃO foi "
                      f"gravado — um modelo silenciosamente errado é pior que "
                      f"nenhum modelo.")
-        rede.salvar(destino / f"ntupla-{nome}.npz")
+        rede.salvar(destino / f"ntupla_anbubus-{nome}.npz")
         alocadas = int(peso.shape[0])
         info[nome] = {"n_saidas": int(peso.shape[1]), "n_ram": rede.n_ram,
                       "ocupadas": ocupadas, "alocadas": alocadas,

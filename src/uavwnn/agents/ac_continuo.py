@@ -587,7 +587,7 @@ política, a mesma censura e o mesmo bootstrap. Trocar o laço junto com o
 aproximador mediria duas coisas, e é o erro que a §4.8 nomeia.
 
     mlp                MLP densa, NumPy puro — o controle pareado do MÉTODO
-    ntupla             a nossa: gradiente funcional (§4.3.1) + NTRN com
+    ntupla_dissertacao a nossa: gradiente funcional (§4.3.1) + NTRN com
                        esquecimento (§4.2.1). **Duas** famílias, convenção de
                        média, fidelidade à dissertação (pendência C2)
     ntupla_anbubus   portada do `NTNModel` de `anbubus/ntn_neurocomputing_v0`:

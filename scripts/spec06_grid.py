@@ -98,7 +98,7 @@ SIGMAS = (0.20, 0.35, 0.50)
 A grade original varria `σ ∈ {0,10; 0,20}` e o resultado foi um **degrau**, não um
 gradiente: em `σ = 0,10` **todos** os pontos das duas famílias n-tuple ficaram em
 3,3-3,9 % de cobertura — o nível da caminhada aleatória —, e em `σ = 0,20` os melhores
-saltaram para 72 % (`ntupla`) e 43 % (`ntupla_anbubus`).
+saltaram para 72 % (`ntupla_dissertacao`) e 43 % (`ntupla_anbubus`).
 
 Um degrau no **teto** da faixa é evidência de que o ótimo está fora dela, e a T-06.4
 prescreve exatamente isto: *"após a descida, repetir os dois eixos de maior efeito
@@ -207,7 +207,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b",
                     help="1b é O PROBLEMA (eq. 5-6, CT_cens); 1a é o exploratório")
-    ap.add_argument("--modelos", default="ntupla,ntupla_anbubus",
+    ap.add_argument("--modelos", default="ntupla_dissertacao,ntupla_anbubus",
                     help="a MLP NÃO entra por padrão — ver a nota sobre o baseline")
     ap.add_argument("--sementes", type=int, default=3, help="`R` da §4.3")
     ap.add_argument("--b-sweep", type=int, default=500_000)
