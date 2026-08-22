@@ -233,3 +233,67 @@ def test_parada_respeita_a_direcao_da_metrica():
     p_maior = ParadaAntecipada(maior_e_melhor=True)
     assert any(p_maior.registrar(v) for v in caindo), \
         "maior-é-melhor não parou com a métrica piorando"
+
+
+# --- a grade de hiperparâmetros (T-06.4/T-06.3) ---------------------------
+
+
+def _grid():
+    import importlib.util
+    import pathlib
+    import sys
+
+    caminho = (pathlib.Path(__file__).resolve().parents[1] / "scripts"
+               / "spec06_grid.py")
+    spec = importlib.util.spec_from_file_location("_grid", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_grid"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_os_tres_modelos_recebem_o_mesmo_numero_de_pontos():
+    """T-06.3: *"um pareamento em que a WNN foi varrida em 15 pontos e a MLP em 2
+    não é pareamento; é vantagem de esforço disfarçada de vantagem de método."*
+
+    O `φ` do crítico com esquecimento fica FORA da grade justamente por isso —
+    existe em um dos três e daria 12 pontos a ele contra 6 aos outros.
+    """
+    g = _grid()
+    tamanhos = {m: len(t) * len(g.SIGMAS) for m, t in g.TAXAS.items()}
+    assert len(set(tamanhos.values())) == 1, tamanhos
+    assert set(g.TAXAS) == {"ntupla", "ntupla_funcional", "mlp"}
+
+
+def test_a_taxa_do_anbubus_e_a_equivalente_na_convencao_de_soma():
+    """A afirmação de justiça da grade, verificada em aritmética.
+
+    Somar `passo` às `N` posições endereçadas muda `f` em `passo` na convenção de
+    **média** (eq. 4.12) e em `passo·N` na de **soma**. Então a mesma taxa nominal dá
+    um passo `N` vezes maior no braço do `anbubus`, e comparar sem converter mediria
+    a **convenção**, não o aproximador.
+
+    Se alguém editar uma das duas faixas sem a outra, a comparação passa a ser
+    injusta **sem nenhum erro aparecer** — e é isso que este teste impede.
+    """
+    from uavwnn.wnn.redes import RedeGradienteFuncional
+
+    g = _grid()
+    n_bits = 25 * g.BITS_POR_ESCALAR
+    n_ram = RedeGradienteFuncional(n_bits, g.TAMANHO_TUPLA, seed=0).n_ram
+
+    for media, soma in zip(g.TAXAS["ntupla"], g.TAXAS["ntupla_funcional"]):
+        esperado = media / n_ram
+        assert soma == pytest.approx(esperado, rel=0.02), (
+            f"taxa de soma {soma:.3e} não equivale a {media:.3e} da média "
+            f"(esperado {esperado:.3e} com N={n_ram}); o passo efetivo em `f` "
+            f"difere e a grade deixa de medir o aproximador")
+
+
+def test_as_faixas_cobrem_a_mesma_razao():
+    """Mesma razão em cada família é o que torna as faixas comparáveis apesar de
+    valores diferentes — a MLP usa Adam e o `anbubus` usa soma, então valores iguais
+    não significam esforço igual."""
+    g = _grid()
+    razoes = {m: max(t) / min(t) for m, t in g.TAXAS.items()}
+    assert max(razoes.values()) / min(razoes.values()) < 1.05, razoes
