@@ -454,15 +454,26 @@ def uma(args: tuple) -> dict:
                 if f.is_file()) / 1e6, 3)}
 
 
-_EIXOS = frozenset({"id", "passo_efetivo", "sigma", "resolucao", "tupla",
+_EIXOS = frozenset({"passo_efetivo", "sigma", "resolucao", "tupla",
                     "passos_m", "idx_critico", "normalizar"})
 """Os eixos que identificam uma corrida, e **só** eles.
 
-O registro de progresso guarda muito mais — `phi`, `taxa_ator`, `n_ram`, as métricas
-— e nada disso pode entrar na chave: `phi` e `taxa_ator` são **derivados** do eixo de
-crítico e do passo por família, então incluí-los faria a chave depender do modelo e
-duas corridas do mesmo ponto nunca casariam. `id` entra porque a busca aleatória
-numera os sorteios e dois sorteios podem coincidir nos valores.
+DUAS EXCLUSÕES, POR MOTIVOS DIFERENTES
+
+`phi`, `taxa_ator`, `n_ram` e as métricas estão no registro de progresso e **não**
+podem entrar: os três primeiros são **derivados** do eixo de crítico e do passo por
+família, então incluí-los faria a chave depender do modelo, e duas corridas do mesmo
+ponto nunca casariam.
+
+`id` fica fora porque ele é o índice do produto cartesiano, e **o índice muda com o
+nível da grade**: a configuração `passo 5e-4, σ 0,20, T 16, n 12, crit 1` é `id=6` no
+nível `decisao` e `id=25` no `desempate`. Com `id` na chave, dois níveis que
+compartilham configurações e orçamento refariam o trabalho — o que importa quando a
+descida coordenada da T-06.4 rodar no mesmo orçamento do desempate e sobrepor com
+ele. Os eixos já determinam o ponto; o `id` só numera.
+
+Na busca aleatória o `id` numera sorteios, mas dois sorteios com valores idênticos
+**são** a mesma configuração — reaproveitar um pelo outro é inócuo, não é confusão.
 """
 
 
@@ -496,7 +507,8 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
     determinação, não falha de infraestrutura — mesma semente, mesmo ponto, mesmo
     estouro da assertiva de estabilidade.
     """
-    alvos = {_chave({"aproximador": t[0], **t[1], "seed_train": t[2]}, t[1].keys())
+    alvos = {_chave({"aproximador": t[0], **t[1], "seed_train": t[2]},
+                    t[1].keys() & _EIXOS)
              for t in tarefas}
     bons, notas = {}, []
     sem_campo = fora_orc = alheios = 0
@@ -603,7 +615,7 @@ def main() -> int:
         antes = len(tarefas)
         tarefas = [t for t in tarefas
                    if _chave({"aproximador": t[0], **t[1], "seed_train": t[2]},
-                             t[1].keys()) not in feitas]
+                             t[1].keys() & _EIXOS) not in feitas]
         print(f"RETOMANDO: {len(res)} corridas aproveitadas de "
               f"{antes} · {len(tarefas)} a fazer" + (f" · {desc}" if desc else ""))
         if not tarefas:
