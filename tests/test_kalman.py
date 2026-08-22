@@ -149,6 +149,31 @@ def test_controle_bate_o_velocidade_constante_sob_virada_brusca():
     assert np.mean(erros_c) < 10.0
 
 
+def test_kfvc_e_otimista_no_q_a_natural():
+    """Degrau 3: o KF-VC é inconsistente (otimista) sob virada i.i.d. com `q_a`
+    pequeno — a previsão de T-07.10, refinada.
+
+    Ele só fica consistente inflando `q_a` a ponto de mal filtrar: não pode ser
+    consistente e preciso ao mesmo tempo. É a assinatura de 'mal especificado'.
+    """
+    from uavwnn.fusion.bancada import rodar_filtro, trajetoria_b1
+    from uavwnn.fusion.consistencia import avaliar
+    from uavwnn.fusion.ruido import CanalGPS, ConfigRuido, fluxo_ruido
+
+    sigma = 10.0
+    erros, covs = [], []
+    for ep in range(80):
+        traj = trajetoria_b1(np.random.default_rng(300 + ep), n_passos=100, sigma_salto=np.pi)
+        canal = CanalGPS(ConfigRuido(sigma_gps=sigma), fluxo_ruido(5, "gps", 0, ep))
+        f = FiltroVelocidadeConstante(sigma_gps=sigma, q_a=2.0)  # q_a natural, pequeno
+        r = rodar_filtro(traj, canal, f)
+        erros.append(r.erros)
+        covs.append(r.covs)
+    n_min = min(e.shape[0] for e in erros)
+    c = avaliar(np.array([e[:n_min] for e in erros]), np.array([cc[:n_min] for cc in covs]))
+    assert c.veredito == "otimista", f"KF-VC deveria ser otimista, veio {c.veredito} (NEES {c.nees_medio:.2f})"
+
+
 def test_passa_baixa_atrasa_alvo_movel():
     """Degrau 2 é enviesado: rastreando velocidade `v`, atraso `v·dt·(1−α)/α`.
 

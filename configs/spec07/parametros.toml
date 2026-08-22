@@ -1,0 +1,99 @@
+# SPEC-07 — parâmetros do ruído, do filtro e da escada, com a procedência de cada um.
+#
+# Escopo pós-D13: um canal só, o GPS do drone. O canal do sensor, o filtro de
+# informação, a H4 e a T3 saíram.
+#
+# TOML e não YAML porque `tomllib` é biblioteca padrão desde o 3.11: verificável
+# por teste sem acrescentar dependência. O campo `origem` segue a convenção da
+# SPEC-05:
+#
+#   lamenza    do PROBLEMA — mexer aqui muda o MDP e invalida a comparação.
+#   propria    sem âncora na literatura, exige medição nossa; aponta o experimento.
+#   pendencia  decisão nossa ainda não fixada por medição (N1, N2 do PENDENCIAS).
+
+# -- varredura de ruído -----------------------------------------------------
+
+[sigma_gps]
+grade = [1.0, 3.0, 5.0, 10.0]
+unidade = "metro"
+origem = "propria"
+nota = """
+Desvio-padrão do GPS próprio, o eixo da varredura da Etapa 2. A unidade canônica
+é o metro, sempre (T-07.1): a corrupção é em metros sobre a posição absoluta,
+antes de qualquer normalização. Em unidades de observação o deslocamento é
+σ/(2S), S = 100 m."""
+
+[dt_gps]
+valor = 2.0
+grade_secundaria = [0.2, 1.0, 5.0]
+unidade = "segundo"
+origem = "pendencia"  # N1
+nota = """
+Taxa do GPS. Escolher dt_gps é escolher o resultado (N1): com dt_dec = 2 s e o
+GPS a 2 s há uma correção por decisão, contra quatro no experimento a 0,5 s que
+mediu o achado A3 (18,8×). Nominal 2 s aqui; a varredura {0,2; 1; 5} é da SPEC-08,
+que a roda com a política no laço."""
+
+# -- filtro de Kalman com entrada de controle (degrau 4) --------------------
+
+[kf_controle]
+origem = "propria"
+q_w = 0.0
+sigma_v0 = 0.0
+kappa = 0.0
+nota = """
+Q = 0 na bancada porque a mobilidade sem massa (o modelo de Lamenza) torna o
+processo exato: x̂⁻ = x̂ + u·dt não tem erro, então qualquer Q > 0 infla P e o
+filtro fica conservador (T-07.5). q_w, sigma_v0 e kappa só passam a valer com a
+ablação de inércia da SPEC-08 — Q(dt) = q_w·dt + (sigma_v0² + kappa·‖Δu‖²)·dt²."""
+
+[ganho_estacionario]
+q_w = 0.05
+origem = "propria"
+nota = "Ablação de custo (T-07.9): ~10 flops, sem matriz, sem divisão."
+
+# -- degraus intermediários da escada ---------------------------------------
+
+[passa_baixa]  # degrau 2
+alpha = 0.5
+alpha_grade = [0.1, 0.25, 0.5, 0.75, 1.0]
+origem = "propria"
+nota = """
+EMA. Sem comando é enviesado para alvo móvel: atraso v·dt·(1−α)/α (30 m em α=0,5).
+A variante usar_comando=true isola 'usar o comando' de 'usar Kalman'."""
+
+[kf_velocidade_constante]  # degrau 3
+q_a_grade = [0.5, 2.0, 5.0, 20.0, 50.0, 200.0]
+origem = "propria"
+nota = """
+KF de aceleração branca, 4 estados, sem entrada de controle. Varre-se q_a e
+reporta-se o melhor por RMSE, senão vira espantalho (T-07.10). A previsão: é
+inconsistente sob comando i.i.d. para todo q_a — mal especificado, não mal
+sintonizado."""
+
+# -- modo de robustez: GPS não branco (ablação) -----------------------------
+
+[gauss_markov]
+tau = 120.0
+fracao_markov = 0.5
+origem = "propria"
+nota = """
+Ablação de robustez (T-07.1a): erro de GPS real tem componente lentamente
+variável. σ_b² = f·σ_gps², σ_w² = (1−f)·σ_gps² preserva a variância marginal e
+isola a correlação. O KF nominal assume branco e fica otimista — é o que o teste
+de brancura da inovação acusa (T-07.7)."""
+
+# -- protocolo Monte Carlo e consistência -----------------------------------
+
+[monte_carlo]
+execucoes = 100
+n_passos_b1 = 120
+alpha_consistencia = 0.05
+dimensao = 2
+raiz_crn = 20260815
+origem = "propria"
+nota = """
+M = 100 é a escolha do intervalo qui-quadrado (T-07.6): faixa a 95 % ≈ [1,63;
+2,41] para ε̄ com n = 2. A raiz alimenta os fluxos de ruído por (canal, nó,
+episódio), com o ε independente de σ (CRN), o que pareia a varredura de σ."""
+</content>

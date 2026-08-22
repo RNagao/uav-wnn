@@ -33,6 +33,8 @@ RMSE de posição (m), bancada B2 (guloso analítico), `M = 100` sementes, `Ns =
 **O KF com entrada de controle ganha ~2,9× sobre a medida crua, em todo σ**, e
 bate o KF de velocidade constante por ~2,8×.
 
+![Barras de RMSE por σ e degrau, em escala log: o EMA sem comando é o pior (~22 m em todo σ), o KF+controle é o melhor, e o KF-VC mal se separa do bruto](img/spec07/escada.png)
+
 ### Por que não é o 18,8× do achado A3, e isso não é falha (N1)
 
 O A3 original (`12,54 m → 0,67 m`, 18,8×) foi medido com decisão a **0,5 s**;
@@ -49,6 +51,8 @@ sintonia.** Rastreando um alvo a 15 m/s com `α = 0,5`, o atraso em regime é
 `v·dt·(1−α)/α = 30 m` — uma ordem de grandeza acima de `σ`. O filtro barato não é
 menos eficiente; é **enviesado**, e o viés domina.
 
+![Atraso do EMA em regime contra α: os pontos medidos caem exatamente sobre a curva teórica v·dt·(1−α)/α, de 30 m em α=0,5 a zero em α=1](img/spec07/passa_baixa_alpha.png)
+
 **O EMA _com comando_ já recupera quase tudo** (2,48 m em σ=3, melhor que o
 KF-VC). Isso não enfraquece a proposta — **desmonta a leitura preguiçosa dela**:
 o que paga não é "usar Kalman", é **conhecer o comando**. O KF+controle
@@ -56,12 +60,35 @@ o que paga não é "usar Kalman", é **conhecer o comando**. O KF+controle
 anotava: *conhecer o comando é o que importa, e o Kalman é a forma principiada de
 usá-lo* — com a covariância que o degrau 5 e a Etapa 3 vão precisar.
 
-**O KF-VC mal ajuda mesmo no melhor `q_a` da grade** (`q_a = 50`–`200`): 13,14 m
-contra 14,07 m do bruto em σ=10. Ele não está mal sintonizado, está **mal
-especificado** — nenhum `Q` de aceleração branca representa um salto de rumo
-determinístico, e a varredura de `q_a` (T-07.10) confirma que o teto dele é
-próximo do bruto. É o que transforma "o KF ingênuo é pior" de anedota em
-diagnóstico.
+**O KF-VC mal ajuda mesmo no melhor `q_a` da grade**: 13,1 m contra 14,1 m do
+bruto em σ=10. Ele não está mal sintonizado, está **mal especificado** — nenhum
+`Q` de aceleração branca representa um salto de rumo determinístico.
+
+### O degrau 3 refina a previsão da spec — e o resultado é melhor
+
+A T-07.10 previa que o KF-VC seria **inconsistente para todo `q_a`**. Medido, o
+quadro é mais rico. Varredura de `q_a` em σ=10, bancada B1 (comando i.i.d.), com
+o NEES ao lado do RMSE:
+
+| `q_a` | NEES | veredito | RMSE (m) |
+|---|---|---|---|
+| 0,5 | 9,27 | **otimista** | 20,9 |
+| 2 | 4,94 | **otimista** | 17,1 |
+| 5 | 3,49 | **otimista** | 15,4 |
+| 20 | 2,41 | **otimista** | 13,9 |
+| 50 | 2,12 | consistente | 13,5 |
+| 200 | 1,97 | consistente | 13,6 |
+
+No `q_a` natural (pequeno) o KF-VC é **otimista** — a previsão vale, e é a
+assinatura de "mal especificado": ele confia numa velocidade que o salto de rumo
+invalida. Ele só fica consistente **inflando `Q` a ponto de mal filtrar** (RMSE
+13,5 m, a um passo do bruto 14,1 m). **Não pode ser consistente e preciso ao
+mesmo tempo** — que é um diagnóstico mais forte que a previsão original, e é o que
+transforma "o KF ingênuo é pior" de anedota em diagnóstico.
+
+![Duas curvas por q_a: o NEES cai de 9,3 para 2 conforme q_a cresce, cruzando a faixa χ² só em q_a=50; o RMSE quase não melhora, ficando preso perto do erro da medida crua](img/spec07/kfvc_tradeoff.png)
+
+![NEES por passo de decisão: o KF+controle fica dentro da faixa χ² 95 %, o KF-VC com q_a=2 fica estável em ~5, muito acima da faixa](img/spec07/nees_degraus.png)
 
 ### O ganho é sobre o que a política enxerga — e agora inteiramente
 
@@ -96,6 +123,13 @@ O número principal do KF sai, portanto, sob um modelo de processo exato; a
 inércia, que tornaria `Q` mensurável, é **ablação declarada** e não a configuração
 nominal (T-07.5), porque trocar a mobilidade alteraria o cenário de Lamenza.
 
+**A média do episódio esconde o transiente** (T-07.11), que é onde a política
+decide. O erro filtrado começa em `σ` e cai como `σ√(2/(k+1))`; o `√tr P` predito
+pelo filtro acompanha o erro medido, o que é a própria consistência vista por
+passo:
+
+![Erro RMS medido, √tr P predito e o ideal σ√(2/(k+1)) contra o passo k: os três coincidem e caem de ~14 m (a medida crua σ√2) para poucos metros em ~20 passos](img/spec07/erro_transiente.png)
+
 ---
 
 ## 3. Potência do detector (critério de saída 3)
@@ -115,6 +149,10 @@ quarta é a mais informativa: erro de GPS **correlacionado** contra um filtro qu
 assume branco fica otimista (NEES 23) **e** a inovação deixa de ser branca
 (`|ρ(1)|` cruza o envelope) — a única desintonia que o teste de brancura pega e o
 NEES médio poderia mascarar se o viés fosse pequeno.
+
+![NEES contra o fator de desintonia de R, em escala log: a curva cruza a faixa χ² só em σ_filtro = σ_verdadeiro, subindo para otimista à esquerda e caindo para conservador à direita](img/spec07/detector_nees_R.png)
+
+![Correlograma da inovação: sob ruído branco a autocorrelação fica dentro do envelope ±1,96/√K em todos os lags; sob Gauss-Markov o lag 1 salta acima do envelope](img/spec07/correlograma.png)
 
 `R` **não se sintoniza, mede-se** (T-07.5): em simulação nós injetamos o ruído,
 então `R = σ²I` é verdade, e qualquer inconsistência é culpa de `Q`, da sincronia
@@ -173,13 +211,13 @@ Lamenza é fechado pela metade, e o relatório final precisa dizê-lo.
 | 2 | brancura da inovação; violação sob Gauss-Markov reportada | ✅ |
 | 3 | tabela de potência do detector | ✅ §3 |
 | 4 | achado A3 medido e explicado (não precisa ser 18,8×) | ✅ 2,9×, N1 |
-| 5 | degraus 2 e 3 sintonizados, com NEES do degrau 3 | ✅ (EMA `α`; KF-VC `q_a` na grade) |
+| 5 | degraus 2 e 3 sintonizados, com NEES do degrau 3 | ✅ EMA `α`, KF-VC varrido; **NEES do degrau 3 reportado** (§1, otimista no `q_a` natural) |
 | 6 | filtro de informação validado | **N/A — fora do escopo (D13)** |
 | 7 | RF-04, teste diferencial verde em n≥20 pares | ✅ §5 |
 | 8 | custo por tipo (mult, soma, divisão) | ✅ §4 |
 | 9 | tabela `T*(σ)` para a SPEC-08 | **parcial** — ver abaixo |
-| 10 | relatório | este documento |
-| 11 | testes automatizados | ✅ 32 testes |
+| 10 | relatório | este documento, com 7 figuras |
+| 11 | testes automatizados | ✅ 33 testes |
 
 **Sobre o critério 9 (T-07.11).** A regra *bin ≈ σ* precisa do `σ` da estimativa
 filtrada. Em unidades de observação, o KF+controle entrega `σ_filtrado/(2S)` com

@@ -90,6 +90,57 @@
       "nis_medio": 1.9967730272566362
     }
   ],
+  "kfvc_tradeoff": {
+    "sigma": 10.0,
+    "faixa": [
+      1.6272798250184628,
+      2.410578955063109
+    ],
+    "varredura": [
+      {
+        "q_a": 0.5,
+        "nees_medio": 9.269459991693141,
+        "veredito": "otimista",
+        "fracao_fora": 0.5055833333333334,
+        "rmse": 20.91089526411162
+      },
+      {
+        "q_a": 2.0,
+        "nees_medio": 4.942866920913642,
+        "veredito": "otimista",
+        "fracao_fora": 0.23775,
+        "rmse": 17.124230125880548
+      },
+      {
+        "q_a": 5.0,
+        "nees_medio": 3.485262190540417,
+        "veredito": "otimista",
+        "fracao_fora": 0.1265,
+        "rmse": 15.351939384209878
+      },
+      {
+        "q_a": 20.0,
+        "nees_medio": 2.4123657999593195,
+        "veredito": "otimista",
+        "fracao_fora": 0.06541666666666666,
+        "rmse": 13.849526403070449
+      },
+      {
+        "q_a": 50.0,
+        "nees_medio": 2.1190355864626667,
+        "veredito": "consistente",
+        "fracao_fora": 0.05366666666666667,
+        "rmse": 13.519244852676358
+      },
+      {
+        "q_a": 200.0,
+        "nees_medio": 1.9720459763040634,
+        "veredito": "consistente",
+        "fracao_fora": 0.048,
+        "rmse": 13.596518250625996
+      }
+    ]
+  },
   "detector": [
     {
       "injecao": "R correto",
