@@ -32,6 +32,22 @@ Uma faixa comum de `α` handicaparia dois dos três, por três razões medidas:
    faz a varredura medir o aproximador em vez de medir a convenção.
 3. Cada faixa cobre a mesma **razão** (16×) em torno do valor de referência da família.
 
+O BASELINE É O MADDPG, E A MLP NÃO ENTRA POR PADRÃO
+
+A MLP pareada tinha **dois** papéis, e sair da grade remove só um. Baseline do
+problema ela nunca foi — isso sempre foi o MADDPG de Lamenza, medido dos pesos
+publicados na SPEC-02. O papel que ela tinha era de **controle pareado do método**:
+mesmo laço, mesma política, só o aproximador diferente, que é o que a T-06.3 usa para
+testar H1.
+
+Sem ela, a comparação de H1 passa a ser contra o MADDPG — que difere do nosso braço em
+**três** coisas ao mesmo tempo: algoritmo (MADDPG contra o Algoritmo 4.4), arquitetura
+(256 × 256 contra 32 × 32) e orçamento de treino (7 dias de GPU por célula). A
+comparação continua legítima e é a que a tese pede, mas **deixa de isolar o
+aproximador**, e o relatório tem de dizer isso em vez de deixar implícito.
+
+`--modelos mlp` continua funcionando para quem quiser o controle de volta.
+
 SELEÇÃO POR COBERTURA, NÃO POR `CT_cens` — e a razão foi medida
 
 `CT_cens` satura em 500 s enquanto nenhum episódio conclui, e `SR` fica em 0 % até o
@@ -76,7 +92,23 @@ from uavwnn.encoding import TermometroQuantil  # noqa: E402
 from uavwnn.refenv import run_episode  # noqa: E402
 
 TAMANHO_TUPLA = 12
-SIGMAS = (0.10, 0.20)
+SIGMAS = (0.20, 0.35, 0.50)
+"""Segunda passada, e a primeira mediu por que ela é necessária.
+
+A grade original varria `σ ∈ {0,10; 0,20}` e o resultado foi um **degrau**, não um
+gradiente: em `σ = 0,10` **todos** os pontos das duas famílias n-tuple ficaram em
+3,3-3,9 % de cobertura — o nível da caminhada aleatória —, e em `σ = 0,20` os melhores
+saltaram para 72 % (`ntupla`) e 43 % (`ntupla_funcional`).
+
+Um degrau no **teto** da faixa é evidência de que o ótimo está fora dela, e a T-06.4
+prescreve exatamente isto: *"após a descida, repetir os dois eixos de maior efeito
+medido"*. `σ` foi o de maior efeito — maior que `α` —, então a segunda passada sobe a
+faixa em vez de refiná-la.
+
+Vale registrar o contraste com a SPEC-05: lá o portão mediu que `σ = 0,25` em `θ_norm`
+dava 90° de ruído angular e nenhuma política apontava. Aqui a ação é a mesma, mas o
+problema tem 12 sensores num campo de 100 m e o horizonte é longo — exploração ampla
+paga, e a faixa que servia ao brinquedo estrangulava o problema real."""
 
 TAXAS = {
     # convenção de MÉDIA (eq. 4.12): o passo em `f` é exatamente `α`
@@ -175,7 +207,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b",
                     help="1b é O PROBLEMA (eq. 5-6, CT_cens); 1a é o exploratório")
-    ap.add_argument("--modelos", default="ntupla,ntupla_funcional,mlp")
+    ap.add_argument("--modelos", default="ntupla,ntupla_funcional",
+                    help="a MLP NÃO entra por padrão — ver a nota sobre o baseline")
     ap.add_argument("--sementes", type=int, default=3, help="`R` da §4.3")
     ap.add_argument("--b-sweep", type=int, default=500_000)
     ap.add_argument("--n-val", type=int, default=20)
