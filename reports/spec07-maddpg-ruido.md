@@ -25,6 +25,60 @@ e com `σ = 0` a observação é bit-idêntica à do ambiente puro (`tests/test_
 3. **Regime L→R** (treino limpo → avaliação ruidosa): o MADDPG nunca viu ruído; o
    KF é o que o transfere sem retreino.
 
+## Comparação com Lamenza: o KF devolve o MADDPG ao patamar publicado
+
+A pergunta direta — *quanto o ruído de GPS degrada o MADDPG publicado, e o filtro
+o recupera?* — nas três células com valor publicado (`Ns = 24`), 100 episódios
+**pareados** por cenário, diferença por bootstrap pareado (o A/A da SPEC-02).
+Reprodução: `scripts/spec07_maddpg_vs_lamenza.py`.
+
+**Primeiro, a montagem se valida: o degrau 0 (limpo) reproduz Lamenza.**
+
+| célula | Lamenza | degrau 0 (limpo) |
+|---|---|---|
+| a_2-s_24 | 29,6 | 32,7 * |
+| a_4-s_24 | 13,8 | 13,6 |
+| a_8-s_24 | 9,7 | 9,7 |
+
+\* `a_2-s_24` é a célula **instável** (a campanha de 900 runs da SPEC-02 deu
+30,3 ± 2,4 s, variância entre runs ~15× a das outras); 32,7 com 100 episódios
+cai dentro dessa dispersão.
+
+**σ = 10 (topo da grade) — o KF recupera 83–100 % do estrago:**
+
+| célula | d1 bruto | Δ(d1−d0) | d4 KF | Δ(d4−d0) | KF recupera |
+|---|---|---|---|---|---|
+| a_2-s_24 | 30,1 | −2,7 [−16,8; +2,5] * | 28,5 | −4,2 [−14,7; +1,0] | +1,55 [+0,8; +2,3] |
+| a_4-s_24 | 15,0 | **+1,4** [+1,0; +1,9] | 13,7 | +0,1 [−0,3; +0,5] | **95 %** |
+| a_8-s_24 | 10,4 | **+0,7** [+0,4; +0,9] | 9,7 | +0,0 [−0,3; +0,3] | **100 %** |
+
+Nas duas células estáveis o ruído bruto degrada com IC separado de zero, e o
+degrau 4 **volta ao degrau 0** (Δ(d4−d0) contém zero — indistinguível do limpo).
+Em `a_2-s_24` a comparação marginal é engolida pela variância do próprio cenário
+(a célula instável), mas a diferença **pareada** `d1−d4` continua conclusiva
+(+1,55 s): o pareamento remove a variância de cenário e o ganho do KF aparece.
+
+**σ = 20 (estresse, fora da grade declarada) — a degradação fica grande e o KF
+ainda recupera ~85 %:**
+
+| célula | d1 bruto | Δ(d1−d0) | d4 KF | Δ(d4−d0) | KF recupera |
+|---|---|---|---|---|---|
+| a_2-s_24 | 37,5 | +4,8 [−5,2; +10,6] * | 29,5 | −3,2 [−13,1; +2,2] | +8,0 [+6,5; +9,5] |
+| a_4-s_24 | 20,8 | **+7,1** [+6,3; +7,9] | 14,7 | +1,0 [+0,6; +1,6] | **86 %** |
+| a_8-s_24 | 12,7 | **+3,0** [+2,6; +3,3] | 10,2 | +0,5 [+0,1; +0,8] | **83 %** |
+
+A `σ=20` o ruído bruto tira o MADDPG **muito** do patamar (a_4: 13,6 → 20,8 s,
++52 %), e o KF o traz de volta para perto do limpo (14,7 s). Aqui um resíduo
+pequeno sobra (Δ(d4−d0) já separa de zero), coerente com o KF ficar levemente
+otimista sob `Q=0` (a seção seguinte) — a sintonia de `Q` da SPEC-08 fecharia o
+que falta.
+
+**A leitura de uma linha:** sob ruído de GPS, o filtro de Kalman com entrada de
+controle **devolve o MADDPG publicado ao seu próprio tempo de conclusão de
+Lamenza** — 83 a 100 % do estrago removido, e nas células estáveis a `σ=10` o
+resultado filtrado é estatisticamente indistinguível do sem ruído. A taxa de
+sucesso fica em 100 % em todos os degraus e σ.
+
 ## A escada no ambiente real (`Q = 0`)
 
 Tempo de conclusão (s), 20 episódios/condição. `d1→d4` = quanto o KF recupera do

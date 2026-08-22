@@ -1,0 +1,320 @@
+{
+  "config": {
+    "episodios": 100,
+    "sigmas": [
+      10.0,
+      20.0
+    ]
+  },
+  "celulas": {
+    "a_2-s_24": {
+      "publicado": 29.6,
+      "degrau0": {
+        "ct": 32.735,
+        "sucesso": 0.99
+      },
+      "sigmas": {
+        "10": {
+          "degrau1": {
+            "ct": 30.075,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 28.52,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": -2.66,
+            "delta_ic_lo": -16.760375,
+            "delta_ic_hi": 2.4901250000000017,
+            "contem_zero": true,
+            "mde_95": 9.283175522863004,
+            "taxa_vitoria_a": 0.19,
+            "tv_ic_lo": 0.12,
+            "tv_ic_hi": 0.27,
+            "p_wilcoxon": 1.3360431686967811e-08
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": -4.215,
+            "delta_ic_lo": -14.731749999999993,
+            "delta_ic_hi": 1.0201249999999995,
+            "contem_zero": true,
+            "mde_95": 9.258536761826948,
+            "taxa_vitoria_a": 0.43,
+            "tv_ic_lo": 0.33,
+            "tv_ic_hi": 0.53,
+            "p_wilcoxon": 0.516249333191765
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 1.5549999999999997,
+            "delta_ic_lo": 0.7600000000000016,
+            "delta_ic_hi": 2.3049999999999997,
+            "contem_zero": false,
+            "mde_95": 0.7584520597036354,
+            "taxa_vitoria_a": 0.24,
+            "tv_ic_lo": 0.16,
+            "tv_ic_hi": 0.33,
+            "p_wilcoxon": 1.0616917506563006e-05
+          },
+          "fracao_recuperada": -0.5845864661654134
+        },
+        "20": {
+          "degrau1": {
+            "ct": 37.51,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 29.495,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": 4.774999999999999,
+            "delta_ic_lo": -5.221749999999998,
+            "delta_ic_hi": 10.595250000000002,
+            "contem_zero": true,
+            "mde_95": 9.532108450130561,
+            "taxa_vitoria_a": 0.04,
+            "tv_ic_lo": 0.01,
+            "tv_ic_hi": 0.08,
+            "p_wilcoxon": 9.462981229956738e-16
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": -3.2399999999999984,
+            "delta_ic_lo": -13.145,
+            "delta_ic_hi": 2.1899999999999977,
+            "contem_zero": true,
+            "mde_95": 9.339971537516384,
+            "taxa_vitoria_a": 0.38,
+            "tv_ic_lo": 0.28,
+            "tv_ic_hi": 0.47,
+            "p_wilcoxon": 0.006745431203376364
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 8.014999999999997,
+            "delta_ic_lo": 6.534250000000004,
+            "delta_ic_hi": 9.480125000000003,
+            "contem_zero": false,
+            "mde_95": 1.50978065046723,
+            "taxa_vitoria_a": 0.11,
+            "tv_ic_lo": 0.05,
+            "tv_ic_hi": 0.17,
+            "p_wilcoxon": 2.7911286451990903e-14
+          },
+          "fracao_recuperada": 1.6785340314136123
+        }
+      }
+    },
+    "a_4-s_24": {
+      "publicado": 13.8,
+      "degrau0": {
+        "ct": 13.645,
+        "sucesso": 1.0
+      },
+      "sigmas": {
+        "10": {
+          "degrau1": {
+            "ct": 15.03,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 13.72,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": 1.3849999999999998,
+            "delta_ic_lo": 0.9500000000000011,
+            "delta_ic_hi": 1.8452500000000005,
+            "contem_zero": false,
+            "mde_95": 0.44613517496767086,
+            "taxa_vitoria_a": 0.17,
+            "tv_ic_lo": 0.1,
+            "tv_ic_hi": 0.24024999999999977,
+            "p_wilcoxon": 7.314086042595892e-09
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": 0.07500000000000107,
+            "delta_ic_lo": -0.29499999999999993,
+            "delta_ic_hi": 0.44512500000000016,
+            "contem_zero": true,
+            "mde_95": 0.3516583942729453,
+            "taxa_vitoria_a": 0.34,
+            "tv_ic_lo": 0.25,
+            "tv_ic_hi": 0.43024999999999974,
+            "p_wilcoxon": 0.42852570102017484
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 1.3099999999999987,
+            "delta_ic_lo": 0.8800000000000008,
+            "delta_ic_hi": 1.750125,
+            "contem_zero": false,
+            "mde_95": 0.4435017479154286,
+            "taxa_vitoria_a": 0.17,
+            "tv_ic_lo": 0.1,
+            "tv_ic_hi": 0.24024999999999977,
+            "p_wilcoxon": 3.0320146721412493e-09
+          },
+          "fracao_recuperada": 0.9458483754512628
+        },
+        "20": {
+          "degrau1": {
+            "ct": 20.79,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 14.68,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": 7.145,
+            "delta_ic_lo": 6.324999999999999,
+            "delta_ic_hi": 7.920374999999998,
+            "contem_zero": false,
+            "mde_95": 0.8229141759686127,
+            "taxa_vitoria_a": 0.0,
+            "tv_ic_lo": 0.0,
+            "tv_ic_hi": 0.0,
+            "p_wilcoxon": 5.5722859958490585e-18
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": 1.0350000000000001,
+            "delta_ic_lo": 0.5698750000000004,
+            "delta_ic_hi": 1.549999999999999,
+            "contem_zero": false,
+            "mde_95": 0.49330599883322773,
+            "taxa_vitoria_a": 0.23,
+            "tv_ic_lo": 0.15,
+            "tv_ic_hi": 0.32,
+            "p_wilcoxon": 7.537519245301972e-05
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 6.109999999999999,
+            "delta_ic_lo": 5.334875000000001,
+            "delta_ic_hi": 6.950124999999999,
+            "contem_zero": false,
+            "mde_95": 0.814058672096896,
+            "taxa_vitoria_a": 0.04,
+            "tv_ic_lo": 0.01,
+            "tv_ic_hi": 0.08,
+            "p_wilcoxon": 1.343265006087025e-16
+          },
+          "fracao_recuperada": 0.855143456962911
+        }
+      }
+    },
+    "a_8-s_24": {
+      "publicado": 9.7,
+      "degrau0": {
+        "ct": 9.71,
+        "sucesso": 1.0
+      },
+      "sigmas": {
+        "10": {
+          "degrau1": {
+            "ct": 10.37,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 9.71,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": 0.6599999999999984,
+            "delta_ic_lo": 0.375,
+            "delta_ic_hi": 0.9449999999999985,
+            "contem_zero": false,
+            "mde_95": 0.2937953496479267,
+            "taxa_vitoria_a": 0.22,
+            "tv_ic_lo": 0.14,
+            "tv_ic_hi": 0.30024999999999974,
+            "p_wilcoxon": 3.158498370678804e-05
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": 0.0,
+            "delta_ic_lo": -0.25512500000000077,
+            "delta_ic_hi": 0.26999999999999963,
+            "contem_zero": true,
+            "mde_95": 0.2541824684606066,
+            "taxa_vitoria_a": 0.33,
+            "tv_ic_lo": 0.24,
+            "tv_ic_hi": 0.43,
+            "p_wilcoxon": 0.7233101258631172
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 0.6599999999999984,
+            "delta_ic_lo": 0.39987500000000037,
+            "delta_ic_hi": 0.9349999999999987,
+            "contem_zero": false,
+            "mde_95": 0.2631386130862776,
+            "taxa_vitoria_a": 0.19,
+            "tv_ic_lo": 0.11975000000000001,
+            "tv_ic_hi": 0.27,
+            "p_wilcoxon": 3.1534173233802107e-06
+          },
+          "fracao_recuperada": 1.0
+        },
+        "20": {
+          "degrau1": {
+            "ct": 12.66,
+            "sucesso": 1.0
+          },
+          "degrau4": {
+            "ct": 10.2,
+            "sucesso": 1.0
+          },
+          "delta_d1_d0": {
+            "n_pareado": 100,
+            "delta_media": 2.9499999999999993,
+            "delta_ic_lo": 2.584999999999999,
+            "delta_ic_hi": 3.3251250000000008,
+            "contem_zero": false,
+            "mde_95": 0.37647278464154293,
+            "taxa_vitoria_a": 0.02,
+            "tv_ic_lo": 0.0,
+            "tv_ic_hi": 0.05,
+            "p_wilcoxon": 1.8476361905384068e-17
+          },
+          "delta_d4_d0": {
+            "n_pareado": 100,
+            "delta_media": 0.48999999999999844,
+            "delta_ic_lo": 0.14499999999999957,
+            "delta_ic_hi": 0.8249999999999993,
+            "contem_zero": false,
+            "mde_95": 0.3351623734336188,
+            "taxa_vitoria_a": 0.33,
+            "tv_ic_lo": 0.24,
+            "tv_ic_hi": 0.42,
+            "p_wilcoxon": 0.004207481885253128
+          },
+          "delta_d1_d4": {
+            "n_pareado": 100,
+            "delta_media": 2.460000000000001,
+            "delta_ic_lo": 2.0198749999999994,
+            "delta_ic_hi": 2.875,
+            "contem_zero": false,
+            "mde_95": 0.43531098183837597,
+            "taxa_vitoria_a": 0.1,
+            "tv_ic_lo": 0.04,
+            "tv_ic_hi": 0.16,
+            "p_wilcoxon": 1.353616204429536e-14
+          },
+          "fracao_recuperada": 0.8338983050847463
+        }
+      }
+    }
+  }
+}
