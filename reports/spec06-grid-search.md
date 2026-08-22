@@ -288,7 +288,59 @@ direto em `f`. Só a nossa é interpretável como "quanto a saída se move".
 
 ---
 
-## 9. Como reproduzir
+## 9. Configuração provisória, para desenvolvimento em paralelo
+
+Escolhida sobre a **parcial** do `desempate` (160 de 720 corridas) para destravar
+trabalho em outra máquina. É provisória: a grade não fechou.
+
+| eixo | valor | por quê |
+|---|---|---|
+| aproximador | `ntupla_dissertacao` | as 4 corridas com SR > 0 são todas dela |
+| `passo_efetivo` | **5e-4** | o maior passo amplamente estável |
+| `σ` | **0,20** | o ponto de 3 sementes com melhor cobertura |
+| `T` / `n` | **32 / 12** (`N` = 67) | `n = 12` domina `n = 24` por 3 a 7× |
+| `φ` | **0,85** | melhor cobertura das vivas |
+| `m` | 8 | não varrido — limitação declarada |
+| `normalizar` | desligado | medido: piora os dois braços |
+
+Medido nesse ponto, 3 sementes, `B` = 200 mil: cobertura **49,3 %** (54,8 / 74,1 /
+19,0), SR 12,7 %, **0/3 abortos**. Referências: caminhante aleatório 3,3 %; guloso
+100 % de SR com CT ≈ 34 s.
+
+### Por que 5e-4 e não 8e-4, que rende mais
+
+Mortalidade. Na dissertação, por nível de passo:
+
+| `passo` | abortos | cobertura das vivas |
+|---|---|---|
+| 3e-4 | 0/16 | 14,0 % |
+| **5e-4** | **2/19** | **26,1 %** |
+| 8e-4 | 9/15 | 37,7 % |
+| 1,5e-3 | 15/15 | — |
+| 3e-3 | 15/15 | — |
+
+`8e-4` rende mais **entre as que sobrevivem**, e mata 60 %. Para desenvolvimento,
+uma configuração que aborta 3 de 5 vezes não serve.
+
+### A armadilha que isso remove
+
+O padrão da `NormalProjetada` é `σ = 0,1`, e o treinador não o sobrescrevia. A
+primeira grade mediu que **as 18 corridas com `σ = 0,10` abortaram**, todas. Não é
+exploração insuficiente: o passo efetivo é `~α·δ/σ`, com `σ` no **denominador**,
+então metade do `σ` dobra o passo. Quem clonasse o repositório e rodasse o
+treinador teria divergência garantida.
+
+Agora `scripts/spec06_treinar.py` fixa `PASSO_EFETIVO` e `SIGMA` explicitamente, com
+`ap_taxa()` convertendo para a convenção de cada família (`passo` na média,
+`passo/N` na soma). A configuração também está em
+`reports/spec06-config-provisoria.json`, legível por máquina.
+
+**Ressalva:** a variância entre sementes nesse ponto é alta — 19,0 %, 54,8 %,
+74,1 %. Uma única semente não é sinal.
+
+---
+
+## 10. Como reproduzir
 
 ```bash
 # grade de decisão (2,8 h)

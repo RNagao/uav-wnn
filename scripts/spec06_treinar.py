@@ -37,6 +37,7 @@ import numpy as np
 
 sys.path.insert(0, "scripts")
 from uavwnn.agents import APROXIMADORES, BASELINES  # noqa: E402
+from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
 from uavwnn.agents.ac_continuo import AtorCriticoContinuo  # noqa: E402
 from uavwnn.agents.base import ContextoEpisodio, Observacao  # noqa: E402
 from uavwnn.campanha import (  # noqa: E402
@@ -105,6 +106,42 @@ REPLICAS = {
 }
 BITS_POR_ESCALAR = 32
 
+# --- configuração provisória vencedora da varredura ------------------------
+#
+# Escolhida sobre a PARCIAL do nível `desempate` (160 de 720 corridas), para
+# destravar desenvolvimento em paralelo. **Provisória**: a grade não fechou, e o
+# portão G1 da SPEC-06 segue não declarado.
+#
+# O motivo de existirem estas constantes é que os padrões não serviam, e um deles
+# era uma armadilha: a `NormalProjetada` tem `sigma = 0,1` por padrão, e a
+# primeira grade mediu que **as 18 corridas com σ = 0,10 abortaram**, todas, pela
+# assertiva de estabilidade. Não é exploração insuficiente — é que o passo efetivo
+# é `~α·δ/σ`, com σ no DENOMINADOR, então metade do σ dobra o passo. Treinar com o
+# padrão daria divergência garantida.
+#
+# A escolha, eixo por eixo, sobre a parcial:
+#
+#   passo 5e-4  O maior passo amplamente estável. Medido na dissertação:
+#               3e-4 -> 0/16 abortos e 14,0 % de cobertura das vivas
+#               5e-4 -> 2/19 abortos e 26,1 %      <- escolhido
+#               8e-4 -> 9/15 abortos e 37,7 %      (melhor, e 60 % de mortalidade)
+#               1,5e-3 e 3e-3 -> 15/15 abortos, os dois
+#   σ 0,20      O ponto de 3 sementes com melhor cobertura usa 0,20 (49,3 %).
+#   T 32, n 12  `n` domina: com n=12 a cobertura é 31,7 % (T16) e 35,7 % (T32);
+#               com n=24 cai para 4,9 % e 10,7 %. T=32 custa 1,26× de T=16.
+#   φ 0,85      Melhor cobertura das vivas (27,8 % contra 22,4 % de 0,70 e
+#               15,4 % de 0,99). O esquecimento NÃO estabiliza: 0,70 aborta 11/21.
+#   m 8         Não varrido — limitação declarada. É o padrão da classe.
+#   normalizar  Desligado: medido, PIORA os dois braços.
+#
+# RESSALVA: variância entre sementes é alta neste ponto (19,0 %, 54,8 %, 74,1 %).
+# Uma única semente não é sinal.
+PASSO_EFETIVO = 5e-4
+"""Passo em `f` por atualização. Na convenção de MÉDIA (eq. 4.12) é a taxa direta."""
+
+SIGMA = 0.20
+"""Desvio da normal projetada. **Não** use o padrão 0,1 da classe — diverge."""
+
 
 def _cfgs(replica: str, na: int, ns: int) -> tuple[EnvConfig, EnvConfig]:
     """`(treino, avaliação)`. As duas fases diferem e a diferença muda a métrica.
@@ -134,6 +171,20 @@ def _ctx(cfg: EnvConfig) -> ContextoEpisodio:
         state_num_closest_drones=cfg.state_num_closest_drones)
 
 
+def ap_taxa(aprox: str, n_bits: int) -> float:
+    """Converte `PASSO_EFETIVO` para a taxa nominal da convenção da família.
+
+    Somar `passo` às `N` posições endereçadas muda `f` em `passo` na convenção de
+    média e em `passo·N` na de soma. Como o `anbubus` usa soma, a taxa dele tem de
+    ser dividida por `N` para produzir o MESMO deslocamento — e `N` depende de
+    `(T, n)`, então a conversão é por configuração, não uma tabela fixa.
+    """
+    if aprox == "ntupla_anbubus":
+        import math
+        return PASSO_EFETIVO / math.ceil(n_bits / 12)
+    return PASSO_EFETIVO
+
+
 def montar_agente(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente,
                   corpus: np.ndarray):
     """Aproximador + codificador + política. `seed_tuple` governa o ladrilhamento."""
@@ -148,9 +199,11 @@ def montar_agente(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente,
         # repetição. Passar `seed_train` aqui acoplaria tuplas e ruído.
         ap = APROXIMADORES[aprox](n_bits=termo.n_bits, seed=sem.seed_tuple,
                                   n_dims_codificador=d_obs,
-                                  limiares_por_dim=BITS_POR_ESCALAR)
+                                  limiares_por_dim=BITS_POR_ESCALAR,
+                                  taxa_ator=ap_taxa(aprox, termo.n_bits))
         codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
     politica = AtorCriticoContinuo(aproximador=ap, codificar=codificar,
+                                   politica=NormalProjetada(SIGMA, None),
                                    id=f"wnn_{aprox}", treinando=True)
     return ap, termo, politica, codificar
 
