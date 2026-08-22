@@ -392,6 +392,21 @@ def main() -> int:
     # ele muda o lote, não a ordem.
     tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
                for s in amostras for sd in range(a.sementes) for m in modelos]
+    # EMBARALHA com semente fixa, e a razão foi medida.
+    #
+    # O produto cartesiano deixa os eixos em blocos: `resolucao` é o 3º, então `T`
+    # alterna a cada 144 corridas. Com 12 workers, os 12 ficam quase sempre na
+    # MESMA configuração de `T` — e aí o tempo por corrida mede **autocontenção do
+    # bloco**, não o custo daquele ponto. Medido: `T=32` pareceu **18× mais lento**
+    # que `T=16`, quando isolado é **1,7×**, e eu quase recomendei cortar um eixo
+    # com base nisso.
+    #
+    # Pior que a medição errada: um parcial lido no meio do caminho fica enviesado
+    # para o bloco corrente, e a leitura comparativa deixa de valer. Semente fixa
+    # preserva a reprodutibilidade.
+    import random as _r
+
+    _r.Random(a.seed_busca).shuffle(tarefas)
 
     rot = (f"grade fatorial COMPLETA ({a.niveis})" if a.modo == "grade"
            else f"busca aleatória ({a.amostras} sorteios)")
