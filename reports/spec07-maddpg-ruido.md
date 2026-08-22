@@ -79,6 +79,10 @@ Lamenza** — 83 a 100 % do estrago removido, e nas células estáveis a `σ=10`
 resultado filtrado é estatisticamente indistinguível do sem ruído. A taxa de
 sucesso fica em 100 % em todos os degraus e σ.
 
+![Barras por célula (Ns=24): Lamenza publicado, degrau 0 limpo, degrau 1 bruto e degrau 4 KF a σ=10; a barra do KF alinha com a do publicado e a do limpo, enquanto a do bruto fica acima](img/spec07-maddpg/comparacao_lamenza.png)
+
+![Δ do tempo de conclusão contra o limpo em função de σ (0, 10, 20), bruto vs KF, três painéis: a curva do bruto sobe com σ e a do KF fica plana perto de zero](img/spec07-maddpg/degradacao_vs_sigma.png)
+
 ## A escada no ambiente real (`Q = 0`)
 
 Tempo de conclusão (s), 20 episódios/condição. `d1→d4` = quanto o KF recupera do
@@ -141,6 +145,10 @@ interrompido, é a política mais fraca da linha `Na=8`, com trajetórias mais
 erráticas que castigam a hipótese "u conhecido". A inconsistência ali é
 propriedade dos pesos publicados, não do nosso filtro.
 
+![NEES do KF por célula e σ, escala log: a maioria fica acima do alvo 2 (otimista), com σ=5 sistematicamente acima de σ=10, e a_8-s_12 disparando](img/spec07-maddpg/nees_real.png)
+
+![RMSE do KF por célula e σ contra as linhas da medida crua σ√2: o erro filtrado fica bem abaixo do cru em todas as células, exceto os checkpoints anômalos Na=8](img/spec07-maddpg/rmse_real.png)
+
 **O laço detector → ajuste fecha, e em dados reais.** Varrendo `q_w` em
 `a_4-s_24, σ=10`:
 
@@ -168,6 +176,24 @@ um `q_w` um pouco maior — a sintonia por célula/σ é o trabalho da SPEC-08.)
   precisa de `Q > 0` para ser consistente. É uma correção de expectativa que só o
   ambiente real produz, e que a SPEC-08 (ablação de inércia, sintonia de `Q`)
   herda com um ponto de partida medido: `q_w ≈ 1` na célula testada.
+
+## Figuras de mérito com o filtro embutido (RNF-05)
+
+O KF é código que voa no UAV e conta no orçamento. Recalculadas com o filtro
+(`scripts/spec07_figuras_maddpg.py`, artefato `spec07-maddpg-merito.json`):
+
+| figura | KF+controle | referência (ator MADDPG) | fração |
+|---|---|---|---|
+| **T3** operações/decisão | **48 flops** (27 mult, 20 soma, 1 div) | ~74 000 mult. fp | **0,065 %** |
+| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | 291 KB | 0,007 % |
+
+O ponto que a RNF-05 pede que se declare: o filtro **não é grátis** (usa somas fp
+e uma divisão), mas é uma **constante pequena e fixa, independente da capacidade
+do modelo** — enquanto o custo da política cresce com a rede. Contra o MADDPG a
+fração é 0,07 %; contra a MLP pareada (o par de H1) o KF **cancela**, porque a MLP
+precisaria exatamente do mesmo filtro.
+
+![Barras em escala log das multiplicações fp do ator do MADDPG (Na=2/4/8, ~74 mil) contra a linha do KF em 48 flops, três ordens de grandeza abaixo](img/spec07-maddpg/custo_com_filtro.png)
 
 ## Ressalvas
 

@@ -1,0 +1,23 @@
+{
+  "kf_flops": 48,
+  "kf_mult_fp": 27,
+  "kf_div_fp": 1,
+  "kf_bytes_por_drone": 20,
+  "por_Na": {
+    "2": {
+      "maddpg_mult_fp": 72960,
+      "fracao_flops": 0.0006578947368421052,
+      "fracao_bytes": 6.805313588850174e-05
+    },
+    "4": {
+      "maddpg_mult_fp": 73984,
+      "fracao_flops": 0.0006487889273356401,
+      "fracao_bytes": 6.711769759450172e-05
+    },
+    "8": {
+      "maddpg_mult_fp": 76032,
+      "fracao_flops": 0.0006313131313131314,
+      "fracao_bytes": 6.532190635451505e-05
+    }
+  }
+}
