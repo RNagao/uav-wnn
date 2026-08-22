@@ -152,7 +152,7 @@ class _RedeNTupla:
         deliberadas de magnitude 1,0 — e a validação contra o Julia é a evidência
         mais forte que o projeto tem. Uma primitiva não policia quem a chama.
 
-        Quem liga é `NTuplaAprox`, o ponto onde o gradiente de política de fato
+        Quem liga é `NTuplaDissertacaoAprox`, o ponto onde o gradiente de política de fato
         entra, que é exatamente onde a divergência da RNF-01 foi MEDIDA. Um teste
         garante que ele não seja desligado por descuido.
 
@@ -170,12 +170,42 @@ class _RedeNTupla:
         self.n_saidas = n_saidas
         self.mapeamento = mapeamento_particionado(n_bits, tamanho_tupla, seed)
         self.n_ram = len(self.mapeamento)
-        # Potências de 2 por tupla. Uma lista, e não um vetor único, porque a
-        # última tupla pode ser mais curta que as outras.
+        # Potências de 2 por tupla. Mantida como lista para quem inspeciona
+        # tupla a tupla; o caminho quente não a usa.
         self._potencias = [
             (np.uint64(1) << np.arange(len(t), dtype=np.uint64))
             for t in self.mapeamento
         ]
+        self._montar_endereco_vetorizado()
+
+    def _montar_endereco_vetorizado(self) -> None:
+        """Pré-computa as duas matrizes que tornam `enderecos` uma chamada só.
+
+        POR QUE ISTO EXISTE — medido em T-06.0, e o número é embaraçoso.
+
+        A versão anterior fazia um laço Python sobre as RAMs, com uma chamada
+        NumPy por RAM. O custo saiu **linear em `n_ram` a ~5 µs por RAM**, medido de
+        32 a 200 RAMs — isto é, despacho, não aritmética. Com `N = 67` isso dava
+        **331 µs dos 337 µs** de `prever()`, contra 8,6 µs da MLP pareada: o
+        n-tuple parecia **39× mais lento**, exatamente o oposto da alegação de H1.
+
+        E a contradição com a contagem de operações (T3) denunciava o problema: são
+        576 operações de bit no endereçamento, que a 280 ns cada não são
+        aritmética de máquina alguma.
+
+        As tuplas curtas (a última pode ser) são preenchidas apontando para um bit
+        **sentinela** acrescentado à entrada, sempre zero, com potência zero — o
+        que o torna neutro na soma. Assim a matriz é retangular e o endereço sai de
+        um `gather` mais um produto.
+        """
+        n_max = max(len(t) for t in self.mapeamento)
+        # Coluna sentinela: índice `n_bits`, acrescentada em `enderecos`.
+        self._tuplas = np.full((self.n_ram, n_max), self.n_bits, dtype=np.intp)
+        self._pot_mat = np.zeros((self.n_ram, n_max), dtype=np.uint64)
+        for i, tupla in enumerate(self.mapeamento):
+            k = len(tupla)
+            self._tuplas[i, :k] = tupla
+            self._pot_mat[i, :k] = np.uint64(1) << np.arange(k, dtype=np.uint64)
 
     @property
     def cobertura(self) -> float:
@@ -197,10 +227,11 @@ class _RedeNTupla:
         """
         if bits.ndim == 1:
             bits = bits[None, :]
-        saida = np.empty((bits.shape[0], self.n_ram), dtype=np.uint64)
-        for i, (tupla, pot) in enumerate(zip(self.mapeamento, self._potencias)):
-            saida[:, i] = (bits[:, tupla].astype(np.uint64) * pot).sum(axis=1)
-        return saida
+        # Bit sentinela em zero, para as tuplas curtas apontarem sem efeito.
+        estendido = np.zeros((bits.shape[0], self.n_bits + 1), dtype=np.uint64)
+        estendido[:, :self.n_bits] = bits
+        # Uma chamada, não `n_ram` chamadas: `(M, N, n) · (N, n) -> (M, N)`.
+        return (estendido[:, self._tuplas] * self._pot_mat).sum(axis=2)
 
     @property
     def ganho_do_passo(self) -> float:
@@ -227,6 +258,20 @@ class _RedeNTupla:
         if atual == para:
             return float(taxa)
         return float(taxa * self.n_ram) if para == "media" else float(taxa / self.n_ram)
+
+    def remapear(self, mapeamento: list) -> None:
+        """Troca o mapeamento e **remonta** as matrizes de endereçamento.
+
+        Existe porque trocar `self.mapeamento` direto deixaria `_tuplas` e
+        `_pot_mat` desatualizadas, e o endereçamento passaria a usar o mapeamento
+        antigo — silenciosamente. Quem carrega checkpoint ou importa modelo de
+        fora (o `NTNModel` do `anbubus`) passa por aqui.
+        """
+        self.mapeamento = list(mapeamento)
+        self.n_ram = len(self.mapeamento)
+        self._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
+                           for t in self.mapeamento]
+        self._montar_endereco_vetorizado()
 
     def _verificar(self, passo: NDArray[np.float64]) -> None:
         """Asserção da §4.2, aplicada ao `δ·g` **efetivo** — não ao nominal.

@@ -29,7 +29,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from uavwnn.agents.ac_continuo import AtorCriticoContinuo, MlpAprox, NTuplaAprox
+from uavwnn.agents.ac_continuo import AtorCriticoContinuo, MlpAprox, NTuplaDissertacaoAprox
 from uavwnn.agents.base import Acao, ContextoEpisodio, Observacao
 from uavwnn.agents.politica_continua import D_ATOR, NormalProjetada
 
@@ -133,7 +133,7 @@ def _rodar(aprox, codificar) -> tuple[list, list[Acao]]:
 
 @pytest.fixture(scope="module")
 def dois_bracos():
-    ntupla = _rodar(NTuplaAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0),
+    ntupla = _rodar(NTuplaDissertacaoAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0),
                     _codificador())
     mlp = _rodar(MlpAprox(n_bits_ou_dim=D_OBS, seed=0),
                  lambda v: np.asarray(v, float))
@@ -213,7 +213,7 @@ def test_avaliacao_nao_atualiza_nem_amostra():
 def test_determinismo_bit_a_bit_da_tabela_n_tupla():
     """Critério de saída 7: mesma semente, tabelas idênticas bit a bit."""
     def treinar():
-        aprox = NTuplaAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0)
+        aprox = NTuplaDissertacaoAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0)
         _rodar(aprox, _codificador())
         return aprox
 
@@ -291,10 +291,10 @@ def test_config_concorda_com_o_codigo():
     from uavwnn.wnn.redes import RedeRegressaoEsquecimento
     cfg = _config()
     assert cfg["d_ator"]["valor"] == D_ATOR
-    # `c_max` é lido de `NTuplaAprox`, e não da rede: o padrão vive no ponto de
+    # `c_max` é lido de `NTuplaDissertacaoAprox`, e não da rede: o padrão vive no ponto de
     # montagem do agente, não na primitiva. Ver
     # `test_asseracao_de_estabilidade_ligada_no_caminho_de_treino`.
-    assert NTuplaAprox(n_bits=N_BITS, tamanho_tupla=8).ator.c_max == cfg["c_max"]["valor"]
+    assert NTuplaDissertacaoAprox(n_bits=N_BITS, tamanho_tupla=8).ator.c_max == cfg["c_max"]["valor"]
     assert RedeRegressaoEsquecimento(32, 8).c_max is None
     assert cfg["c_max"]["valor_critico"] == "nulo"
     assert str(D_ATOR) in cfg["arquitetura_mlp"]["valor"]
@@ -304,13 +304,13 @@ def test_asseracao_de_estabilidade_ligada_no_caminho_de_treino():
     """Critério de saída 6 — e o teste existe porque o padrão mudou de lugar.
 
     A asserção da §4.2 é `None` na rede (primitiva de uso geral, que serve de
-    oráculo contra o `Ramnet.jl`) e `0,5` em `NTuplaAprox` (onde o gradiente de
+    oráculo contra o `Ramnet.jl`) e `0,5` em `NTuplaDissertacaoAprox` (onde o gradiente de
     política entra, e onde a divergência da RNF-01 foi medida). Se alguém inverter
     esse padrão, a proteção desaparece sem nenhum teste ficar vermelho — salvo
     este.
     """
     from uavwnn.wnn.redes import TreinoInstavel
-    aprox = NTuplaAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0)
+    aprox = NTuplaDissertacaoAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0)
     assert aprox.ator.c_max == 0.5, "asserção desligada no caminho de treino"
 
     bits = np.zeros(N_BITS, bool)
@@ -324,7 +324,7 @@ def test_asseracao_de_estabilidade_ligada_no_caminho_de_treino():
 
 def test_desligar_a_asseracao_e_decisao_explicita():
     """`c_max=None` funciona, mas tem de ser escrito por quem monta o agente."""
-    aprox = NTuplaAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0, c_max=None)
+    aprox = NTuplaDissertacaoAprox(n_bits=N_BITS, tamanho_tupla=8, seed=0, c_max=None)
     bits = np.zeros(N_BITS, bool)
     bits[:8] = True
     aprox.ascender_ator(bits, np.full(D_ATOR, 500.0))           # passa

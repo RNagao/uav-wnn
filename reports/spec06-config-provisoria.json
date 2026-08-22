@@ -1,0 +1,30 @@
+{
+  "_": "Configuração PROVISÓRIA vencedora da varredura SPEC-06, escolhida sobre a parcial do nível `desempate` (160 de 720 corridas). A grade não fechou e o portão G1 segue não declarado. Ver reports/spec06-grid-search.md §10.",
+  "aproximador": "ntupla_dissertacao",
+  "cenario": {"replica": "1b", "na": 1, "ns": 12, "ruido_gps": false},
+  "hiperparametros": {
+    "passo_efetivo": 5e-4,
+    "taxa_ator": 5e-4,
+    "sigma": 0.20,
+    "resolucao_termometro": 32,
+    "n_bits": 800,
+    "tamanho_tupla": 12,
+    "n_ram": 67,
+    "phi": 0.85,
+    "passos_m": 8,
+    "desconto": 0.99,
+    "normalizar": false,
+    "c_max": 0.5,
+    "convencao": "media"
+  },
+  "desempenho_medido": {
+    "b_sweep": 200000,
+    "sementes": [0, 1, 2],
+    "cobertura_por_semente": [0.548, 0.741, 0.190],
+    "cobertura_media": 0.493,
+    "sr_medio": 0.127,
+    "abortos": "0/3"
+  },
+  "referencias": {"caminhada_aleatoria_cobertura": 0.033,
+                  "guloso_sr": 1.0, "guloso_ct_s": 34}
+}

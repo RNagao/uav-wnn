@@ -25,7 +25,7 @@ from uavwnn.agents import (
     AtorCriticoContinuo,
     ContextoEpisodio,
     MlpAprox,
-    NTuplaAprox,
+    NTuplaDissertacaoAprox,
     NormalProjetada,
     Observacao,
     Policy,
@@ -256,7 +256,7 @@ def test_wnn_faz_zero_multiplicacoes_e_a_mlp_nao():
     nem atribuído a um dos lados.
     """
     term = TermometroArtigo(-1.0, 1.0, 8)
-    nt = NTuplaAprox(term.n_bits_para(25)).custo()
+    nt = NTuplaDissertacaoAprox(term.n_bits_para(25)).custo()
     mlp = MlpAprox(25).custo()
 
     assert nt["mult_fp_aproximador"] == 0          # a alegação de H1
@@ -275,7 +275,7 @@ def test_os_dois_aproximadores_satisfazem_a_interface_congelada():
     """Entram no harness da SPEC-02 sem caminho especial."""
     term = TermometroArtigo(-1.0, 1.0, 8)
     for ap, cod in ((MlpAprox(25), lambda v: v),
-                    (NTuplaAprox(term.n_bits_para(25)),
+                    (NTuplaDissertacaoAprox(term.n_bits_para(25)),
                      lambda v: term.codificar(np.clip(v, -1, 0.999)[None, :])[0])):
         ag = AtorCriticoContinuo(aproximador=ap, codificar=cod)
         assert isinstance(ag, Policy)
@@ -302,7 +302,7 @@ def test_pareamento_a_mesma_observacao_chega_aos_dois():
     rng = np.random.default_rng(3)
     vetores = rng.uniform(-1, 1, size=(6, 25))
     for ap, cod in ((MlpAprox(25), cod_mlp),
-                    (NTuplaAprox(term.n_bits_para(25)), cod_wnn)):
+                    (NTuplaDissertacaoAprox(term.n_bits_para(25)), cod_wnn)):
         ag = AtorCriticoContinuo(aproximador=ap, codificar=cod)
         ag.reset(_ctx(), np.random.default_rng(0))
         for v in vetores:
@@ -382,7 +382,7 @@ def test_mlp_aprende_o_bandido():
 def test_ntuple_aprende_o_bandido():
     term = TermometroArtigo(-3.0, 3.0, 8)
     et, es = _bandido(
-        NTuplaAprox(term.n_bits_para(6), tamanho_tupla=8, taxa_ator=3e-3, seed=0),
+        NTuplaDissertacaoAprox(term.n_bits_para(6), tamanho_tupla=8, taxa_ator=3e-3, seed=0),
         lambda v: term.codificar(np.clip(v, -3, 2.999)[None, :])[0], "3e-3")
     assert et < 15.0, f"erro de rumo {et:.1f}° alto demais"
     assert es < 0.10, f"erro de velocidade {es:.3f} alto demais"

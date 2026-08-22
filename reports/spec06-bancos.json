@@ -1,0 +1,96 @@
+{
+  "config": {
+    "celulas": "1:12,2:12,4:12",
+    "n_test": 60,
+    "saida": "reports/spec06-bancos.json"
+  },
+  "celulas": {
+    "a1s12": {
+      "bancos": {
+        "test": {
+          "n": 500,
+          "hash": "a18e234709ff1331"
+        },
+        "val": {
+          "n": 100,
+          "hash": "a2d5a33c0883b412"
+        }
+      },
+      "p5": {
+        "ct_p99_em_500": 43.04999999999998,
+        "horizonte": 500.0,
+        "sr_guloso": 1.0,
+        "permissivo": true,
+        "n_episodios": 60,
+        "ct_medio": 33.43333333333333,
+        "sr_em_500": 1.0
+      },
+      "excedente_pos_conclusao": {
+        "n": 40,
+        "media": 30.5,
+        "mediana": 30.5,
+        "min": 30.5,
+        "max": 30.5,
+        "duracao_media": 64.4875
+      }
+    },
+    "a2s12": {
+      "bancos": {
+        "test": {
+          "n": 500,
+          "hash": "dad3c81339626933"
+        },
+        "val": {
+          "n": 100,
+          "hash": "637c8dce2a97e88d"
+        }
+      },
+      "p5": {
+        "ct_p99_em_500": 43.77999999999997,
+        "horizonte": 500.0,
+        "sr_guloso": 1.0,
+        "permissivo": true,
+        "n_episodios": 60,
+        "ct_medio": 33.775,
+        "sr_em_500": 1.0
+      },
+      "excedente_pos_conclusao": {
+        "n": 40,
+        "media": 30.5,
+        "mediana": 30.5,
+        "min": 30.5,
+        "max": 30.5,
+        "duracao_media": 64.3875
+      }
+    },
+    "a4s12": {
+      "bancos": {
+        "test": {
+          "n": 500,
+          "hash": "420ca5d9fe6a2e9b"
+        },
+        "val": {
+          "n": 100,
+          "hash": "cac407c93264abbf"
+        }
+      },
+      "p5": {
+        "ct_p99_em_500": 39.705,
+        "horizonte": 500.0,
+        "sr_guloso": 1.0,
+        "permissivo": true,
+        "n_episodios": 60,
+        "ct_medio": 30.333333333333332,
+        "sr_em_500": 1.0
+      },
+      "excedente_pos_conclusao": {
+        "n": 40,
+        "media": 30.5,
+        "mediana": 30.5,
+        "min": 30.5,
+        "max": 30.5,
+        "duracao_media": 61.4625
+      }
+    }
+  }
+}

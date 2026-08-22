@@ -62,11 +62,13 @@ def _rede_de(peso: np.ndarray, mapeamento: np.ndarray, tupla: int,
     # Mapeamento DELES, fatiado como as nossas tuplas. Nunca re-sorteado: o
     # `torch.randperm` não coincide com o do NumPy, e uma rede cujos endereços não
     # correspondem aos valores falha em silêncio.
-    rede.mapeamento = [mapeamento[i:i + tupla]
-                       for i in range(0, len(mapeamento), tupla)]
-    rede.n_ram = len(rede.mapeamento)
-    rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                       for t in rede.mapeamento]
+    #
+    # Via `remapear` e não por atribuição direta: a rede mantém matrizes de
+    # endereçamento pré-computadas, e trocar `mapeamento` sem remontá-las deixaria o
+    # endereçamento usando o mapeamento ANTIGO — em silêncio. Foi o que seis testes
+    # pegaram quando a vetorização entrou.
+    rede.remapear([mapeamento[i:i + tupla]
+                   for i in range(0, len(mapeamento), tupla)])
 
     base = 2 ** tupla
     esperado = rede.n_ram * base
@@ -146,7 +148,7 @@ def main() -> int:
                      f"(tolerância {a.tolerancia:.0e}). O checkpoint NÃO foi "
                      f"gravado — um modelo silenciosamente errado é pior que "
                      f"nenhum modelo.")
-        rede.salvar(destino / f"ntupla-{nome}.npz")
+        rede.salvar(destino / f"ntupla_anbubus-{nome}.npz")
         alocadas = int(peso.shape[0])
         info[nome] = {"n_saidas": int(peso.shape[1]), "n_ram": rede.n_ram,
                       "ocupadas": ocupadas, "alocadas": alocadas,
@@ -169,7 +171,7 @@ def main() -> int:
 
     print(f"\ncheckpoint: {destino}")
     print(f"  use com: uv run python scripts/spec06_campanha_wnn.py "
-          f"--aproximador ntupla_funcional --checkpoint {destino} "
+          f"--aproximador ntupla_anbubus --checkpoint {destino} "
           f"--celulas {celula[0]}:{celula[1]}")
     return 0
 

@@ -21,8 +21,8 @@ from .ac_continuo import (
     AtorCriticoContinuo,
     Aproximador,
     MlpAprox,
-    NTuplaAprox,
-    NTuplaFuncionalAprox,
+    NTuplaDissertacaoAprox,
+    NTuplaAnbubusAprox,
 )
 from .baselines import (
     BASELINES,
@@ -38,7 +38,7 @@ from .politica_continua import D_ATOR, NormalProjetada
 __all__ = [
     "Acao", "Adam", "AdaptadorRunner", "Aproximador", "AtorCriticoContinuo",
     "APROXIMADORES", "BASELINES", "CaminhadaAleatoria", "D_ATOR", "MLP",
-    "MlpAprox", "NTuplaAprox", "NTuplaFuncionalAprox", "NormalProjetada",
+    "MlpAprox", "NTuplaDissertacaoAprox", "NTuplaAnbubusAprox", "NormalProjetada",
     "ContextoEpisodio", "EstadoVerdadeiro", "Guloso", "KMeansTSP",
     "Observacao", "PADDING", "Policy", "PoliticaPrivilegiada", "V_MAX",
     "held_karp", "vizinho_2opt",

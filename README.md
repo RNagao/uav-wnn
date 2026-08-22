@@ -247,6 +247,9 @@ uv run pytest -q                    # 18 testes, ~1 min
 | **`spec05_circular.py`** | **portão da SPEC-05**: normal projetada contra gaussiana simples, em três instrumentos. Sai com código 0 só se o C2 vencer com IC separado |
 | **`spec05_mountaincar.py`** | T-05.4(a): reprodução do Katopodis no `MountainCarContinuous-v0`, hiperparâmetros das tabelas A.3/A.6 verbatim. `--p13` mede `Σ` como desvio em vez de covariância |
 | **`spec05_identidade.py`** | T-05.5: cobertura do canal de identidade sob binarização e efeito de `R` sobre a diferenciação entre UAVs |
+| **`spec06_orcamento.py`** | T-06.0: vazão por célula e por parcela, `B_max`, e o veredito sobre P2. **Bloqueia as outras tarefas da SPEC-06** |
+| **`spec06_bancos.py`** | bancos `test`/`val` disjuntos (§4.2), horizonte permissivo (P5) e a interação `max_seconds_stalled` × RF-02 |
+| **`spec06_treinar.py`** | o treinador da campanha: réplicas 1a e 1b, um laço para as duas, com os artefatos da §4.7 |
 
 ### Os três aproximadores comparáveis contra o MADDPG
 
@@ -258,7 +261,7 @@ com o aproximador mediria duas coisas.
 |---|---|---|---|
 | `mlp` | MLP densa `D→32→32→3`, NumPy puro | MLP | — |
 | `ntupla` | **a nossa**: gradiente funcional (§4.3.1) | NTRN com esquecimento (§4.2.1) | média (eq. 4.12) |
-| `ntupla_funcional` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
+| `ntupla_anbubus` | portada do `NTNModel` de [`anbubus/ntn_neurocomputing_v0`](https://github.com/anbubus/ntn_neurocomputing_v0) | gradiente funcional (mesma família) | **soma** |
 
 O baseline do **problema** é outro e não entra nessa tabela: o MADDPG de Lamenza,
 medido dos pesos publicados (256 × 256, 287–299 KB). Estes três são variações do
@@ -317,7 +320,7 @@ uv run --isolated --with "ray[rllib]" --with torch --with pettingzoo --with nump
 uv run python scripts/spec06_importar_ppo.py     reports/ckpt/ppo-a2s12-bruto.npz reports/ckpt/ppo-a2s12
 
 # 3. campanha, como qualquer outro checkpoint
-uv run python scripts/spec06_campanha_wnn.py --aproximador ntupla_funcional     --checkpoint reports/ckpt/ppo-a2s12 --celulas 2:12 --runs 1000
+uv run python scripts/spec06_campanha_wnn.py --aproximador ntupla_anbubus     --checkpoint reports/ckpt/ppo-a2s12 --celulas 2:12 --runs 1000
 ```
 
 A fronteira por arquivo coincide com o que a **RNF-11** já exigia: torch no treino,

@@ -199,6 +199,44 @@ O PRD §6.1 é honesto quanto ao status do número: 0,11 s por episódio de 120 
 
 **Saída:** tabela de vazão por célula e por parcela; veredito escrito sobre a estimativa de 8–30 h (confirmada, otimista ou pessimista, com o fator); `B_max` e o plano de campanha; P2 fechada.
 
+> **FECHADA (2026-08-21).** `scripts/spec06_orcamento.py`, relatório em
+> `reports/spec06-orcamento.md`. Quatro resultados:
+>
+> **1. Não há resposta única para "quem domina".** Há cruzamento: em `Na = 1` o
+> aprendizado domina (52-58 %); em `Na = 8` a simulação domina (67-79 %). A alegação
+> de tempo de parede **não pode ser feita em geral** — vale onde o aprendizado
+> domina. A codificação é **0,2 %** do relógio, o que **contradiz** a contagem de
+> operações da SPEC-05 §4.8 (onde o codificador domina). As duas estão certas: o
+> termômetro é NumPy vetorizado, a consulta esparsa é laço Python. É o primeiro caso
+> em que a separação T2/T3 da §5.5 muda a leitura, e reportar só uma enganaria.
+>
+> **2. A medição expôs um defeito nosso, e ele mudava o orçamento.** `enderecos()`
+> consumia **331 dos 337 µs** de `prever()`, com custo linear em `n_ram` a ~5 µs por
+> RAM — despacho, não aritmética. Vetorizado: **42×** no endereçamento, **13×** no
+> `prever()`, e os 45 testes diferenciais contra o `Ramnet.jl` passam sem alteração.
+> Efeito no orçamento: `B_max` de 10,5 M (**em cima** da linha de corte de ~10 M,
+> que acionaria a ordem do PRD §8) para **19,5 M**. **A correção é o que torna a
+> varredura pagável.**
+>
+> **3. Estimativa do PRD §6.1 CONFIRMADA:** 848 passos/s em `Na=4, Ns=12` → **16,4 h**
+> num núcleo para 50 M passos, dentro dos 8-30 h. Antes da vetorização eram 30,5 h,
+> isto é, fora pela borda pessimista — a estimativa estava certa, a implementação não.
+>
+> **4. P2 NÃO É TESTÁVEL COMO POSTA.** `update_rate` não é parâmetro livre: o
+> ambiente o deriva de `algorithm_iteration_interval/2` (`environment.py:473`).
+> Variá-lo isolado exigiria editar o ambiente, o que a regra do projeto proíbe;
+> variar as duas juntas e atribuir a diferença ao integrador seria confusão de
+> variáveis.
+>
+> O que é testável **falha**: o par `(aii, update_rate)` muda `CT` em **9,0 %**
+> (`Na=1`, IC `[−3,39; −2,70]`) e **15,4 %** (`Na=8`, IC `[−10,75; −3,80]`, KS
+> p = 0,014), contra um critério que pedia IC contendo zero e `|Δ| < 1 %`.
+>
+> **Isso quantifica a assimetria da fig. 7.3** que a SPEC-00 registrou: o
+> `visualize_performance.py` avalia o MADDPG a `aii = 0,5` e o guloso a `0,1`, e o
+> intervalo mais fino dá ao guloso **9-15 % de vantagem** em tempo de conclusão. O
+> sinal é o que a SPEC-00 supôs; a magnitude não era conhecida.
+
 ---
 
 ### T-06.1 — Réplica 1a: experimento exploratório (Lamenza §7.1)
@@ -382,6 +420,56 @@ Redigir o veredito com **o número que o sustenta** (PRD §11.6). Os três desfe
 > **Piso de mensurabilidade (D-06.3).** Há um limite para isso: se a melhor política disponível for **indistinguível da caminhada aleatória** com IC 95 %, não há resolução para medir degradação relativa — degradar ruído sobre uma política aleatória mede zero contra zero. Nesse caso, e só nesse, a Etapa 2 **muda de eixo primário**: passa a ser avaliada por **erro de estimativa e consistência NEES/NIS** (que não dependem da política ser boa), H3 é avaliada sobre a qualidade do filtro, e H2 e H4 são declaradas **inconclusivas por piso de desempenho**, com a razão escrita. O degrau 0 da escada passa a ser a **heurística gulosa sob observação ruidosa**, que continua sendo uma pergunta de fusão legítima.
 
 **Relatório da etapa** (regra 4 do `specs/README.md`): 4–6 páginas com todas as figuras e tabelas, pronto para entrar como o capítulo de reprodução de E2 — sem re-medição posterior.
+
+---
+
+## 5-bis. Estado da execução (2026-08-21)
+
+`reports/spec06-etapa1.md`. **4 dos 10 critérios fechados**, infraestrutura da §4
+pronta e validada de ponta a ponta, e **o portão G1 não declarado** — declará-lo com
+2 % do orçamento medido seria afirmar mais do que se mediu.
+
+| fechado | |
+|---|---|
+| 1 | P2, vazão decomposta, `B_max` = 19,5 M |
+| 7 | `R ≥ 3` sem descarte, implementado e ativo |
+| 10 | RNF-07, por teste estrutural que guarda o futuro |
+| — | **P5**: horizonte permissivo = **500 s** (o piso), SR do guloso 100 % |
+| — | `max_seconds_stalled` × RF-02 = **30,5 s**, variância zero, previsão confirmada |
+
+### Três correções ao protocolo da §4, descobertas por execução
+
+**A eq. 7-2 não existe no ambiente.** Ele implementa `punish` (eq. 5-6) e o
+incremento. Calculá-la fora não modifica o problema — a recompensa de aprendizado é
+escolha do agente. E a diferença **não é uma constante**: a 7-2 é não negativa, então
+episódio mais longo acumula mais retorno; ela não penaliza demora, que é o que o §7.1
+descreve. Confundi-las mediria o §7.2 com horizonte generoso.
+
+**A parada antecipada da §4.4 dispara antes de o treino começar.** Medido:
+*"convergiu em 1950 passos"* de 6000, com `SR = 0` do começo ao fim. O critério
+confunde *"platô depois de aprender"* com *"ainda não começou"*, e libera orçamento de
+quem mais precisa. Corrigido com guarda de metade das avaliações.
+
+**`SR` e `CT_cens` saturam.** A caminhada aleatória também dá `SR = 0,0 %`, e
+`CT_cens` fica em 500 s para todos. Com as duas achatadas, a seleção de checkpoint
+escolhe **ao acaso** e a falha catastrófica dispara para qualquer corrida
+sub-treinada. Separadas: **seleção** por `cobertura` (sinal desde o primeiro passo, o
+próprio objetivo da 7-2, monótona em `SR`), **reporte** por `SR` como a T-06.1 manda.
+
+### A asserção da SPEC-05 §4.2 pagou por si, no caso previsto
+
+A T-06.1 previu que a 7-2 acumulada sob horizonte permissivo daria alvos de TD
+grandes e prescreveu normalizar por `(1−γ)`. Medido: **sem a normalização a asserção
+aborta no passo 998** (`passo 0,6742 excede c_max=0,5`). A §4.3 classifica como bug e
+manda corrigir e re-executar. A escala `(1−γ) = 0,01` está registrada em código
+**antes** da campanha, com o fator 100 que a previsão antecipou.
+
+### O custo do que falta
+
+`B_max` = 19,5 M a 848 passos/s são **6,4 h por corrida**. O critério 2 são 3 células
+× 5 sementes × 2 braços = **192 h de CPU**, ~16 h de parede por braço em 12 núcleos.
+A campanha executada aqui usa `B_max = 400 000` — **2 % do medido** — e existe para
+validar o arnês, não para fechar o critério.
 
 ---
 

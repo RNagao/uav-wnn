@@ -1,6 +1,6 @@
 """Teste diferencial contra o `NTNModel` de `anbubus/ntn_neurocomputing_v0`.
 
-Prova que a nossa `NTuplaFuncionalAprox` é uma **portagem fiel** daquele modelo, e
+Prova que a nossa `NTuplaAnbubusAprox` é uma **portagem fiel** daquele modelo, e
 não uma reimplementação com o mesmo nome. É o mesmo padrão dos testes contra o
 `Ramnet.jl`: um oráculo executável, comparação numérica, tolerância declarada.
 
@@ -29,7 +29,7 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch é opcional (grupo `baseline`)")
 
-from uavwnn.agents.ac_continuo import NTuplaFuncionalAprox  # noqa: E402
+from uavwnn.agents.ac_continuo import NTuplaAnbubusAprox  # noqa: E402
 from uavwnn.encoding.artigo import TermometroArtigo  # noqa: E402
 from uavwnn.wnn.redes import RedeGradienteFuncional  # noqa: E402
 
@@ -91,10 +91,10 @@ def _nossa_com_mapeamento_deles(n_bits, tupla, n_saidas, mapping):
     r = RedeGradienteFuncional(n_bits, tupla, n_saidas=n_saidas, seed=0,
                                c_max=None, convencao="soma")
     idx = mapping.numpy()
-    r.mapeamento = [idx[i:i + tupla] for i in range(0, len(idx), tupla)]
-    r.n_ram = len(r.mapeamento)
-    r._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                    for t in r.mapeamento]
+    # `remapear` e não atribuição direta: a rede pré-computa matrizes de
+    # endereçamento, e trocar `mapeamento` sem remontá-las usaria o mapeamento
+    # antigo em silêncio. Este teste foi o que pegou isso.
+    r.remapear([idx[i:i + tupla] for i in range(0, len(idx), tupla)])
     r.memoria = [{} for _ in range(r.n_ram)]
     return r
 
@@ -196,10 +196,10 @@ def test_as_duas_familias_diferem_onde_deve_e_concordam_onde_deve():
     Não é teste de igualdade: é de que as diferenças são **as declaradas**, e só
     elas. Se alguém alinhar as duas por acidente, a comparação perde o objeto.
     """
-    from uavwnn.agents.ac_continuo import NTuplaAprox
+    from uavwnn.agents.ac_continuo import NTuplaDissertacaoAprox
 
-    nossa = NTuplaAprox(n_bits=128, tamanho_tupla=8)
-    deles = NTuplaFuncionalAprox(n_bits=128, tamanho_tupla=8)
+    nossa = NTuplaDissertacaoAprox(n_bits=128, tamanho_tupla=8)
+    deles = NTuplaAnbubusAprox(n_bits=128, tamanho_tupla=8)
 
     # DIFEREM: convenção, e a família do crítico
     assert nossa.ator.convencao == "media"
