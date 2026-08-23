@@ -382,6 +382,8 @@ def main() -> int:
     ap.add_argument("--minilote", type=int, default=None, help="publicados: 128, 512")
     ap.add_argument("--vf-clip", type=float, default=None,
                     help="3000 no hopper; 10 é o padrão do RLlib")
+    ap.add_argument("--ray-cpus", type=int, default=2,
+                    help="CPUs que o ray reserva. A grade roda várias em paralelo.")
     ap.add_argument("--sementes-aval", default=None,
                     help="arquivo com uma semente por linha (banco val ou test). "
                          "Sem ele, não há avaliação determinística e a grade "
@@ -394,7 +396,10 @@ def main() -> int:
     import ray
 
     celula = _analisar_celula(a.celula)
-    ray.init(num_cpus=4, log_to_driver=False, include_dashboard=False)
+    # `--ray-cpus` para caber mais de uma corrida por máquina: a grade lança
+    # subprocessos deste script em paralelo, e cada `ray.init` RESERVA o que pede.
+    # Com 4 fixos, três corridas já esgotariam 12 threads.
+    ray.init(num_cpus=a.ray_cpus, log_to_driver=False, include_dashboard=False)
     hp = dict(REFERENCIAS[a.referencia])
     for chave, valor in (("lr", a.lr), ("gamma", a.gamma), ("lambda_", a.lambda_),
                          ("tuple_size", a.tupla), ("resolucao", a.resolucao),
