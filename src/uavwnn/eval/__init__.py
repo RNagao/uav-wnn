@@ -26,18 +26,21 @@ from .sementes import ArvoreSementes, disjuntos
 from .stats import (
     B_CANONICO,
     Diferenca,
+    Equivalencia,
     Marginal,
     bootstrap_media,
     bootstrap_pareado,
     holm,
     mcnemar,
     mde_95,
+    tost,
     wilcoxon_pareado,
 )
 
 __all__ = [
-    "ArvoreSementes", "B_CANONICO", "Diferenca", "MAX_EPISODE_LENGTH",
-    "Marginal", "MetricasEpisodio", "Resumo", "bootstrap_media",
-    "bootstrap_pareado", "disjuntos", "gini", "holm", "lb1", "mcnemar",
-    "mde_95", "resumir_episodios", "sucesso_comum", "wilcoxon_pareado",
+    "ArvoreSementes", "B_CANONICO", "Diferenca", "Equivalencia",
+    "MAX_EPISODE_LENGTH", "Marginal", "MetricasEpisodio", "Resumo",
+    "bootstrap_media", "bootstrap_pareado", "disjuntos", "gini", "holm", "lb1",
+    "mcnemar", "mde_95", "resumir_episodios", "sucesso_comum", "tost",
+    "wilcoxon_pareado",
 ]
