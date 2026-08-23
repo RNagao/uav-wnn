@@ -1,0 +1,45 @@
+{
+  "wnn": {
+    "dissertação": {
+      "persistente_kb": 1844.74609375,
+      "residente_kb": 1845.12890625,
+      "entradas_ocupadas": 70950,
+      "mult_fp": 4,
+      "soma_fp": 203,
+      "lookups": 201,
+      "soma_int": 804,
+      "total_sem_mac": 1208
+    },
+    "anbubus (abort)": {
+      "persistente_kb": 1724.68359375,
+      "residente_kb": 1725.06640625,
+      "entradas_ocupadas": 63850,
+      "mult_fp": 4,
+      "soma_fp": 203,
+      "lookups": 201,
+      "soma_int": 804,
+      "total_sem_mac": 1208
+    }
+  },
+  "maddpg": {
+    "Na=2": {
+      "persistente_kb": 287.0078125,
+      "mult_fp": 72964,
+      "D": 27
+    },
+    "Na=4": {
+      "persistente_kb": 291.0078125,
+      "mult_fp": 73988,
+      "D": 31
+    },
+    "Na=8": {
+      "persistente_kb": 299.0078125,
+      "mult_fp": 76036,
+      "D": 39
+    }
+  },
+  "mlp_pareada": {
+    "persistente_kb": 7.6328125,
+    "mult_fp": 1892
+  }
+}
