@@ -440,6 +440,37 @@ def uma(args: tuple) -> dict:
     if nz is not None:
         nz.congelar()
     salvar_checkpoint("final")
+
+    # AVALIA O CHECKPOINT DE MELHOR VALIDAÇÃO, não a rede viva — e a diferença foi
+    # medida, não presumida.
+    #
+    # A rede viva é o estado FINAL. Salvávamos `melhor` (o comentário acima diz "como
+    # a §4.4 manda") e reportávamos o final, que são redes diferentes. Medido na
+    # melhor corrida do anbubus, as duas no banco `test`:
+    #
+    #     melhor  cobertura 80,2 %  SR 69,0 %  CT 193,0 s
+    #     final   cobertura 79,4 %  SR 55,0 %  CT 250,8 s   <- o que era reportado
+    #
+    # Catorze pontos de SR subestimados, e SR é a métrica que Lamenza reporta. O
+    # viés não é simétrico entre os braços: quem aborta mais tem o estado final mais
+    # próximo da divergência, então era penalizado duas vezes.
+    #
+    # `melhor` pode não existir se a corrida abortou antes da primeira melhora; aí o
+    # final é tudo que há, e é o que se avalia.
+    dir_melhor = corrida.dir / "checkpoints" / "melhor"
+    if dir_melhor.exists():
+        try:
+            ap.ator = type(ap.ator).carregar(next(dir_melhor.glob("*ator.npz")))
+            ap.critico = type(ap.critico).carregar(
+                next(dir_melhor.glob("*critico.npz")))
+            termo_m = TermometroQuantil.carregar(dir_melhor / "termometro.npz")
+            pol.codificar = lambda v, _t=termo_m: _t.codificar(
+                np.asarray(v, float)[None, :])[0]
+        except Exception as e:      # noqa: BLE001
+            # Falha ao reler não pode custar a corrida inteira: registra e avalia o
+            # que está em memória, que é o comportamento anterior.
+            print(f"  aviso: não reli o checkpoint melhor ({e}); avaliando o final",
+                  flush=True)
     final = avaliar(cfg_av, pol, ctx_av, test)
     corrida.gravar_eval_test(final["por_episodio"])
     return {"aproximador": aprox, **amostra, **det, "seed_train": seed_train,
