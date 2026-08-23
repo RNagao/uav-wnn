@@ -377,24 +377,43 @@ class _RedeNTupla:
             kwargs["phi"] = cfg["phi"]
         rede = alvo(**kwargs)
 
-        # mapeamento gravado, não re-sorteado
+        # `remapear` e NÃO atribuição direta, e a diferença era um defeito real.
+        #
+        # Atribuir `.mapeamento` deixa `_tuplas` e `_pot_mat` — as matrizes que o
+        # `enderecos()` vetorizado de fato usa — com o mapa ALEATÓRIO do construtor.
+        # A rede carregada então lê endereços errados, com os valores certos na
+        # memória, e não levanta nada: `n_ram` coincide, as formas coincidem, só o
+        # conteúdo está trocado.
+        #
+        # Medido antes da correção: a rede original predizia [1,004; 2,008; 3,012] e
+        # a carregada [0,012; 0,024; 0,036]. O docstring de `remapear` já dizia
+        # "quem carrega checkpoint passa por aqui" — e este caminho não passava.
         corte = np.cumsum(z["tamanhos_tupla"])[:-1]
-        rede.mapeamento = np.split(z["mapeamento"], corte)
-        rede.n_ram = len(rede.mapeamento)
-        rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                           for t in rede.mapeamento]
+        rede.remapear(np.split(z["mapeamento"], corte))
+
+        # Os arrays saem do `NpzFile` UMA vez, fora do laço, e isso não é estilo.
+        #
+        # `NpzFile.__getitem__` relê e descomprime do zip a cada acesso — medido: 3,4
+        # ms por acesso a um array de 70 950 elementos, sem cache. Acessar dentro do
+        # laço fazia 70 950 leituras completas, ou seja trabalho quadrático: **4 min
+        # só para `enderecos`**, mais o mesmo para `valores`. Um checkpoint de uma
+        # corrida de 3,5 M de passos levava ~8 min para carregar, e o custo cresce
+        # com o quadrado da ocupação.
+        tamanhos = z["tamanhos_ram"]
+        enderecos = z["enderecos"]
+        valores = z["valores"]
+        contadores = z["contadores"] if "contadores" in z else None
 
         rede.memoria = [{} for _ in range(rede.n_ram)]
-        tem_cont = "contadores" in z
         i = 0
-        for r, n in enumerate(z["tamanhos_ram"]):
+        for r, n in enumerate(tamanhos):
             for _ in range(int(n)):
-                chave = int(z["enderecos"][i])
-                if tem_cont:
-                    rede.memoria[r][chave] = (z["valores"][i].copy(),
-                                              z["contadores"][i].copy())
+                chave = int(enderecos[i])
+                if contadores is not None:
+                    rede.memoria[r][chave] = (valores[i].copy(),
+                                              contadores[i].copy())
                 else:
-                    rede.memoria[r][chave] = z["valores"][i].copy()
+                    rede.memoria[r][chave] = valores[i].copy()
                 i += 1
         return rede
 

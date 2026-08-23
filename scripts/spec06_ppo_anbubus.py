@@ -113,10 +113,45 @@ def _analisar_celula(txt: str) -> tuple[int, int]:
 
 # Hiperparâmetros do repositório deles (`wnn/*/individual_run/experiment.py`),
 # traduzidos para os nomes atuais do RLlib. Os valores são os deles.
-ANBUBUS = dict(lr=4e-4, gamma=0.98, train_batch_size=1000, num_epochs=1,
-               minibatch_size=512)
-TUPLA_ANBUBUS = 8
-RESOLUCAO_ANBUBUS = 32
+# As OITO configurações publicadas em `wnn/*/individual_run/experiment.py`. Quatro
+# invariantes atravessam todas, e é por isso que são invariantes e não escolhas:
+#
+#   observation_filter = "MeanStdFilter"    em TODAS as oito
+#   num_sgd_iter       = 1                  em TODAS
+#   faixa do codificador = (-1,5; +1,5)     em TODAS
+#   timesteps_total    = 1 000 000          em TODAS
+#
+#   tarefa    tipo       lr     γ     λ    lote  minilote  n    T    extra
+#   cartpole  discreta   3e-3   —     —    —     128       8    64
+#   lunar     discreta   3e-3   —     —    2000  128       8    16
+#   hopper    CONTÍNUA   4e-4   0,98  —    1000  512       8    32   vf_clip=3000
+#   reacher   CONTÍNUA   7e-5   0,99  0,9  1000  128       10   300
+#
+# A referência para o nosso problema são **hopper e reacher**: ação contínua. As
+# duas discretas entram só para dar a faixa de `lr`, que vai de 7e-5 a 3e-3.
+REFERENCIAS = {
+    "hopper":  dict(lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
+                    minibatch_size=512, tuple_size=8, resolucao=32,
+                    vf_clip_param=3000.0),
+    "reacher": dict(lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
+                    minibatch_size=128, tuple_size=10, resolucao=300,
+                    vf_clip_param=10.0),
+}
+
+ANBUBUS = dict(REFERENCIAS["reacher"])
+"""Padrão = **reacher**, e a escolha tem duas razões.
+
+É a tarefa contínua com `γ = 0,99`, que é o desconto que Lamenza fixa — então não há
+conflito a resolver entre a referência do algoritmo e a do problema. E é a única com
+`λ` declarado (0,9); o hopper usa o padrão do RLlib.
+
+O `T = 300` dela é o ponto a vigiar: com `obs_dim = 25` dá **7 500 bits**, e com
+`n = 10` são **750 RAMs**. A alocação do `NTNModel` é DENSA (`n_nodes · 2^n`
+posições), então `750 · 2¹⁰ = 768 000` posições por saída. É grande, mas cabe — ao
+contrário de `n = 32`, que daria 4,3·10⁹ por RAM."""
+
+TUPLA_ANBUBUS = ANBUBUS["tuple_size"]
+RESOLUCAO_ANBUBUS = ANBUBUS["resolucao"]
 FAIXA_OBS = (-1.0, 1.5)
 """Faixa REAL da observação, medida — e ela **não** é a declarada pelo ambiente.
 
@@ -157,8 +192,15 @@ def _exigir_dependencias():
                  "vendor/ntn_neurocomputing_v0")
 
 
-def construir(celula: tuple[int, int], seed: int, passos_lote: int | None = None):
-    """Monta o PPO do RLlib sobre o `NTNModel`, no ambiente de Lamenza."""
+def construir(celula: tuple[int, int], seed: int, passos_lote: int | None = None,
+              hp: dict | None = None):
+    """Monta o PPO do RLlib sobre o `NTNModel`, no ambiente de Lamenza.
+
+    `hp` sobrescreve `ANBUBUS`; é o que permite varrer a faixa publicada em vez de
+    fixar uma tarefa. As chaves são as do RLlib atual, não as de 2022 (ver o
+    cabeçalho: `num_sgd_iter` virou `num_epochs`, `sgd_minibatch_size` virou
+    `minibatch_size`).
+    """
     import ray
     from ntn_neurocomputing_v0.wnn.ntn_model import NTNModel
     from ray.rllib.algorithms.ppo import PPOConfig
@@ -179,7 +221,9 @@ def construir(celula: tuple[int, int], seed: int, passos_lote: int | None = None
         modulo.GrADySEnvironment(render_mode=None, **kw)))
     ModelCatalog.register_custom_model("ntn_model", NTNModel)
 
-    treino = dict(ANBUBUS)
+    cfg = dict(ANBUBUS, **(hp or {}))
+    tupla, resol = cfg.pop("tuple_size"), cfg.pop("resolucao")
+    treino = dict(cfg, num_epochs=1)   # `num_sgd_iter = 1` em todas as oito
     if passos_lote:
         treino["train_batch_size"] = passos_lote
         treino["minibatch_size"] = min(treino["minibatch_size"], passos_lote)
@@ -188,11 +232,11 @@ def construir(celula: tuple[int, int], seed: int, passos_lote: int | None = None
         "custom_model": "ntn_model",
         "custom_model_config": {
             "seed": seed,
-            "tuple_size": TUPLA_ANBUBUS,
+            "tuple_size": tupla,
             # Faixa MEDIDA, não a declarada. Ver `FAIXA_OBS`. O -1 é o padding
             # da eq. 5-1, e o 1,5 é o drone que saiu da caixa do cenário.
             "encoding": {"enc_type": "thermometer",
-                         "resolution": RESOLUCAO_ANBUBUS,
+                         "resolution": resol,
                          "min": FAIXA_OBS[0], "max": FAIXA_OBS[1]},
         },
     }
@@ -203,7 +247,14 @@ def construir(celula: tuple[int, int], seed: int, passos_lote: int | None = None
             # NTNModel usa. Desativar é obrigatório, não preferência.
             .api_stack(enable_rl_module_and_learner=False,
                        enable_env_runner_and_connector_v2=False)
-            .env_runners(num_env_runners=0)
+            # `MeanStdFilter` é INVARIANTE nas oito configurações publicadas, e
+            # estava faltando aqui. Não é detalhe: o `Thermometer` do `NTNModel` tem
+            # faixa FIXA, então ele **depende** de a entrada estar normalizada para
+            # que os limiares caiam onde os dados estão. Sem o filtro, a rede recebe
+            # uma distribuição que o codificador não supõe — e foi exatamente essa
+            # dupla (normalizador + faixa fixa) que a nossa medição de "normalizar
+            # piora" não testou, porque lá o nosso termômetro já era adaptativo.
+            .env_runners(num_env_runners=0, observation_filter="MeanStdFilter")
             # O ambiente emite fora do espaço que ele declara (ver `FAIXA_OBS`), e
             # o pré-processador do RLlib aborta por isso. Desligá-lo é a escolha
             # certa: **não tocamos no ambiente**, e o modelo já binariza com a
@@ -233,8 +284,8 @@ def exportar_bruto(algo, destino: Path, celula: tuple[int, int]) -> dict:
         "mapeamento": modelo.mapping.detach().cpu().numpy().astype(np.int64),
         "peso_ator": modelo.policy_mem.weight.detach().cpu().numpy(),
         "peso_critico": modelo.vf_mem.weight.detach().cpu().numpy(),
-        "tamanho_tupla": np.array(TUPLA_ANBUBUS),
-        "resolucao": np.array(RESOLUCAO_ANBUBUS),
+        "tamanho_tupla": np.array(int(modelo.tuple_size)),
+        "resolucao": np.array(int(modelo.res)),
         "n_bits": np.array(int(modelo.input_dim)),
         "n_nodes": np.array(int(modelo.n_nodes)),
         "celula": np.array(celula, np.int64),
@@ -245,6 +296,62 @@ def exportar_bruto(algo, destino: Path, celula: tuple[int, int]) -> dict:
     return {"arquivo": str(destino), "n_bits": int(modelo.input_dim),
             "n_ram": int(modelo.n_nodes), "d_ator": int(dados["peso_ator"].shape[1]),
             "ocupadas_ator": ocup, "alocadas": int(dados["peso_ator"].shape[0])}
+
+
+def avaliar_determinista(algo, kw_env, sementes) -> dict:
+    """Cobertura, SR e CT no banco dado, com a política DETERMINÍSTICA.
+
+    Existe para que o braço do PPO seja selecionado pela **mesma** métrica que os
+    braços do Algoritmo 4.4. Sem isto, a grade do PPO escolheria por retorno de
+    treino — com ruído de exploração ligado — e a comparação entre braços mediria
+    dois critérios de seleção em vez de dois métodos.
+
+    `explore=False` é o equivalente do protocolo de Lamenza §7 (*"during an
+    evaluation the training is temporarily halted and action noise is removed"*):
+    usa a média da gaussiana, não uma amostra. Com σ APRENDIDA isso importa mais que
+    com σ fixa, porque σ pode ter crescido durante o treino.
+
+    O episódio de avaliação termina ao coletar tudo (`end_when_all_collected=True`),
+    ao contrário do de treino — é a mesma assimetria de `refenv.run_episode`, e é o
+    que torna `CT` interpretável.
+    """
+    modulo = _carregar_ambiente()
+    kw = dict(kw_env, end_when_all_collected=True)
+    env = modulo.GrADySEnvironment(render_mode=None, **kw)
+    cob, suc, ct = [], [], []
+    for semente in sementes:
+        obs, _ = env.reset(seed=int(semente))
+        n_sensores = kw["num_sensors"]
+        # ESPELHA `refenv.run_episode`, e a fidelidade importa: aquele laço é o do
+        # script que gerou a fig. 7.3 e quebra na PRIMEIRA `info` não vazia, porque
+        # é ela que traz `completion_time` e `all_collected` da conclusão. Inferir
+        # a coleta da recompensa seria errado sem dar erro — a eq. 5-6 mistura
+        # coleta e tempo.
+        final_info: dict = {}
+        while True:
+            acoes = {ag: algo.compute_single_action(o, explore=False)
+                     for ag, o in obs.items()}
+            obs, _r, term, trunc, infos = env.step(acoes)
+            if infos and "avg_reward" in next(iter(infos.values())):
+                final_info = next(iter(infos.values()))
+                break
+            if term.get("__all__") or trunc.get("__all__") or not obs:
+                break
+        coletados = int(env.sensors_collected)
+        tudo = bool(final_info.get("all_collected", coletados == n_sensores))
+        cob.append(coletados / n_sensores)
+        suc.append(tudo)
+        ct.append(float(final_info.get("completion_time", kw["max_episode_length"])))
+    try:
+        env.close()
+    except Exception:
+        pass
+    import statistics as st
+    ok = [t for t, s_ in zip(ct, suc) if s_]
+    return {"cobertura": st.fmean(cob), "sr": st.fmean(map(float, suc)),
+            "ct_cens": st.fmean(ct),
+            "ct_succ": st.fmean(ok) if ok else float("nan"),
+            "n_episodios": len(cob)}
 
 
 def main() -> int:
@@ -259,6 +366,29 @@ def main() -> int:
                     help=".npz com a tabela treinada, para "
                          "scripts/spec06_importar_ppo.py converter")
     ap.add_argument("--saida", default="reports/spec06-ppo-anbubus.json")
+    # --- os eixos, com os valores publicados como faixa ---------------------
+    ap.add_argument("--referencia", choices=sorted(REFERENCIAS), default="reacher",
+                    help="base: `reacher` (γ=0,99, λ=0,9, n=10, T=300) ou "
+                         "`hopper` (γ=0,98, n=8, T=32, vf_clip=3000)")
+    ap.add_argument("--lr", type=float, default=None,
+                    help="publicados: 7e-5 (reacher), 4e-4 (hopper), 3e-3 (discretas)")
+    ap.add_argument("--gamma", type=float, default=None,
+                    help="Lamenza fixa 0,99; o hopper deles usa 0,98")
+    ap.add_argument("--lambda-gae", type=float, default=None, dest="lambda_",
+                    help="0,9 no reacher; padrão do RLlib nas outras")
+    ap.add_argument("--tupla", type=int, default=None, help="publicados: 8, 10")
+    ap.add_argument("--resolucao", type=int, default=None,
+                    help="publicados: 16, 32, 64, 300")
+    ap.add_argument("--minilote", type=int, default=None, help="publicados: 128, 512")
+    ap.add_argument("--vf-clip", type=float, default=None,
+                    help="3000 no hopper; 10 é o padrão do RLlib")
+    ap.add_argument("--ray-cpus", type=int, default=2,
+                    help="CPUs que o ray reserva. A grade roda várias em paralelo.")
+    ap.add_argument("--sementes-aval", default=None,
+                    help="arquivo com uma semente por linha (banco val ou test). "
+                         "Sem ele, não há avaliação determinística e a grade "
+                         "selecionaria por retorno de treino — critério diferente "
+                         "do usado nos braços do Algoritmo 4.4.")
     a = ap.parse_args()
 
     _exigir_dependencias()
@@ -266,11 +396,20 @@ def main() -> int:
     import ray
 
     celula = _analisar_celula(a.celula)
-    ray.init(num_cpus=4, log_to_driver=False, include_dashboard=False)
-    algo, kw_env = construir(celula, a.seed, a.lote)
+    # `--ray-cpus` para caber mais de uma corrida por máquina: a grade lança
+    # subprocessos deste script em paralelo, e cada `ray.init` RESERVA o que pede.
+    # Com 4 fixos, três corridas já esgotariam 12 threads.
+    ray.init(num_cpus=a.ray_cpus, log_to_driver=False, include_dashboard=False)
+    hp = dict(REFERENCIAS[a.referencia])
+    for chave, valor in (("lr", a.lr), ("gamma", a.gamma), ("lambda_", a.lambda_),
+                         ("tuple_size", a.tupla), ("resolucao", a.resolucao),
+                         ("minibatch_size", a.minilote), ("vf_clip_param", a.vf_clip)):
+        if valor is not None:
+            hp[chave] = valor
+    algo, kw_env = construir(celula, a.seed, a.lote, hp)
     print(f"PPO (RLlib) + NTNModel · Na={celula[0]} Ns={celula[1]} · "
           f"{a.passos} passos")
-    print(f"hiperparâmetros do anbubus: {ANBUBUS}")
+    print(f"referência `{a.referencia}` -> {hp}")
 
     hist, vistos = [], 0
     while vistos < a.passos:
@@ -283,8 +422,17 @@ def main() -> int:
                      "retorno": None if ret is None else float(ret)})
         print(f"  {vistos:>8} passos  retorno {ret}")
 
+    aval = None
+    if a.sementes_aval:
+        sementes = [int(l) for l in Path(a.sementes_aval).read_text().split() if l.strip()]
+        aval = avaliar_determinista(algo, kw_env, sementes)
+        print(f"  avaliação determinística ({aval['n_episodios']} episódios): "
+              f"cobertura {aval['cobertura']:.1%} SR {aval['sr']:.1%} "
+              f"CT_cens {aval['ct_cens']:.0f}s")
+
     artefato = {"celula": list(celula), "config": vars(a), "env": kw_env,
-                "hiperparametros": ANBUBUS, "historico": hist}
+                "avaliacao": aval,
+                "hiperparametros": hp, "historico": hist}
     if a.bruto:
         artefato["bruto"] = exportar_bruto(algo, Path(a.bruto), celula)
         b = artefato["bruto"]

@@ -211,3 +211,43 @@ def test_critico_guarda_o_dobro_do_ator():
     v_critico = next(iter(critico.memoria[0].values()))
     assert isinstance(v_ator, np.ndarray)
     assert len(v_critico) == 2, "crítico guarda (valor, contador)"
+
+
+def test_carregar_remonta_o_enderecamento_vetorizado():
+    """Regressão: `carregar` tem de passar por `remapear`, não atribuir direto.
+
+    O defeito que isto guarda era silencioso e total. `carregar` atribuía
+    `.mapeamento` sem remontar `_tuplas`/`_pot_mat` — as matrizes que o `enderecos()`
+    vetorizado de fato usa —, então a rede carregada lia os endereços do mapa
+    ALEATÓRIO do construtor, com os valores certos na memória. Nada levantava:
+    `n_ram` coincide e as formas coincidem, só o conteúdo está trocado.
+
+    Medido antes da correção: original `[1,004; 2,008; 3,012]`, carregada
+    `[0,012; 0,024; 0,036]`. Todo checkpoint carregado estava errado, e o único
+    motivo pelo qual a grade não foi afetada é que ela avalia a rede VIVA.
+
+    Verifica os dois: predição idêntica E `_tuplas` coerente com `mapeamento`.
+    """
+    import tempfile
+
+    g = np.random.default_rng(0)
+    rede = RedeGradienteFuncional(200, 8, n_saidas=3, seed=1)
+    bits = (g.random(200) < 0.5).astype(np.uint8)
+    for _ in range(30):
+        rede.atualizar((g.random(200) < 0.5).astype(np.uint8),
+                       np.array([0.1, 0.2, 0.3]))
+    rede.atualizar(bits, np.array([1.0, 2.0, 3.0]))
+    esperado = rede.prever(bits).copy()
+
+    with tempfile.TemporaryDirectory() as t:
+        alvo = Path(t) / "rede.npz"
+        rede.salvar(alvo)
+        lida = RedeGradienteFuncional.carregar(alvo)
+
+    assert np.allclose(esperado, lida.prever(bits)), (
+        "a rede carregada prediz outro valor: o endereçamento não foi remontado")
+    # E o invariante que causa o defeito, verificado direto: a matriz de tuplas
+    # tem de ser o mapeamento, não o sorteio do construtor.
+    for r, tupla in enumerate(lida.mapeamento):
+        assert list(lida._tuplas[r][:len(tupla)]) == list(tupla), (
+            f"_tuplas[{r}] não corresponde a mapeamento[{r}]")
