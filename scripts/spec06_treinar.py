@@ -143,6 +143,17 @@ PASSO_EFETIVO = 5e-4
 SIGMA = 0.20
 """Desvio da normal projetada. **Não** use o padrão 0,1 da classe — diverge."""
 
+TAMANHO_TUPLA = 12
+"""`n` da varredura, e precisa ser EXPLÍCITO porque os padrões das duas famílias
+divergem: `NTuplaDissertacaoAprox` usa 12 e `NTuplaAnbubusAprox` usa **8**.
+
+Sem passar isto, a configuração vencedora só valia para a dissertação — o anbubus
+rodava com `n = 8`, ou `N = 100` em vez de 67, uma rede que a grade nunca mediu. E
+como a conversão de taxa divide por `N`, o passo efetivo saía 1,49× acima do
+validado. Dois defeitos que se compunham em instabilidade construída.
+
+`n = 12` em todos os seis melhores pontos das duas famílias; nenhum usa 24."""
+
 
 def _cfgs(replica: str, na: int, ns: int) -> tuple[EnvConfig, EnvConfig]:
     """`(treino, avaliação)`. As duas fases diferem e a diferença muda a métrica.
@@ -182,7 +193,9 @@ def ap_taxa(aprox: str, n_bits: int) -> float:
     """
     if aprox == "ntupla_anbubus":
         import math
-        return PASSO_EFETIVO / math.ceil(n_bits / 12)
+        # `TAMANHO_TUPLA`, não um 12 fixo: com o literal, `n = 8` daria taxa 1,49×
+        # grande demais e `n = 24` daria 0,51×, porque `N = ceil(n_bits/n)`.
+        return PASSO_EFETIVO / math.ceil(n_bits / TAMANHO_TUPLA)
     return PASSO_EFETIVO
 
 
@@ -201,6 +214,7 @@ def montar_agente(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente,
         ap = APROXIMADORES[aprox](n_bits=termo.n_bits, seed=sem.seed_tuple,
                                   n_dims_codificador=d_obs,
                                   limiares_por_dim=BITS_POR_ESCALAR,
+                                  tamanho_tupla=TAMANHO_TUPLA,
                                   taxa_ator=ap_taxa(aprox, termo.n_bits))
         codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
     politica = AtorCriticoContinuo(aproximador=ap, codificar=codificar,
@@ -413,6 +427,13 @@ def main() -> int:
     print(f"recompensa {r['recompensa']} × {r['escala_recompensa']} · "
           f"seleção por {r['metrica']}, reporta {r['reportada']} · horizonte {r['horizonte']:.0f} s · N*_a="
           f"{'0 (cegos)' if r['cegos'] else 'Na−1'}")
+    if a.replica != "1b":
+        print(f"  AVISO: `PASSO_EFETIVO`={PASSO_EFETIVO:.1e} e `SIGMA`={SIGMA} foram "
+              f"medidos na réplica **1b** (grade `desempate`).\n"
+              f"  Você está na {a.replica}, que usa outra recompensa "
+              f"({r['recompensa']}, escala {r['escala_recompensa']:.3g}).\n"
+              f"  A escala de `δ` difere, e é `α·δ·∇log π` que a assertiva da §4.2 "
+              f"mede — a estabilidade não transfere de graça.\n")
     if r["escala_recompensa"] != 1.0:
         print(f"  escala {r['escala_recompensa']} = (1−γ): normalização do alvo de "
               f"valor prescrita pela T-06.1.\n  Sem ela a asserção da §4.2 aborta "

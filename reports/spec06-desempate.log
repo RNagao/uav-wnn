@@ -1,0 +1,359 @@
+grade fatorial COMPLETA (desempate) · réplica 1b · Na=1 Ns=12 · sem ruído
+120 pontos COMPARTILHADOS × 2 modelos × 3 sementes = 720 corridas
+B_sweep = 200,000 · 12 processos
+eixos: passo_efetivo(5) × sigma(2) × resolucao(2) × tupla(2) × passos_m(1) × idx_critico(3) × normalizar(1)
+estimativa: ~6.5 h de parede
+progresso ao vivo: reports/spec06-desempate.progresso.jsonl
+
+RETOMANDO: 212 corridas aproveitadas de 720 · 508 a fazer
+  [    5/508]  1.0% · decorrido   5.4 min · resta ~547.5 min
+  [   10/508]  2.0% · decorrido   8.0 min · resta ~399.3 min
+  [   15/508]  3.0% · decorrido   8.2 min · resta ~269.2 min
+  [   20/508]  3.9% · decorrido  11.5 min · resta ~279.5 min
+  [   25/508]  4.9% · decorrido  11.9 min · resta ~229.1 min
+  [   30/508]  5.9% · decorrido  14.0 min · resta ~222.6 min
+  [   35/508]  6.9% · decorrido  17.2 min · resta ~233.0 min
+  [   40/508]  7.9% · decorrido  19.3 min · resta ~225.6 min
+  [   45/508]  8.9% · decorrido  20.3 min · resta ~208.9 min
+  [   50/508]  9.8% · decorrido  21.2 min · resta ~193.9 min
+  [   55/508] 10.8% · decorrido  23.2 min · resta ~190.9 min
+  [   60/508] 11.8% · decorrido  24.3 min · resta ~181.7 min
+  [   65/508] 12.8% · decorrido  26.0 min · resta ~177.4 min
+  [   70/508] 13.8% · decorrido  28.5 min · resta ~178.1 min
+  [   75/508] 14.8% · decorrido  29.2 min · resta ~168.4 min
+  [   80/508] 15.7% · decorrido  30.4 min · resta ~162.6 min
+  [   85/508] 16.7% · decorrido  30.9 min · resta ~153.7 min
+  [   90/508] 17.7% · decorrido  32.0 min · resta ~148.6 min
+  [   95/508] 18.7% · decorrido  35.6 min · resta ~154.9 min
+  [  100/508] 19.7% · decorrido  35.9 min · resta ~146.6 min
+  [  105/508] 20.7% · decorrido  36.9 min · resta ~141.5 min
+  [  110/508] 21.7% · decorrido  37.6 min · resta ~136.0 min
+  [  115/508] 22.6% · decorrido  39.2 min · resta ~134.0 min
+  [  120/508] 23.6% · decorrido  41.0 min · resta ~132.6 min
+  [  125/508] 24.6% · decorrido  42.7 min · resta ~130.7 min
+  [  130/508] 25.6% · decorrido  45.8 min · resta ~133.0 min
+  [  135/508] 26.6% · decorrido  48.0 min · resta ~132.6 min
+  [  140/508] 27.6% · decorrido  49.3 min · resta ~129.7 min
+  [  145/508] 28.5% · decorrido  51.1 min · resta ~127.9 min
+  [  150/508] 29.5% · decorrido  53.0 min · resta ~126.5 min
+  [  155/508] 30.5% · decorrido  54.3 min · resta ~123.7 min
+  [  160/508] 31.5% · decorrido  57.6 min · resta ~125.3 min
+  [  165/508] 32.5% · decorrido  58.1 min · resta ~120.7 min
+  [  170/508] 33.5% · decorrido  60.0 min · resta ~119.2 min
+  [  175/508] 34.4% · decorrido  60.8 min · resta ~115.6 min
+  [  180/508] 35.4% · decorrido  64.3 min · resta ~117.2 min
+  [  185/508] 36.4% · decorrido  65.3 min · resta ~114.0 min
+  [  190/508] 37.4% · decorrido  66.2 min · resta ~110.8 min
+  [  195/508] 38.4% · decorrido  68.3 min · resta ~109.6 min
+  [  200/508] 39.4% · decorrido  69.5 min · resta ~107.0 min
+  [  205/508] 40.4% · decorrido  71.5 min · resta ~105.7 min
+  [  210/508] 41.3% · decorrido  72.2 min · resta ~102.4 min
+  [  215/508] 42.3% · decorrido  75.1 min · resta ~102.4 min
+  [  220/508] 43.3% · decorrido  76.4 min · resta ~100.0 min
+  [  225/508] 44.3% · decorrido  78.2 min · resta ~ 98.3 min
+  [  230/508] 45.3% · decorrido  80.3 min · resta ~ 97.1 min
+  [  235/508] 46.3% · decorrido  80.8 min · resta ~ 93.8 min
+  [  240/508] 47.2% · decorrido  81.8 min · resta ~ 91.3 min
+  [  245/508] 48.2% · decorrido  84.2 min · resta ~ 90.4 min
+  [  250/508] 49.2% · decorrido  84.7 min · resta ~ 87.4 min
+  [  255/508] 50.2% · decorrido  85.8 min · resta ~ 85.2 min
+  [  260/508] 51.2% · decorrido  87.6 min · resta ~ 83.6 min
+  [  265/508] 52.2% · decorrido  88.0 min · resta ~ 80.7 min
+  [  270/508] 53.1% · decorrido  89.9 min · resta ~ 79.2 min
+  [  275/508] 54.1% · decorrido  90.7 min · resta ~ 76.9 min
+  [  280/508] 55.1% · decorrido  93.3 min · resta ~ 75.9 min
+  [  285/508] 56.1% · decorrido  93.7 min · resta ~ 73.3 min
+  [  290/508] 57.1% · decorrido  94.4 min · resta ~ 70.9 min
+  [  295/508] 58.1% · decorrido  96.4 min · resta ~ 69.6 min
+  [  300/508] 59.1% · decorrido  97.2 min · resta ~ 67.4 min
+  [  305/508] 60.0% · decorrido  98.6 min · resta ~ 65.6 min
+  [  310/508] 61.0% · decorrido  98.9 min · resta ~ 63.2 min
+  [  315/508] 62.0% · decorrido 101.2 min · resta ~ 62.0 min
+  [  320/508] 63.0% · decorrido 103.5 min · resta ~ 60.8 min
+  [  325/508] 64.0% · decorrido 104.4 min · resta ~ 58.8 min
+  [  330/508] 65.0% · decorrido 107.1 min · resta ~ 57.8 min
+  [  335/508] 65.9% · decorrido 107.8 min · resta ~ 55.7 min
+  [  340/508] 66.9% · decorrido 108.1 min · resta ~ 53.4 min
+  [  345/508] 67.9% · decorrido 108.4 min · resta ~ 51.2 min
+  [  350/508] 68.9% · decorrido 110.1 min · resta ~ 49.7 min
+  [  355/508] 69.9% · decorrido 111.5 min · resta ~ 48.1 min
+  [  360/508] 70.9% · decorrido 113.3 min · resta ~ 46.6 min
+  [  365/508] 71.9% · decorrido 114.6 min · resta ~ 44.9 min
+  [  370/508] 72.8% · decorrido 116.0 min · resta ~ 43.3 min
+  [  375/508] 73.8% · decorrido 118.2 min · resta ~ 41.9 min
+  [  380/508] 74.8% · decorrido 119.9 min · resta ~ 40.4 min
+  [  385/508] 75.8% · decorrido 120.7 min · resta ~ 38.6 min
+  [  390/508] 76.8% · decorrido 122.5 min · resta ~ 37.1 min
+  [  395/508] 77.8% · decorrido 123.9 min · resta ~ 35.4 min
+  [  400/508] 78.7% · decorrido 125.7 min · resta ~ 33.9 min
+  [  405/508] 79.7% · decorrido 128.1 min · resta ~ 32.6 min
+  [  410/508] 80.7% · decorrido 129.0 min · resta ~ 30.8 min
+  [  415/508] 81.7% · decorrido 130.4 min · resta ~ 29.2 min
+  [  420/508] 82.7% · decorrido 131.9 min · resta ~ 27.6 min
+  [  425/508] 83.7% · decorrido 133.1 min · resta ~ 26.0 min
+  [  430/508] 84.6% · decorrido 135.4 min · resta ~ 24.6 min
+  [  435/508] 85.6% · decorrido 135.7 min · resta ~ 22.8 min
+  [  440/508] 86.6% · decorrido 136.1 min · resta ~ 21.0 min
+  [  445/508] 87.6% · decorrido 137.6 min · resta ~ 19.5 min
+  [  450/508] 88.6% · decorrido 140.3 min · resta ~ 18.1 min
+  [  455/508] 89.6% · decorrido 142.3 min · resta ~ 16.6 min
+  [  460/508] 90.6% · decorrido 142.6 min · resta ~ 14.9 min
+  [  465/508] 91.5% · decorrido 143.1 min · resta ~ 13.2 min
+  [  470/508] 92.5% · decorrido 143.8 min · resta ~ 11.6 min
+  [  475/508] 93.5% · decorrido 144.7 min · resta ~ 10.1 min
+  [  480/508] 94.5% · decorrido 145.6 min · resta ~  8.5 min
+  [  485/508] 95.5% · decorrido 147.9 min · resta ~  7.0 min
+  [  490/508] 96.5% · decorrido 149.1 min · resta ~  5.5 min
+  [  495/508] 97.4% · decorrido 152.1 min · resta ~  4.0 min
+  [  500/508] 98.4% · decorrido 154.5 min · resta ~  2.5 min
+  [  505/508] 99.4% · decorrido 156.1 min · resta ~  0.9 min
+  [  508/508] 100.0% · decorrido 157.4 min · resta ~  0.0 min
+            modelo  id    passo     σ    T   n   m   crít    N     cob     SR   ab
+ntupla_dissertacao  67  8.0e-04  0.35   32  12   8   0.85   67  50.1% 21.3%  0/3
+ntupla_dissertacao  31  5.0e-04  0.20   32  12   8   0.85   67  49.3% 12.7%  0/3
+    ntupla_anbubus  92  1.5e-03  0.35   32  12   8      4   67  46.6% 10.3%  2/3
+ntupla_dissertacao  61  8.0e-04  0.35   16  12   8   0.85   34  46.0%  0.7%  0/3
+ntupla_dissertacao  36  5.0e-04  0.35   16  12   8    0.7   34  44.9%  0.0%  0/3
+ntupla_dissertacao  42  5.0e-04  0.35   32  12   8    0.7   67  44.3%  0.0%  0/3
+ntupla_dissertacao  25  5.0e-04  0.20   16  12   8   0.85   34  42.4%  0.0%  0/3
+ntupla_dissertacao  24  5.0e-04  0.20   16  12   8    0.7   34  42.1%  3.3%  1/3
+ntupla_dissertacao  66  8.0e-04  0.35   32  12   8    0.7   67  40.4%  0.0%  0/3
+ntupla_dissertacao  60  8.0e-04  0.35   16  12   8    0.7   34  40.3%  0.0%  0/3
+ntupla_dissertacao  43  5.0e-04  0.35   32  12   8   0.85   67  39.3% 17.0%  0/3
+ntupla_dissertacao  38  5.0e-04  0.35   16  12   8   0.99   34  38.2% 24.7%  0/3
+ntupla_dissertacao   7  3.0e-04  0.20   32  12   8   0.85   67  37.5%  0.0%  0/3
+ntupla_dissertacao  30  5.0e-04  0.20   32  12   8    0.7   67  37.2%  1.0%  1/3
+ntupla_dissertacao  13  3.0e-04  0.35   16  12   8   0.85   34  35.1%  1.7%  0/3
+ntupla_dissertacao   6  3.0e-04  0.20   32  12   8    0.7   67  34.6%  0.0%  0/3
+ntupla_dissertacao  44  5.0e-04  0.35   32  12   8   0.99   67  32.6%  1.3%  0/3
+ntupla_dissertacao  12  3.0e-04  0.35   16  12   8    0.7   34  32.2%  0.0%  0/3
+ntupla_dissertacao  62  8.0e-04  0.35   16  12   8   0.99   34  31.5%  1.3%  0/3
+    ntupla_anbubus  86  1.5e-03  0.35   16  12   8      4   34  30.1%  0.0%  1/3
+    ntupla_anbubus  91  1.5e-03  0.35   32  12   8      1   67  29.0%  0.7%  1/3
+    ntupla_anbubus  56  8.0e-04  0.20   32  12   8      4   67  28.5%  0.0%  1/3
+ntupla_dissertacao   0  3.0e-04  0.20   16  12   8    0.7   34  26.3%  0.0%  0/3
+ntupla_dissertacao   8  3.0e-04  0.20   32  12   8   0.99   67  25.1%  0.0%  0/3
+    ntupla_anbubus  55  8.0e-04  0.20   32  12   8      1   67  23.8%  0.0%  1/3
+    ntupla_anbubus  85  1.5e-03  0.35   16  12   8      1   34  22.9%  5.3%  3/3
+ntupla_dissertacao  32  5.0e-04  0.20   32  12   8   0.99   67  22.6%  0.0%  0/3
+ntupla_dissertacao  26  5.0e-04  0.20   16  12   8   0.99   34  21.5%  0.0%  0/3
+ntupla_dissertacao  18  3.0e-04  0.35   32  12   8    0.7   67  21.3%  0.0%  0/3
+ntupla_dissertacao  68  8.0e-04  0.35   32  12   8   0.99   67  20.9%  0.0%  0/3
+    ntupla_anbubus 116  3.0e-03  0.35   32  12   8      4   67  20.5%  0.0%  3/3
+ntupla_dissertacao  34  5.0e-04  0.20   32  24   8   0.85   34  19.5%  4.3%  0/3
+    ntupla_anbubus  90  1.5e-03  0.35   32  12   8   0.25   67  19.4%  0.0%  2/3
+ntupla_dissertacao  19  3.0e-04  0.35   32  12   8   0.85   67  19.3%  0.0%  0/3
+    ntupla_anbubus  32  5.0e-04  0.20   32  12   8      4   67  19.2%  0.0%  0/3
+    ntupla_anbubus  31  5.0e-04  0.20   32  12   8      1   67  18.9%  0.0%  0/3
+    ntupla_anbubus  68  8.0e-04  0.35   32  12   8      4   67  18.7%  0.0%  0/3
+ntupla_dissertacao  14  3.0e-04  0.35   16  12   8   0.99   34  18.6%  0.0%  0/3
+    ntupla_anbubus  67  8.0e-04  0.35   32  12   8      1   67  18.5%  0.0%  0/3
+ntupla_dissertacao  20  3.0e-04  0.35   32  12   8   0.99   67  17.9%  0.0%  0/3
+    ntupla_anbubus  84  1.5e-03  0.35   16  12   8   0.25   34  17.7%  0.0%  2/3
+    ntupla_anbubus  66  8.0e-04  0.35   32  12   8   0.25   67  17.0%  0.0%  0/3
+    ntupla_anbubus  24  5.0e-04  0.20   16  12   8   0.25   34  16.9%  0.0%  0/3
+    ntupla_anbubus  25  5.0e-04  0.20   16  12   8      1   34  16.8%  0.0%  0/3
+    ntupla_anbubus  62  8.0e-04  0.35   16  12   8      4   34  16.8%  0.0%  0/3
+    ntupla_anbubus  44  5.0e-04  0.35   32  12   8      4   67  16.7%  0.0%  0/3
+    ntupla_anbubus  38  5.0e-04  0.35   16  12   8      4   34  16.5%  0.0%  0/3
+ntupla_dissertacao   1  3.0e-04  0.20   16  12   8   0.85   34  16.4%  0.0%  0/3
+ntupla_dissertacao  37  5.0e-04  0.35   16  12   8   0.85   34  16.4%  0.0%  0/3
+    ntupla_anbubus  43  5.0e-04  0.35   32  12   8      1   67  16.4%  0.0%  0/3
+    ntupla_anbubus  26  5.0e-04  0.20   16  12   8      4   34  16.3%  0.0%  0/3
+    ntupla_anbubus  94  1.5e-03  0.35   32  24   8      1   34  16.3%  0.0%  1/3
+    ntupla_anbubus   2  3.0e-04  0.20   16  12   8      4   34  16.3%  0.0%  0/3
+    ntupla_anbubus   8  3.0e-04  0.20   32  12   8      4   67  16.1%  0.0%  0/3
+    ntupla_anbubus  30  5.0e-04  0.20   32  12   8   0.25   67  16.0%  0.0%  0/3
+    ntupla_anbubus  57  8.0e-04  0.20   32  24   8   0.25   34  16.0%  0.0%  0/3
+    ntupla_anbubus  61  8.0e-04  0.35   16  12   8      1   34  15.9%  0.0%  0/3
+    ntupla_anbubus  54  8.0e-04  0.20   32  12   8   0.25   67  15.9%  0.0%  1/3
+    ntupla_anbubus  60  8.0e-04  0.35   16  12   8   0.25   34  15.9%  0.0%  0/3
+    ntupla_anbubus  42  5.0e-04  0.35   32  12   8   0.25   67  15.8%  0.0%  0/3
+    ntupla_anbubus  95  1.5e-03  0.35   32  24   8      4   34  15.8%  0.0%  1/3
+    ntupla_anbubus   7  3.0e-04  0.20   32  12   8      1   67  15.8%  0.0%  0/3
+    ntupla_anbubus   1  3.0e-04  0.20   16  12   8      1   34  15.6%  0.0%  0/3
+    ntupla_anbubus  20  3.0e-04  0.35   32  12   8      4   67  15.5%  0.0%  0/3
+    ntupla_anbubus  18  3.0e-04  0.35   32  12   8   0.25   67  15.4%  0.0%  0/3
+    ntupla_anbubus  14  3.0e-04  0.35   16  12   8      4   34  15.4%  0.0%  0/3
+    ntupla_anbubus   0  3.0e-04  0.20   16  12   8   0.25   34  15.2%  0.0%  0/3
+    ntupla_anbubus   6  3.0e-04  0.20   32  12   8   0.25   67  15.1%  0.0%  0/3
+    ntupla_anbubus  33  5.0e-04  0.20   32  24   8   0.25   34  15.1%  0.0%  0/3
+    ntupla_anbubus  37  5.0e-04  0.35   16  12   8      1   34  15.1%  0.0%  0/3
+ntupla_dissertacao  70  8.0e-04  0.35   32  24   8   0.85   34  15.1%  0.0%  0/3
+    ntupla_anbubus  93  1.5e-03  0.35   32  24   8   0.25   34  14.9%  0.0%  1/3
+    ntupla_anbubus  36  5.0e-04  0.35   16  12   8   0.25   34  14.8%  0.0%  0/3
+ntupla_dissertacao   2  3.0e-04  0.20   16  12   8   0.99   34  14.8%  0.0%  0/3
+    ntupla_anbubus  12  3.0e-04  0.35   16  12   8   0.25   34  14.8%  0.0%  0/3
+    ntupla_anbubus  59  8.0e-04  0.20   32  24   8      4   34  14.5%  0.0%  2/3
+    ntupla_anbubus  13  3.0e-04  0.35   16  12   8      1   34  14.5%  0.0%  0/3
+    ntupla_anbubus 108  3.0e-03  0.35   16  12   8   0.25   34  14.5%  0.0%  3/3
+    ntupla_anbubus 114  3.0e-03  0.35   32  12   8   0.25   67  14.4%  0.0%  3/3
+    ntupla_anbubus  19  3.0e-04  0.35   32  12   8      1   67  14.4%  0.0%  0/3
+    ntupla_anbubus  50  8.0e-04  0.20   16  12   8      4   34  14.4%  0.0%  3/3
+ntupla_dissertacao  91  1.5e-03  0.35   32  12   8   0.85   67  14.3%  0.0%  3/3
+    ntupla_anbubus  35  5.0e-04  0.20   32  24   8      4   34  14.1%  0.0%  0/3
+    ntupla_anbubus 115  3.0e-03  0.35   32  12   8      1   67  14.0%  0.0%  3/3
+    ntupla_anbubus  48  8.0e-04  0.20   16  12   8   0.25   34  13.6%  0.0%  2/3
+    ntupla_anbubus  58  8.0e-04  0.20   32  24   8      1   34  13.6%  0.0%  2/3
+ntupla_dissertacao  69  8.0e-04  0.35   32  24   8    0.7   34  13.3%  0.0%  0/3
+ntupla_dissertacao  46  5.0e-04  0.35   32  24   8   0.85   34  13.1%  0.0%  0/3
+    ntupla_anbubus  34  5.0e-04  0.20   32  24   8      1   34  13.1%  0.0%  0/3
+    ntupla_anbubus  70  8.0e-04  0.35   32  24   8      1   34  13.0%  0.0%  0/3
+ntupla_dissertacao  86  1.5e-03  0.35   16  12   8   0.99   34  12.8%  0.0%  3/3
+ntupla_dissertacao  85  1.5e-03  0.35   16  12   8   0.85   34  12.7%  0.0%  3/3
+    ntupla_anbubus  71  8.0e-04  0.35   32  24   8      4   34  12.5%  0.0%  0/3
+ntupla_dissertacao  45  5.0e-04  0.35   32  24   8    0.7   34  12.4%  0.0%  0/3
+    ntupla_anbubus  69  8.0e-04  0.35   32  24   8   0.25   34  12.1%  0.0%  0/3
+    ntupla_anbubus 109  3.0e-03  0.35   16  12   8      1   34  12.1%  0.0%  3/3
+    ntupla_anbubus 110  3.0e-03  0.35   16  12   8      4   34  11.4%  0.0%  3/3
+ntupla_dissertacao  35  5.0e-04  0.20   32  24   8   0.99   34  11.2%  0.0%  0/3
+ntupla_dissertacao  10  3.0e-04  0.20   32  24   8   0.85   34  11.1%  0.0%  0/3
+ntupla_dissertacao   9  3.0e-04  0.20   32  24   8    0.7   34  11.0%  0.0%  0/3
+    ntupla_anbubus  11  3.0e-04  0.20   32  24   8      4   34  11.0%  0.0%  0/3
+    ntupla_anbubus  10  3.0e-04  0.20   32  24   8      1   34  10.6%  0.0%  0/3
+    ntupla_anbubus   9  3.0e-04  0.20   32  24   8   0.25   34  10.5%  0.0%  0/3
+    ntupla_anbubus  88  1.5e-03  0.35   16  24   8      1   17  10.4%  0.0%  0/3
+ntupla_dissertacao  92  1.5e-03  0.35   32  12   8   0.99   67  10.3%  0.0%  3/3
+    ntupla_anbubus  74  1.5e-03  0.20   16  12   8      4   34   9.9%  0.0%  3/3
+    ntupla_anbubus  46  5.0e-04  0.35   32  24   8      1   34   9.8%  0.0%  0/3
+    ntupla_anbubus  87  1.5e-03  0.35   16  24   8   0.25   17   9.7%  0.0%  0/3
+ntupla_dissertacao  21  3.0e-04  0.35   32  24   8    0.7   34   9.6%  0.0%  0/3
+ntupla_dissertacao  33  5.0e-04  0.20   32  24   8    0.7   34   9.5%  0.0%  1/3
+    ntupla_anbubus  45  5.0e-04  0.35   32  24   8   0.25   34   9.3%  0.0%  0/3
+ntupla_dissertacao  50  8.0e-04  0.20   16  12   8   0.99   34   9.3%  0.0%  3/3
+ntupla_dissertacao  90  1.5e-03  0.35   32  12   8    0.7   67   9.2%  0.0%  3/3
+ntupla_dissertacao  71  8.0e-04  0.35   32  24   8   0.99   34   9.2%  0.0%  0/3
+    ntupla_anbubus  89  1.5e-03  0.35   16  24   8      4   17   9.1%  0.0%  1/3
+    ntupla_anbubus  49  8.0e-04  0.20   16  12   8      1   34   9.0%  0.0%  0/3
+ntupla_dissertacao  84  1.5e-03  0.35   16  12   8    0.7   34   8.8%  0.0%  3/3
+    ntupla_anbubus  47  5.0e-04  0.35   32  24   8      4   34   8.8%  0.0%  0/3
+    ntupla_anbubus  28  5.0e-04  0.20   16  24   8      1   17   8.3%  0.0%  0/3
+ntupla_dissertacao  11  3.0e-04  0.20   32  24   8   0.99   34   8.3%  0.0%  0/3
+    ntupla_anbubus 119  3.0e-03  0.35   32  24   8      4   34   8.2%  0.0%  3/3
+    ntupla_anbubus 118  3.0e-03  0.35   32  24   8      1   34   8.0%  0.0%  3/3
+    ntupla_anbubus  27  5.0e-04  0.20   16  24   8   0.25   17   7.9%  0.0%  0/3
+ntupla_dissertacao  22  3.0e-04  0.35   32  24   8   0.85   34   7.7%  0.0%  0/3
+    ntupla_anbubus  29  5.0e-04  0.20   16  24   8      4   17   7.6%  0.0%  0/3
+ntupla_dissertacao  49  8.0e-04  0.20   16  12   8   0.85   34   7.5%  0.0%  3/3
+    ntupla_anbubus 117  3.0e-03  0.35   32  24   8   0.25   34   7.4%  0.0%  3/3
+    ntupla_anbubus  79  1.5e-03  0.20   32  12   8      1   67   7.4%  0.0%  3/3
+    ntupla_anbubus  64  8.0e-04  0.35   16  24   8      1   17   7.2%  0.0%  0/3
+    ntupla_anbubus  22  3.0e-04  0.35   32  24   8      1   34   6.9%  0.0%  0/3
+ntupla_dissertacao  47  5.0e-04  0.35   32  24   8   0.99   34   6.9%  0.0%  0/3
+    ntupla_anbubus  23  3.0e-04  0.35   32  24   8      4   34   6.8%  0.0%  0/3
+    ntupla_anbubus  63  8.0e-04  0.35   16  24   8   0.25   17   6.6%  0.0%  0/3
+    ntupla_anbubus  21  3.0e-04  0.35   32  24   8   0.25   34   6.5%  0.0%  0/3
+ntupla_dissertacao 116  3.0e-03  0.35   32  12   8   0.99   67   6.4%  0.0%  3/3
+ntupla_dissertacao  64  8.0e-04  0.35   16  24   8   0.85   17   6.4%  0.0%  0/3
+ntupla_dissertacao 110  3.0e-03  0.35   16  12   8   0.99   34   6.1%  0.0%  3/3
+    ntupla_anbubus   5  3.0e-04  0.20   16  24   8      4   17   6.1%  0.0%  0/3
+ntupla_dissertacao  23  3.0e-04  0.35   32  24   8   0.99   34   6.1%  0.0%  0/3
+    ntupla_anbubus  65  8.0e-04  0.35   16  24   8      4   17   5.9%  0.0%  0/3
+    ntupla_anbubus  78  1.5e-03  0.20   32  12   8   0.25   67   5.9%  0.0%  3/3
+ntupla_dissertacao  48  8.0e-04  0.20   16  12   8    0.7   34   5.9%  0.0%  3/3
+ntupla_dissertacao  54  8.0e-04  0.20   32  12   8    0.7   67   5.9%  0.0%  3/3
+ntupla_dissertacao  63  8.0e-04  0.35   16  24   8    0.7   17   5.8%  0.0%  0/3
+    ntupla_anbubus  73  1.5e-03  0.20   16  12   8      1   34   5.7%  0.0%  3/3
+ntupla_dissertacao  39  5.0e-04  0.35   16  24   8    0.7   17   5.6%  0.0%  0/3
+ntupla_dissertacao  55  8.0e-04  0.20   32  12   8   0.85   67   5.5%  0.0%  3/3
+ntupla_dissertacao 108  3.0e-03  0.35   16  12   8    0.7   34   5.5%  0.0%  3/3
+ntupla_dissertacao 109  3.0e-03  0.35   16  12   8   0.85   34   5.4%  0.0%  3/3
+    ntupla_anbubus   3  3.0e-04  0.20   16  24   8   0.25   17   5.4%  0.0%  0/3
+    ntupla_anbubus   4  3.0e-04  0.20   16  24   8      1   17   5.4%  0.0%  0/3
+ntupla_dissertacao  74  1.5e-03  0.20   16  12   8   0.99   34   5.3%  0.0%  3/3
+    ntupla_anbubus  80  1.5e-03  0.20   32  12   8      4   67   5.3%  0.0%  3/3
+ntupla_dissertacao   3  3.0e-04  0.20   16  24   8    0.7   17   5.3%  0.0%  0/3
+    ntupla_anbubus  72  1.5e-03  0.20   16  12   8   0.25   34   5.2%  0.0%  3/3
+    ntupla_anbubus  41  5.0e-04  0.35   16  24   8      4   17   5.2%  0.0%  0/3
+ntupla_dissertacao  15  3.0e-04  0.35   16  24   8    0.7   17   5.2%  0.0%  0/3
+ntupla_dissertacao  27  5.0e-04  0.20   16  24   8    0.7   17   5.1%  0.0%  2/3
+ntupla_dissertacao  16  3.0e-04  0.35   16  24   8   0.85   17   4.9%  0.0%  0/3
+ntupla_dissertacao  40  5.0e-04  0.35   16  24   8   0.85   17   4.9%  0.0%  0/3
+ntupla_dissertacao  95  1.5e-03  0.35   32  24   8   0.99   34   4.9%  0.0%  3/3
+    ntupla_anbubus  40  5.0e-04  0.35   16  24   8      1   17   4.8%  0.0%  0/3
+ntupla_dissertacao  28  5.0e-04  0.20   16  24   8   0.85   17   4.7%  0.0%  2/3
+    ntupla_anbubus  39  5.0e-04  0.35   16  24   8   0.25   17   4.7%  0.0%  0/3
+ntupla_dissertacao  65  8.0e-04  0.35   16  24   8   0.99   17   4.7%  0.0%  0/3
+    ntupla_anbubus  51  8.0e-04  0.20   16  24   8   0.25   17   4.7%  0.0%  1/3
+    ntupla_anbubus  53  8.0e-04  0.20   16  24   8      4   17   4.7%  0.0%  1/3
+ntupla_dissertacao   4  3.0e-04  0.20   16  24   8   0.85   17   4.6%  0.0%  0/3
+ntupla_dissertacao  73  1.5e-03  0.20   16  12   8   0.85   34   4.6%  0.0%  3/3
+ntupla_dissertacao 115  3.0e-03  0.35   32  12   8   0.85   67   4.6%  0.0%  3/3
+ntupla_dissertacao  29  5.0e-04  0.20   16  24   8   0.99   17   4.5%  0.0%  0/3
+ntupla_dissertacao  80  1.5e-03  0.20   32  12   8   0.99   67   4.4%  0.0%  3/3
+ntupla_dissertacao  56  8.0e-04  0.20   32  12   8   0.99   67   4.4%  0.0%  3/3
+    ntupla_anbubus  82  1.5e-03  0.20   32  24   8      1   34   4.3%  0.0%  3/3
+    ntupla_anbubus  17  3.0e-04  0.35   16  24   8      4   17   4.2%  0.0%  0/3
+    ntupla_anbubus 111  3.0e-03  0.35   16  24   8   0.25   17   4.2%  0.0%  3/3
+ntupla_dissertacao  41  5.0e-04  0.35   16  24   8   0.99   17   4.2%  0.0%  0/3
+    ntupla_anbubus 113  3.0e-03  0.35   16  24   8      4   17   4.2%  0.0%  3/3
+    ntupla_anbubus  83  1.5e-03  0.20   32  24   8      4   34   4.2%  0.0%  3/3
+ntupla_dissertacao  78  1.5e-03  0.20   32  12   8    0.7   67   4.1%  0.0%  3/3
+    ntupla_anbubus  15  3.0e-04  0.35   16  24   8   0.25   17   4.1%  0.0%  0/3
+    ntupla_anbubus  16  3.0e-04  0.35   16  24   8      1   17   4.0%  0.0%  0/3
+ntupla_dissertacao   5  3.0e-04  0.20   16  24   8   0.99   17   4.0%  0.0%  0/3
+ntupla_dissertacao  72  1.5e-03  0.20   16  12   8    0.7   34   3.9%  0.0%  3/3
+ntupla_dissertacao  79  1.5e-03  0.20   32  12   8   0.85   67   3.9%  0.0%  3/3
+ntupla_dissertacao  94  1.5e-03  0.35   32  24   8   0.85   34   3.9%  0.0%  3/3
+ntupla_dissertacao  59  8.0e-04  0.20   32  24   8   0.99   34   3.8%  0.0%  3/3
+ntupla_dissertacao  93  1.5e-03  0.35   32  24   8    0.7   34   3.8%  0.0%  3/3
+    ntupla_anbubus  81  1.5e-03  0.20   32  24   8   0.25   34   3.8%  0.0%  3/3
+ntupla_dissertacao 114  3.0e-03  0.35   32  12   8    0.7   67   3.7%  0.0%  3/3
+ntupla_dissertacao  89  1.5e-03  0.35   16  24   8   0.99   17   3.7%  0.0%  3/3
+ntupla_dissertacao  58  8.0e-04  0.20   32  24   8   0.85   34   3.7%  0.0%  3/3
+ntupla_dissertacao  87  1.5e-03  0.35   16  24   8    0.7   17   3.6%  0.0%  3/3
+ntupla_dissertacao  57  8.0e-04  0.20   32  24   8    0.7   34   3.6%  0.0%  3/3
+    ntupla_anbubus 112  3.0e-03  0.35   16  24   8      1   17   3.6%  0.0%  3/3
+ntupla_dissertacao  17  3.0e-04  0.35   16  24   8   0.99   17   3.6%  0.0%  0/3
+ntupla_dissertacao  82  1.5e-03  0.20   32  24   8   0.85   34   3.6%  0.0%  3/3
+ntupla_dissertacao  97  3.0e-03  0.20   16  12   8   0.85   34   3.5%  0.0%  3/3
+ntupla_dissertacao  96  3.0e-03  0.20   16  12   8    0.7   34   3.5%  0.0%  3/3
+ntupla_dissertacao  98  3.0e-03  0.20   16  12   8   0.99   34   3.5%  0.0%  3/3
+ntupla_dissertacao  81  1.5e-03  0.20   32  24   8    0.7   34   3.5%  0.0%  3/3
+ntupla_dissertacao  83  1.5e-03  0.20   32  24   8   0.99   34   3.5%  0.0%  3/3
+ntupla_dissertacao 102  3.0e-03  0.20   32  12   8    0.7   67   3.5%  0.0%  3/3
+ntupla_dissertacao  88  1.5e-03  0.35   16  24   8   0.85   17   3.5%  0.0%  3/3
+ntupla_dissertacao  52  8.0e-04  0.20   16  24   8   0.85   17   3.5%  0.0%  3/3
+    ntupla_anbubus  98  3.0e-03  0.20   16  12   8      4   34   3.5%  0.0%  3/3
+    ntupla_anbubus  96  3.0e-03  0.20   16  12   8   0.25   34   3.5%  0.0%  3/3
+    ntupla_anbubus  97  3.0e-03  0.20   16  12   8      1   34   3.5%  0.0%  3/3
+ntupla_dissertacao 104  3.0e-03  0.20   32  12   8   0.99   67   3.4%  0.0%  3/3
+ntupla_dissertacao 118  3.0e-03  0.35   32  24   8   0.85   34   3.4%  0.0%  3/3
+ntupla_dissertacao 111  3.0e-03  0.35   16  24   8    0.7   17   3.4%  0.0%  3/3
+ntupla_dissertacao 103  3.0e-03  0.20   32  12   8   0.85   67   3.4%  0.0%  3/3
+    ntupla_anbubus  77  1.5e-03  0.20   16  24   8      4   17   3.4%  0.0%  3/3
+    ntupla_anbubus  52  8.0e-04  0.20   16  24   8      1   17   3.4%  0.0%  0/3
+ntupla_dissertacao 119  3.0e-03  0.35   32  24   8   0.99   34   3.4%  0.0%  3/3
+    ntupla_anbubus 104  3.0e-03  0.20   32  12   8      4   67   3.4%  0.0%  3/3
+    ntupla_anbubus  76  1.5e-03  0.20   16  24   8      1   17   3.4%  0.0%  3/3
+    ntupla_anbubus 103  3.0e-03  0.20   32  12   8      1   67   3.4%  0.0%  3/3
+    ntupla_anbubus 102  3.0e-03  0.20   32  12   8   0.25   67   3.4%  0.0%  3/3
+ntupla_dissertacao  51  8.0e-04  0.20   16  24   8    0.7   17   3.4%  0.0%  3/3
+    ntupla_anbubus  75  1.5e-03  0.20   16  24   8   0.25   17   3.4%  0.0%  3/3
+ntupla_dissertacao  53  8.0e-04  0.20   16  24   8   0.99   17   3.4%  0.0%  3/3
+ntupla_dissertacao 112  3.0e-03  0.35   16  24   8   0.85   17   3.4%  0.0%  3/3
+ntupla_dissertacao 117  3.0e-03  0.35   32  24   8    0.7   34   3.4%  0.0%  3/3
+ntupla_dissertacao 100  3.0e-03  0.20   16  24   8   0.85   17   3.3%  0.0%  3/3
+    ntupla_anbubus 101  3.0e-03  0.20   16  24   8      4   17   3.3%  0.0%  3/3
+    ntupla_anbubus 107  3.0e-03  0.20   32  24   8      4   34   3.3%  0.0%  3/3
+ntupla_dissertacao  76  1.5e-03  0.20   16  24   8   0.85   17   3.3%  0.0%  3/3
+ntupla_dissertacao 106  3.0e-03  0.20   32  24   8   0.85   34   3.3%  0.0%  3/3
+ntupla_dissertacao  77  1.5e-03  0.20   16  24   8   0.99   17   3.3%  0.0%  3/3
+ntupla_dissertacao 101  3.0e-03  0.20   16  24   8   0.99   17   3.3%  0.0%  3/3
+ntupla_dissertacao 113  3.0e-03  0.35   16  24   8   0.99   17   3.3%  0.0%  3/3
+ntupla_dissertacao 107  3.0e-03  0.20   32  24   8   0.99   34   3.3%  0.0%  3/3
+ntupla_dissertacao  99  3.0e-03  0.20   16  24   8    0.7   17   3.3%  0.0%  3/3
+    ntupla_anbubus 100  3.0e-03  0.20   16  24   8      1   17   3.3%  0.0%  3/3
+    ntupla_anbubus 105  3.0e-03  0.20   32  24   8   0.25   34   3.3%  0.0%  3/3
+    ntupla_anbubus 106  3.0e-03  0.20   32  24   8      1   34   3.3%  0.0%  3/3
+ntupla_dissertacao  75  1.5e-03  0.20   16  24   8    0.7   17   3.3%  0.0%  3/3
+ntupla_dissertacao 105  3.0e-03  0.20   32  24   8    0.7   34   3.3%  0.0%  3/3
+    ntupla_anbubus  99  3.0e-03  0.20   16  24   8   0.25   17   3.3%  0.0%  3/3
+
+                       MELHOR POR MODELO
+  ntupla_dissertacao: passo 8.00e-04 · σ 0.350 · T 32 · n 12 · m 8 · crítico 0.85 · N 67
+      -> cobertura 50.1%, SR 21.3%, abortos 0/3
+  ntupla_anbubus: passo 1.50e-03 · σ 0.350 · T 32 · n 12 · m 8 · crítico 4 · N 67
+      -> cobertura 46.6%, SR 10.3%, abortos 2/3
+
+parede: 157.4 min · artefato: reports/spec06-desempate.json
