@@ -152,25 +152,34 @@ contrário de `n = 32`, que daria 4,3·10⁹ por RAM."""
 
 TUPLA_ANBUBUS = ANBUBUS["tuple_size"]
 RESOLUCAO_ANBUBUS = ANBUBUS["resolucao"]
-FAIXA_OBS = (-1.0, 1.5)
-"""Faixa REAL da observação, medida — e ela **não** é a declarada pelo ambiente.
+FAIXA_OBS = (-1.5, 1.5)
+"""A faixa das oito configurações publicadas, e ela é em DESVIOS-PADRÃO.
 
-O `GrADySEnvironment` declara `Box(-1.0, 1.0)` e emite valores até **1,50**. Não é
-ruído numérico: a normalização é `(d + S)/(2S)` com `S = 100`, o que dá 1,5 quando
-`d = 200` — isto é, os drones **saem** da caixa de 100 × 100 e a normalização supõe
-que não saem. Medido em 400 passos, `Na ∈ {2, 8}`: faixa `[-1,0000; 1,5000]`.
+Com `observation_filter = "MeanStdFilter"` — invariante nas oito — o codificador não
+vê a observação crua: vê a padronizada. Medido, espiando `encoder.encode` durante um
+`train()`: média +0,144, desvio 1,061, faixa [-4,93; 9,80]. O `±1,5` deles é ±1,5
+desvio, não ±1,5 unidade de observação.
 
-Consequências, e nenhuma delas é opcional:
+A CONSTANTE ANTERIOR ERA (-1,0; 1,5), E O MOTIVO DELA MORREU
 
-1. O `Thermometer(min=-1, max=1)` das configurações do `anbubus` **saturaria** tudo
-   acima de 1,0, perdendo a distinção entre "longe" e "muito longe" exatamente na
-   região em que ela importa para reaproximar o enxame.
-2. O RLlib **valida** o espaço declarado e aborta a coleta. Nós **não corrigimos o
-   ambiente** (é a regra do projeto: clonar o cenário 3 sem modificação), então o
-   que se desliga é a validação — os dados seguem intactos.
-3. O nosso `TermometroQuantil` (E2) se ajusta a um corpus e portanto absorve isto
-   sozinho. O E0 de faixa fixa não absorveria, e é um argumento a mais para o E2
-   que a SPEC-01 não tinha.
+Aquele valor vinha de medir a observação **crua**: o `GrADySEnvironment` declara
+`Box(-1, 1)` e emite até 1,50, porque a normalização é `(d + S)/(2S)` com `S = 100` e
+os drones **saem** da caixa de 100 × 100. Era a faixa certa para entrada crua.
+
+Ao acrescentar o `MeanStdFilter` a entrada passou a ser padronizada, e a constante
+virou uma faixa de observação crua aplicada a desvios-padrão — assimétrica e com o
+dobro da saturação:
+
+    (-1,0; 1,5)  24,1 % dos valores saturam
+    (-1,5; 1,5)  12,4 % dos valores saturam
+
+Os 12,4 % não são defeito: são a escolha deles de cortar em ±1,5 desvio, o que
+concentra a resolução onde estão os dados. Manter a nossa seria divergir do artigo
+sem ganho.
+
+O `_disable_preprocessor_api=True` continua necessário por outro motivo — o ambiente
+emite fora do espaço que **declara**, e o pré-processador do RLlib aborta por isso.
+Desligá-lo é o que evita tocar no ambiente.
 """
 """`tuple_size = 8` e `resolution = 32` são os das configurações deles. O 8 não é
 escolha estética: a alocação é **densa** (`n_nodes · 2^n` posições), então `n = 32`

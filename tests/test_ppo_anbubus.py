@@ -66,19 +66,35 @@ def test_treina_na_fase_certa():
     assert _script().ENV_TREINO["end_when_all_collected"] is False
 
 
-def test_faixa_da_observacao_e_a_medida_nao_a_declarada():
-    """O ambiente declara `Box(-1, 1)` e emite até **1,50**. Medido.
+def test_faixa_da_observacao_e_a_do_artigo_em_desvios_padrao():
+    """A faixa é `(-1,5; 1,5)` nas OITO configurações publicadas, e é em σ.
 
-    A normalização é `(d + S)/(2S)` com `S = 100`, o que dá 1,5 quando `d = 200` —
-    os drones **saem** da caixa de 100 × 100 e a normalização supõe que não saem.
+    Com `observation_filter = "MeanStdFilter"` — também invariante nas oito — o
+    codificador não vê a observação crua, vê a padronizada. Medido espiando
+    `encoder.encode` durante um `train()`: média +0,144, desvio 1,061, faixa
+    [-4,93; 9,80]. O ±1,5 é ±1,5 desvio.
 
-    Um termômetro de faixa fixa em `[-1, 1]` saturaria tudo acima de 1,0, perdendo a
-    distinção entre "longe" e "muito longe" justamente onde ela importa para
-    reaproximar o enxame. O `FAIXA_OBS` do script existe por isso.
+    ESTE TESTE JÁ AFIRMOU O CONTRÁRIO, e o motivo de ter mudado importa.
+
+    Ele fixava `lo == -1.0`, vindo de medir a observação **crua**: o
+    `GrADySEnvironment` declara `Box(-1, 1)` e emite até 1,50, porque a normalização
+    é `(d + S)/(2S)` com `S = 100` e os drones **saem** da caixa de 100 × 100. Era a
+    faixa certa para entrada crua, e o teste guardava isso corretamente.
+
+    O `MeanStdFilter` entrou depois, e com ele a entrada passou a ser padronizada — o
+    que transformou aquela constante numa faixa de observação crua aplicada a
+    desvios-padrão. Assimétrica, e com o dobro da saturação:
+
+        (-1,0; 1,5)  24,1 % dos valores saturam
+        (-1,5; 1,5)  12,4 % dos valores saturam
+
+    Os 12,4 % são a escolha deles: cortar em ±1,5 σ concentra a resolução onde estão
+    os dados. Divergir disso seria sintonia nossa disfarçada de reprodução.
     """
     lo, hi = _script().FAIXA_OBS
-    assert lo == -1.0
-    assert hi >= 1.5, f"faixa superior {hi} não cobre o 1,50 medido"
+    assert (lo, hi) == (-1.5, 1.5), (
+        "a faixa tem de ser a das oito configurações publicadas; com MeanStdFilter "
+        "ela é em desvios-padrão, não em unidades de observação")
 
 
 @pytest.mark.parametrize("celula", [(2, 12), (4, 24), (8, 36)])
