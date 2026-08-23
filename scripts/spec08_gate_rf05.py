@@ -33,28 +33,32 @@ from uavwnn.fusion.consistencia import avaliar
 from uavwnn.fusion.ruido import ConfigRuido
 from uavwnn.refenv import LAMENZA_003, load_heuristics
 
+sys.path.insert(0, "scripts")
+from spec06_campanha_wnn import montar  # noqa: E402  (checkpoint→política, p/ mobilidade real)
+
 SIGMA_ANCORA = 5.0
 Q_A_GRADE = [0.5, 2.0, 5.0, 20.0, 50.0, 200.0]     # degrau 3 (T-08.1)
 Q_W_GRADE = [0.0, 0.25, 1.0, 4.0]                  # degrau 4: descasamento de atuação
 SAIDA = Path("results/etapa2/gate_rf05.json")
 
 
-def _coletar(cfg, degrau, sigma, episodios, **kw):
-    """Roda o guloso por `episodios` no ambiente ruidoso e empilha os logs.
+def _coletar(cfg, degrau, sigma, episodios, politica, **kw):
+    """Roda `politica` por `episodios` no ambiente ruidoso e empilha os logs.
 
-    Devolve arrays alinhados truncando ao menor `K` (episódios têm comprimentos
-    diferentes): `(erros[M,K,2], covs[M,K,2,2]|None, inov[M,J,2]|None, S[...]|None)`.
+    `politica` é o guloso de referência (padrão) OU o WNN carregado — a
+    consistência do filtro tem de valer sob a **mobilidade real** que vai ser
+    avaliada (T-08.1). Devolve arrays alinhados truncando ao menor `K`:
+    `(erros[M,K,2], covs[M,K,2,2]|None, inov[M,J,2]|None, S[...]|None)`.
     """
-    greedy = load_heuristics().create_greedy_heuristics(0, 12)
+    amb = criar_ambiente_ruidoso(
+        cfg, degrau=degrau, config_ruido=ConfigRuido(sigma_gps=sigma), **kw)
     erros_ep, covs_ep, inov_ep, ess_ep = [], [], [], []
     for e in range(episodios):
         random.seed(e); np.random.seed(e)
-        amb = criar_ambiente_ruidoso(
-            cfg, degrau=degrau, config_ruido=ConfigRuido(sigma_gps=sigma), **kw)
-        amb.indice_ruido = e
+        amb.indice_ruido = e                     # reset() recria a fusão e limpa o log
         obs, _ = amb.reset()
         for _ in range(400):
-            obs, _, term, trunc, infos = amb.step({a: greedy(obs[a]) for a in amb.agents})
+            obs, _, term, trunc, infos = amb.step({a: politica(obs[a]) for a in amb.agents})
             if (infos and "avg_reward" in next(iter(infos.values()))) \
                     or any(term.values()) or any(trunc.values()):
                 break
@@ -82,9 +86,9 @@ def _rmse(erros: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.sum(erros**2, axis=-1))))
 
 
-def _consistencia(cfg, degrau, episodios, **kw) -> dict:
+def _consistencia(cfg, degrau, episodios, politica, **kw) -> dict:
     """NEES (erro,P) e NIS (inovação,S) de um degrau, mais RMSE."""
-    erros, covs, inov, ess = _coletar(cfg, degrau, SIGMA_ANCORA, episodios, **kw)
+    erros, covs, inov, ess = _coletar(cfg, degrau, SIGMA_ANCORA, episodios, politica, **kw)
     out: dict = {"rmse": _rmse(erros) if erros is not None else None,
                  "n_execucoes": 0 if erros is None else int(erros.shape[0]),
                  "n_passos": 0 if erros is None else int(erros.shape[1])}
@@ -99,12 +103,12 @@ def _consistencia(cfg, degrau, episodios, **kw) -> dict:
     return out
 
 
-def _varre(cfg, degrau, grade, chave, episodios) -> dict:
+def _varre(cfg, degrau, grade, chave, episodios, politica) -> dict:
     """Varre o parâmetro do filtro e escolhe o melhor (NEES mais perto de n=2)."""
     tentativas = {}
     melhor_q, melhor_dist = None, float("inf")
     for q in grade:
-        r = _consistencia(cfg, degrau, episodios, **{chave: q})
+        r = _consistencia(cfg, degrau, episodios, politica, **{chave: q})
         tentativas[str(q)] = r
         nees = r.get("nees", {}).get("medio")
         if nees is not None:
@@ -137,25 +141,38 @@ def _hash_filtro(dt: float, q_w: float) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--episodios", type=int, default=100)
+    ap.add_argument("--checkpoint", type=Path, default=None,
+                    help="checkpoint WNN p/ validar o filtro sob a mobilidade REAL "
+                         "(T-08.1); padrão: guloso de referência")
+    ap.add_argument("--aproximador", default=None, help="família (se --checkpoint)")
     ap.add_argument("--saida", type=Path, default=SAIDA)
     a = ap.parse_args()
 
     cfg = LAMENZA_003(1, 12, phase="eval")
     dt = float(cfg.algorithm_iteration_interval)
+    if a.checkpoint is not None:
+        aprox = a.aproximador or json.loads(
+            (a.checkpoint.parent.parent / "config.json").read_text())["config"]["aproximador"]
+        politica, _ = montar(aprox, cfg, a.checkpoint)
+        fonte = f"WNN {aprox}"
+    else:
+        greedy = load_heuristics().create_greedy_heuristics(0, 12)
+        politica = lambda o: greedy(o)          # noqa: E731
+        fonte = "guloso de referência"
     print(f"Gate RF-05/RF-04 · célula 1×12 · σ_âncora={SIGMA_ANCORA} · "
-          f"{a.episodios} episódios (guloso de referência)\n")
+          f"{a.episodios} episódios · mobilidade: {fonte}\n")
 
     print("degrau 2 (passa-baixa)…", flush=True)
-    d2 = _consistencia(cfg, 2, a.episodios, alpha=0.5)
+    d2 = _consistencia(cfg, 2, a.episodios, politica, alpha=0.5)
     print(f"  RMSE {d2['rmse']:.2f} m (sem P — NEES/NIS não se aplica)\n")
 
     print("degrau 3 (KF vel. constante) — varrendo q_a…", flush=True)
-    d3 = _varre(cfg, 3, Q_A_GRADE, "q_a", a.episodios)
+    d3 = _varre(cfg, 3, Q_A_GRADE, "q_a", a.episodios, politica)
     v3 = d3["resultado_melhor"].get("nees", {}).get("veredito", "?")
     print(f"  melhor q_a={d3['melhor']} · NEES {v3}\n")
 
     print("degrau 4 (KF+controle) — varrendo q_w…", flush=True)
-    d4 = _varre(cfg, 4, Q_W_GRADE, "q_w", a.episodios)
+    d4 = _varre(cfg, 4, Q_W_GRADE, "q_w", a.episodios, politica)
     nees4 = d4["resultado_melhor"].get("nees", {})
     nis4 = d4["resultado_melhor"].get("nis", {})
     print(f"  melhor q_w={d4['melhor']} · NEES {nees4.get('veredito','?')} "
@@ -176,6 +193,7 @@ def main() -> int:
         "hash_experimento": Path("results/etapa2/analysis_plan.sha256").read_text().split()[0]
         if Path("results/etapa2/analysis_plan.sha256").exists() else None,
         "sigma_ancora": SIGMA_ANCORA, "dt": dt, "episodios": a.episodios,
+        "mobilidade": fonte,
         "degrau2": d2, "degrau3": d3, "degrau4": d4, "rf04": rf04,
         "regras": {
             "degrau4_consistente": degrau4_ok,
