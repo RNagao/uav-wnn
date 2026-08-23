@@ -90,13 +90,25 @@ def test_hiperparametros_sao_os_do_anbubus(celula):
     ser decisão registrada, não deriva.
     """
     mod = _script()
-    assert mod.ANBUBUS["lr"] == 4e-4
-    assert mod.ANBUBUS["gamma"] == 0.98
-    assert mod.ANBUBUS["train_batch_size"] == 1000
-    assert mod.ANBUBUS["num_epochs"] == 1
-    assert mod.ANBUBUS["minibatch_size"] == 512
-    assert mod.TUPLA_ANBUBUS == 8
-    assert mod.RESOLUCAO_ANBUBUS == 32
+    # Fixa as DUAS tarefas contínuas, não uma: é a citação completa de
+    # `wnn/{hopper,reacher}/thermo/individual_run/experiment.py`, e é o que a grade
+    # varre. Pinar só a base deixaria a outra livre para derivar.
+    assert mod.REFERENCIAS["hopper"] == dict(
+        lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
+        minibatch_size=512, tuple_size=8, resolucao=32, vf_clip_param=3000.0)
+    assert mod.REFERENCIAS["reacher"] == dict(
+        lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
+        minibatch_size=128, tuple_size=10, resolucao=300, vf_clip_param=10.0)
+
+    # A BASE é o reacher, e a escolha está registrada: é a tarefa contínua com
+    # γ = 0,99, o desconto que Lamenza fixa, e a única com λ declarado.
+    assert mod.ANBUBUS == mod.REFERENCIAS["reacher"]
+    assert mod.TUPLA_ANBUBUS == 10
+    assert mod.RESOLUCAO_ANBUBUS == 300
+
+    # `num_sgd_iter = 1` é INVARIANTE nas oito configurações publicadas, então não
+    # é eixo nem escolha: fica embutido em `construir`.
+    assert "num_epochs" not in mod.ANBUBUS
 
 
 def test_o_treinador_nao_importa_uavwnn():

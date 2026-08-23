@@ -377,12 +377,19 @@ class _RedeNTupla:
             kwargs["phi"] = cfg["phi"]
         rede = alvo(**kwargs)
 
-        # mapeamento gravado, não re-sorteado
+        # `remapear` e NÃO atribuição direta, e a diferença era um defeito real.
+        #
+        # Atribuir `.mapeamento` deixa `_tuplas` e `_pot_mat` — as matrizes que o
+        # `enderecos()` vetorizado de fato usa — com o mapa ALEATÓRIO do construtor.
+        # A rede carregada então lê endereços errados, com os valores certos na
+        # memória, e não levanta nada: `n_ram` coincide, as formas coincidem, só o
+        # conteúdo está trocado.
+        #
+        # Medido antes da correção: a rede original predizia [1,004; 2,008; 3,012] e
+        # a carregada [0,012; 0,024; 0,036]. O docstring de `remapear` já dizia
+        # "quem carrega checkpoint passa por aqui" — e este caminho não passava.
         corte = np.cumsum(z["tamanhos_tupla"])[:-1]
-        rede.mapeamento = np.split(z["mapeamento"], corte)
-        rede.n_ram = len(rede.mapeamento)
-        rede._potencias = [(np.uint64(1) << np.arange(len(t), dtype=np.uint64))
-                           for t in rede.mapeamento]
+        rede.remapear(np.split(z["mapeamento"], corte))
 
         rede.memoria = [{} for _ in range(rede.n_ram)]
         tem_cont = "contadores" in z
