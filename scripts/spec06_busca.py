@@ -623,7 +623,32 @@ def main() -> int:
     else:
         progresso.write_text("")
     t0 = time.perf_counter()
-    with mp.Pool(a.processos) as pool:
+    # `maxtasksperchild`: RECICLA o worker a cada N corridas, e a razão foi medida.
+    #
+    # Sem isso o processo do worker degrada — não a máquina, não a grade. Medido na
+    # execução de 753 min: composição idêntica (44 % de abortos nas 25 primeiras
+    # corridas, 40 % nas últimas; `N` e tamanho de checkpoint estáveis), memória sem
+    # pressão, swap zerado, `espera-io` zero, CPU a 99 % — e ainda assim
+    #
+    #     ms/passo:  2,1 -> 2,8 -> 4,0 -> 6,9 -> 11,6 -> 20,0 -> 34,0 -> 51,6
+    #     duração:   3,2 min nas 25 primeiras -> 120,6 min nas 25 últimas
+    #
+    # O teste que isolou a causa: um worker RECÉM-CRIADO, disputando as mesmas 12
+    # threads, faz **4,3 ms/passo** enquanto os antigos fazem **51,6**. Doze vezes.
+    # A degradação está no processo, não no ambiente compartilhado.
+    #
+    # A vazão despencou de 97,6 para 3,8 corridas/h, o que levaria a grade a 134 h.
+    #
+    # Eu havia atribuído isso a viés de fila ("os rápidos terminam primeiro") e
+    # estava errado: aquilo explica a MÉDIA das concluídas subir, não a mesma
+    # configuração ficar 12× mais lenta. Também testei vazamento por construção de
+    # ambiente e não achei — mas o teste ia a 2 400 ambientes, e cada worker cria
+    # ~50 mil (≈2 900 episódios por corrida × 17 corridas).
+    #
+    # `2` e não `1`: reciclar a cada corrida paga ~6 s de importação por corrida, o
+    # que a 3 min de aborto seria 3 % de desperdício. A cada 2 o custo cai pela
+    # metade e a degradação não chega perto de aparecer.
+    with mp.Pool(a.processos, maxtasksperchild=2) as pool:
         for i, x in enumerate(pool.imap_unordered(uma, tarefas, chunksize=1), 1):
             res.append(x)
             with open(progresso, "a") as f:
