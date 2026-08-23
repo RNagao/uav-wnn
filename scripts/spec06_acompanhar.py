@@ -39,6 +39,13 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 
 
+MODELO = {"ntupla_dissertacao": "dissertação", "ntupla_anbubus": "anbubus",
+           "mlp": "MLP"}
+"""Nome curto por família. O `aproximador` é a variável mais importante do painel —
+sem ele, duas linhas com os mesmos hiperparâmetros são indistinguíveis, e as duas
+famílias convertem a taxa de formas diferentes (média contra soma)."""
+
+
 def _hm(segundos: float) -> str:
     """`4h12m`. Sem dias: acima de 48 h a estimativa não merece essa precisão."""
     if segundos != segundos or segundos < 0 or segundos > 48 * 3600:
@@ -106,10 +113,25 @@ def alg44(raiz: Path, progresso: Path, alvo: int, total: int) -> None:
           f"de {total} ──")
     if prontas:
         ab = sum(1 for x in prontas if x.get("abortou"))
-        vv = [x for x in prontas if not x.get("abortou")]
-        print(f"   prontas: {ab} abortadas · {len(vv)} completas"
-              + (f" · melhor cobertura {max(x['cobertura'] for x in vv):.1%}"
-                 if vv else ""))
+        print(f"   PARADAS ({len(prontas)}): {ab} por instabilidade · "
+              f"{len(prontas) - ab} completaram o orçamento")
+        for x in sorted(prontas, key=lambda y: -y["cobertura"]):
+            mod = MODELO.get(x["aproximador"], x["aproximador"])
+            if x.get("abortou"):
+                # O passo em que a assertiva da §4.2 estourou: é a informação que
+                # separa "divergiu logo" de "aprendeu e depois divergiu".
+                msg = x["abortou"]
+                onde = (msg.split("treino ")[1].split(".")[0]
+                        if "treino " in msg else "?")
+                estado = f"ABORTOU no passo {int(onde):>9,}" if onde.isdigit() \
+                    else "ABORTOU"
+            else:
+                estado = f"completou {x['passos']:>9,} passos"
+            print(f"   {'':18} {'':5} {'':6} │ {mod:>11} │ "
+                  f"passo {x['passo_efetivo']:.1e} σ{x['sigma']:.2f} "
+                  f"T{x['resolucao']:>2} crit{x['idx_critico']} │ "
+                  f"cob {x['cobertura']:>6.1%}   SR {x['sr']:>5.1%} │ "
+                  f"{estado}")
     etas = []
     for cfg, L in sorted(vivas, key=lambda t: -t[1][-1]["cobertura"]):
         u = L[-1]
@@ -123,11 +145,12 @@ def alg44(raiz: Path, progresso: Path, alvo: int, total: int) -> None:
         if antes:
             d = u["cobertura"] - sum(antes) / len(antes)
             seta = "↑" if d > 0.02 else "↓" if d < -0.02 else "="
-        print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ "
-              f"passo {cfg['passo_efetivo']:.0e} σ{cfg['sigma']:.2f} "
-              f"T{cfg['resolucao']:>2} │ cob {u['cobertura']:>6.1%} {seta} "
-              f"SR {u['sr']:>5.1%} │ máx {max(x['cobertura'] for x in L):>6.1%} "
-              f"│ {taxa:>5.0f} p/s")
+        mod = MODELO.get(cfg.get("aproximador", ""), cfg.get("aproximador", "?"))
+        print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ {mod:>11} │ "
+              f"passo {cfg['passo_efetivo']:.1e} σ{cfg['sigma']:.2f} "
+              f"T{cfg['resolucao']:>2} crit{cfg['idx_critico']} │ "
+              f"cob {u['cobertura']:>6.1%} {seta} SR {u['sr']:>5.1%} │ "
+              f"máx {max(x['cobertura'] for x in L):>6.1%} │ {taxa:>5.0f} p/s")
     if etas:
         finitos = [e for e in etas if e == e]
         if finitos:
