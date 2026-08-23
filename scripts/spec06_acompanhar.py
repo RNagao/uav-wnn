@@ -107,10 +107,21 @@ def alg44(raiz: Path, progresso: Path, alvo: int, total: int) -> None:
         linhas = _ler(m)
         cfg = m.parent / "config.json"
         if linhas and cfg.exists():
-            vivas.append((json.loads(cfg.read_text())["config"], linhas))
+            # A semente NÃO está no config.json — ela é o último componente do
+            # caminho, `runs/<exp>/<config_hash>/<seed_train>/`, como a §4.7 manda.
+            # Sem exibi-la, duas corridas do mesmo ponto parecem modelos diferentes.
+            vivas.append((json.loads(cfg.read_text())["config"], linhas,
+                          m.parent.name))
 
-    print(f"── ALGORITMO 4.4 · {len(prontas)} prontas / {len(vivas)} vivas "
-          f"de {total} ──")
+    # PONTOS distintos, não corridas: o desenho é `pontos × sementes`, e contar só
+    # corridas faz parecer que há mais modelos do que há.
+    def _pt(c):
+        return (c["aproximador"], c["passo_efetivo"], c["sigma"], c["resolucao"],
+                c["idx_critico"])
+    n_pt = len({_pt(c) for c, _, _ in vivas} |
+               {_pt(x) for x in prontas if "aproximador" in x})
+    print(f"── ALGORITMO 4.4 · {len(prontas)} paradas / {len(vivas)} vivas de "
+          f"{total} corridas · {n_pt} pontos distintos ──")
     if prontas:
         ab = sum(1 for x in prontas if x.get("abortou"))
         print(f"   PARADAS ({len(prontas)}): {ab} por instabilidade · "
@@ -127,13 +138,17 @@ def alg44(raiz: Path, progresso: Path, alvo: int, total: int) -> None:
                     else "ABORTOU"
             else:
                 estado = f"completou {x['passos']:>9,} passos"
-            print(f"   {'':18} {'':5} {'':6} │ {mod:>11} │ "
+            print(f"   {'':18} {'':5} {'':6} │ {mod:>11} "
+                  f"s{x.get('seed_train','?')} │ "
                   f"passo {x['passo_efetivo']:.1e} σ{x['sigma']:.2f} "
                   f"T{x['resolucao']:>2} crit{x['idx_critico']} │ "
                   f"cob {x['cobertura']:>6.1%}   SR {x['sr']:>5.1%} │ "
                   f"{estado}")
     etas = []
-    for cfg, L in sorted(vivas, key=lambda t: -t[1][-1]["cobertura"]):
+    # Ordena por PONTO e depois por semente, não por cobertura: assim os pares do
+    # mesmo ponto ficam adjacentes e a variância entre sementes salta à vista.
+    for cfg, L, sd in sorted(vivas, key=lambda t: (
+            t[0]["aproximador"], -t[0]["passo_efetivo"], t[0]["resolucao"], t[2])):
         u = L[-1]
         frac = u["passo"] / alvo
         taxa = _taxa_marginal(L)
@@ -146,7 +161,7 @@ def alg44(raiz: Path, progresso: Path, alvo: int, total: int) -> None:
             d = u["cobertura"] - sum(antes) / len(antes)
             seta = "↑" if d > 0.02 else "↓" if d < -0.02 else "="
         mod = MODELO.get(cfg.get("aproximador", ""), cfg.get("aproximador", "?"))
-        print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ {mod:>11} │ "
+        print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ {mod:>11} s{sd} │ "
               f"passo {cfg['passo_efetivo']:.1e} σ{cfg['sigma']:.2f} "
               f"T{cfg['resolucao']:>2} crit{cfg['idx_critico']} │ "
               f"cob {u['cobertura']:>6.1%} {seta} SR {u['sr']:>5.1%} │ "
