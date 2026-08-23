@@ -66,6 +66,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -393,6 +394,13 @@ def main() -> int:
                     help="3000 no hopper; 10 é o padrão do RLlib")
     ap.add_argument("--ray-cpus", type=int, default=2,
                     help="CPUs que o ray reserva. A grade roda várias em paralelo.")
+    ap.add_argument("--aval-cada", type=int, default=0,
+                    help="avalia deterministicamente a cada N passos, para acompanhar "
+                         "as figuras de mérito ao vivo. 0 = só no fim. Custa alguns "
+                         "segundos por avaliação e NÃO entra na seleção.")
+    ap.add_argument("--n-aval-parcial", type=int, default=8,
+                    help="episódios nas avaliações intermediárias; menos que no fim, "
+                         "porque servem para acompanhar e não para decidir")
     ap.add_argument("--sementes-aval", default=None,
                     help="arquivo com uma semente por linha (banco val ou test). "
                          "Sem ele, não há avaliação determinística e a grade "
@@ -420,16 +428,55 @@ def main() -> int:
           f"{a.passos} passos")
     print(f"referência `{a.referencia}` -> {hp}")
 
-    hist, vistos = [], 0
+    sementes_val = []
+    if a.sementes_aval:
+        sementes_val = [int(l) for l in Path(a.sementes_aval).read_text().split()
+                        if l.strip()]
+
+    hist, vistos, proximo = [], 0, a.aval_cada
+    t_ini = time.perf_counter()
+    marcos = []          # (passos, parede) para a taxa MARGINAL, não a acumulada
     while vistos < a.passos:
         r = algo.train()
         m = r.get("env_runners", r)
         vistos = r.get("num_env_steps_sampled_lifetime",
-                       r.get("timesteps_total", vistos + ANBUBUS["train_batch_size"]))
+                       r.get("timesteps_total",
+                                     vistos + (a.lote or hp["train_batch_size"])))
         ret = m.get("episode_return_mean", m.get("episode_reward_mean"))
-        hist.append({"passos": int(vistos),
-                     "retorno": None if ret is None else float(ret)})
-        print(f"  {vistos:>8} passos  retorno {ret}")
+        agora = time.perf_counter() - t_ini
+        marcos.append((int(vistos), agora))
+        del marcos[:-8]
+
+        # ETA pela taxa MARGINAL da janela recente. A acumulada mente por baixo
+        # quando a corrida desacelera — na campanha do Alg 4.4 ela marcava 361
+        # passos/s enquanto a real era 147, e eu errei duas ETAs por causa disso.
+        eta = float("nan")
+        if len(marcos) >= 2:
+            dp = marcos[-1][0] - marcos[0][0]
+            dt = marcos[-1][1] - marcos[0][1]
+            if dt > 0 and dp > 0:
+                eta = (a.passos - vistos) / (dp / dt)
+        falta = ("  --" if eta != eta
+                 else f"{int(eta) // 3600:>2}h{int(eta) % 3600 // 60:02d}m")
+        linha = {"passos": int(vistos),
+                 "retorno": None if ret is None else float(ret),
+                 "parede_s": agora}
+
+        # Figuras de mérito ao vivo, DETERMINÍSTICAS. Não entram na seleção — são
+        # para acompanhar; a que decide é a do fim, com o banco inteiro.
+        if a.aval_cada and sementes_val and vistos >= proximo:
+            proximo = vistos + a.aval_cada
+            pa = avaliar_determinista(algo, kw_env,
+                                      sementes_val[:a.n_aval_parcial])
+            linha["parcial"] = pa
+            print(f"  {vistos:>8}/{a.passos} {vistos / a.passos:>4.0%} resta {falta}"
+                  f" · retorno {ret if ret is None else round(ret, 2)}"
+                  f" · cobertura {pa['cobertura']:>6.1%} SR {pa['sr']:>5.1%}"
+                  f" CT {pa['ct_cens']:>5.0f}s", flush=True)
+        else:
+            print(f"  {vistos:>8}/{a.passos} {vistos / a.passos:>4.0%} resta {falta}"
+                  f" · retorno {ret if ret is None else round(ret, 2)}", flush=True)
+        hist.append(linha)
 
     aval = None
     if a.sementes_aval:
