@@ -365,7 +365,15 @@ def main() -> int:
     tarefa = _Tarefa(a.episodios, a.n_aval, a.p13, a.familia)
     if a.processos > 1:
         import multiprocessing as mp
-        with mp.Pool(a.processos) as pool:
+        # `maxtasksperchild=1`: o processo que treina DEGRADA 1,55× por corrida,
+        # de forma geométrica — medido na grade de desempate da SPEC-06 (2,0 ->
+        # 50,8 ms/passo em 9 corridas no mesmo worker, com composição idêntica e
+        # sem pressão de memória, swap ou I/O). É fragmentação de heap por
+        # construir e descartar centenas de MB de tabelas hash a cada corrida.
+        # O `fork` faz o filho herdar a memória do pai, então reciclar custa
+        # milissegundos, e o `maxtasks` é checado entre corridas — nenhuma é
+        # interrompida no meio.
+        with mp.Pool(a.processos, maxtasksperchild=1) as pool:
             pares = pool.map(tarefa, range(a.sementes))
     else:
         pares = [tarefa(s) for s in range(a.sementes)]

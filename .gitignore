@@ -23,3 +23,7 @@ checkpoints/
 # SPEC-02: grão fino de episódios — dado de máquina, cresce, não vai para o git.
 # `agregado.csv` e `comparacoes.csv` VÃO, para `make repro` dar diff inspecionável.
 results/**/episodios.csv
+
+# artefatos de corrida da SPEC-06: 4,9 GB de checkpoints e métricas por corrida.
+# Os resultados agregados vão em reports/, que é o que a PR precisa carregar.
+runs/spec06-desempate/

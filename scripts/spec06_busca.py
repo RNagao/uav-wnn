@@ -454,6 +454,48 @@ def uma(args: tuple) -> dict:
                 if f.is_file()) / 1e6, 3)}
 
 
+PONTOS_LONGA = [
+    # --- dissertação: os 3 melhores por média de 3 sementes, todos sem aborto ---
+    ("ntupla_dissertacao", 8e-4, 0.35, 32, 12, 1),   # 50,1 % cob · SR 21,3 % · 0/3
+    ("ntupla_dissertacao", 5e-4, 0.20, 32, 12, 1),   # 49,3 % cob · SR 12,7 % · 0/3
+    ("ntupla_dissertacao", 8e-4, 0.35, 16, 12, 1),   # 46,0 % cob · SR  0,7 % · 0/3
+    # --- anbubus: os 2 melhores REAIS, que abortam, mais um seguro de piso ------
+    ("ntupla_anbubus",    1.5e-3, 0.35, 32, 12, 2),  # 46,6 % cob · SR 10,3 % · 2/3
+    ("ntupla_anbubus",    1.5e-3, 0.35, 32, 12, 1),  # 29,0 % cob · SR  0,7 % · 1/3
+    ("ntupla_anbubus",     5e-4, 0.20, 32, 12, 2),   # 19,2 % cob · SR  0,0 % · 0/3
+]
+"""Pontos da corrida longa: `(modelo, passo, σ, T, n, idx_critico)`.
+
+`m = 8` e `normalizar = False` em todos, como na grade que os elegeu.
+
+POR QUE O ANBUBUS NÃO ENTRA COM OS TRÊS "SEM ABORTO"
+
+Porque os sem aborto dele não são os melhores dele. Ordenando por média de três
+sementes, com abortos incluídos:
+
+    46,6 % cob · SR méd 10,3 % (máx 30,0 %) · 2/3 abortos · passo 1,5e-3 σ 0,35
+    30,1 %                                  · 1/3         · passo 1,5e-3 σ 0,35 T16
+    29,0 % cob · SR méd  0,7 %              · 1/3         · passo 1,5e-3 σ 0,35 crit1
+    ...
+    19,2 % cob · SR      0,0 %              · 0/3         · passo 5e-4 σ 0,20  <- o melhor "seguro"
+
+As QUATRO corridas do anbubus com SR > 0 na grade inteira estão em `passo 1,5e-3`
+com `σ 0,35`, e uma delas COMPLETOU, com SR 30 % e cobertura 64,3 %. Eu havia
+declarado esse nível "território morto" por contagem de abortos e estava errado: é
+o ótimo dele. Comparar 19,2 % contra os 50,1 % da dissertação seria comparar o
+ótimo de uma com um ponto seguro da outra.
+
+Então o braço dele leva dois pontos do ótimo — que provavelmente vão abortar, e o
+aborto é a resposta: "não sustenta o próprio ótimo" — e um seguro, para medir se os
+19,2 % melhoram com 50× de orçamento.
+
+DOIS SEEDS, NÃO TRÊS. 6 pontos × 2 sementes = 12 corridas, e 12 corridas em 12
+workers dá contenção IDÊNTICA para todas. Com 3 sementes seriam 18 em duas ondas,
+e a segunda rodaria com a máquina mais livre — o que contaminaria justamente a
+comparação "pelo mesmo tempo" que esta corrida existe para fazer.
+"""
+
+
 _EIXOS = frozenset({"passo_efetivo", "sigma", "resolucao", "tupla",
                     "passos_m", "idx_critico", "normalizar"})
 """Os eixos que identificam uma corrida, e **só** eles.
@@ -543,7 +585,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b")
     ap.add_argument("--modelos", default="ntupla_dissertacao,ntupla_anbubus")
-    ap.add_argument("--modo", choices=("grade", "aleatoria"), default="grade",
+    ap.add_argument("--modo", choices=("grade", "aleatoria", "longa"), default="grade",
                     help="`grade` = fatorial completo; `aleatoria` = sorteio")
     ap.add_argument("--niveis", choices=tuple(GRADE), default="reduzido",
                     help="cardinalidade da grade fatorial — ver o custo impresso")
@@ -563,7 +605,17 @@ def main() -> int:
     a = ap.parse_args()
 
     modelos = a.modelos.split(",")
-    if a.modo == "grade":
+    if a.modo == "longa":
+        # Pontos explícitos, um por modelo — NÃO é produto cartesiano, porque os
+        # melhores de cada família não coincidem. Ver `PONTOS_LONGA`.
+        amostras = None
+        tarefas = [(mod, {"id": i, "passo_efetivo": pe, "sigma": sg,
+                          "resolucao": T, "tupla": n, "passos_m": 8,
+                          "idx_critico": ic, "normalizar": False},
+                    sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
+                   for i, (mod, pe, sg, T, n, ic) in enumerate(PONTOS_LONGA)
+                   for sd in range(a.sementes)]
+    elif a.modo == "grade":
         amostras = grade(a.niveis)
     else:
         amostras = amostrar(a.amostras, a.seed_busca)
@@ -572,8 +624,9 @@ def main() -> int:
     # total seria o mesmo, mas nenhuma leitura parcial seria comparativa —
     # medido: 15 corridas concluídas, 15 da mesma rede. `chunksize` não resolve:
     # ele muda o lote, não a ordem.
-    tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
-               for s in amostras for sd in range(a.sementes) for m in modelos]
+    if amostras is not None:
+        tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
+                   for s in amostras for sd in range(a.sementes) for m in modelos]
     # EMBARALHA com semente fixa, e a razão foi medida.
     #
     # O produto cartesiano deixa os eixos em blocos: `resolucao` é o 3º, então `T`
@@ -590,16 +643,37 @@ def main() -> int:
 
     _r.Random(a.seed_busca).shuffle(tarefas)
 
-    rot = (f"grade fatorial COMPLETA ({a.niveis})" if a.modo == "grade"
+    rot = ("corrida LONGA sobre os melhores pontos de cada modelo"
+           if a.modo == "longa"
+           else f"grade fatorial COMPLETA ({a.niveis})" if a.modo == "grade"
            else f"busca aleatória ({a.amostras} sorteios)")
     print(f"{rot} · réplica {a.replica} · Na=1 Ns=12 · sem ruído")
-    print(f"{len(amostras)} pontos COMPARTILHADOS × {len(modelos)} modelos "
-          f"× {a.sementes} sementes = {len(tarefas)} corridas")
+    if a.modo == "longa":
+        print(f"{len(PONTOS_LONGA)} pontos ESPECÍFICOS por modelo × {a.sementes} "
+              f"sementes = {len(tarefas)} corridas")
+        for mod, pe, sg, T, n, ic in PONTOS_LONGA:
+            print(f"  {mod:>19} passo {pe:.1e} σ {sg:.2f} T{T} n{n} crit {ic}")
+    else:
+        print(f"{len(amostras)} pontos COMPARTILHADOS × {len(modelos)} modelos "
+              f"× {a.sementes} sementes = {len(tarefas)} corridas")
     print(f"B_sweep = {a.b_sweep:,} · {a.processos} processos")
     if a.modo == "grade":
         print("eixos: " + " × ".join(f"{k}({len(v)})" for k, v in
                                      GRADE[a.niveis].items()))
-    est = len(tarefas) * 6.5 * (a.b_sweep / 200_000) / a.processos / 60
+    # ESTIMATIVA a partir do custo MEDIDO, não de uma constante herdada.
+    #
+    # 1,80 ms por passo com os workers reciclados e 12 em paralelo (mediana sobre 72
+    # corridas de T32/n12 da grade de desempate). O total de passos por corrida não
+    # é só `b_sweep`: a avaliação intercalada roda 40 × `n_val` episódios e o teste
+    # final `n_test`, a ~76 passos por episódio (medido em 8 900 episódios reais — o
+    # `max_seconds_stalled = 30` trunca bem antes do teto de 1 000).
+    #
+    # A constante anterior (6,5 min/corrida a 200 mil passos) subestimava por 2× e
+    # ignorava `n_val`/`n_test` por completo.
+    MS_POR_PASSO, PASSOS_POR_EP = 1.80, 76
+    _passos = a.b_sweep + 40 * a.n_val * PASSOS_POR_EP + a.n_test * PASSOS_POR_EP
+    _lotes = -(-len(tarefas) // a.processos)     # ondas de `processos` corridas
+    est = _lotes * _passos * MS_POR_PASSO / 1000 / 3600
     print(f"estimativa: ~{est:.1f} h de parede")
     print(f"progresso ao vivo: {Path(a.saida).with_suffix('.progresso.jsonl')}\n")
 
@@ -623,7 +697,53 @@ def main() -> int:
     else:
         progresso.write_text("")
     t0 = time.perf_counter()
-    with mp.Pool(a.processos) as pool:
+    # `maxtasksperchild`: RECICLA o worker a cada N corridas, e a razão foi medida.
+    #
+    # Sem isso o processo do worker degrada — não a máquina, não a grade. Medido na
+    # execução de 753 min: composição idêntica (44 % de abortos nas 25 primeiras
+    # corridas, 40 % nas últimas; `N` e tamanho de checkpoint estáveis), memória sem
+    # pressão, swap zerado, `espera-io` zero, CPU a 99 % — e ainda assim
+    #
+    #     ms/passo:  2,1 -> 2,8 -> 4,0 -> 6,9 -> 11,6 -> 20,0 -> 34,0 -> 51,6
+    #     duração:   3,2 min nas 25 primeiras -> 120,6 min nas 25 últimas
+    #
+    # O teste que isolou a causa: um worker RECÉM-CRIADO, disputando as mesmas 12
+    # threads, faz **4,3 ms/passo** enquanto os antigos fazem **51,6**. Doze vezes.
+    # A degradação está no processo, não no ambiente compartilhado.
+    #
+    # A vazão despencou de 97,6 para 3,8 corridas/h, o que levaria a grade a 134 h.
+    #
+    # Eu havia atribuído isso a viés de fila ("os rápidos terminam primeiro") e
+    # estava errado: aquilo explica a MÉDIA das concluídas subir, não a mesma
+    # configuração ficar 12× mais lenta. Também testei vazamento por construção de
+    # ambiente e não achei — mas o teste ia a 2 400 ambientes, e cada worker cria
+    # ~50 mil (≈2 900 episódios por corrida × 17 corridas).
+    #
+    # NÃO É a construção de ambiente: medi a curva até 40 mil ambientes num só
+    # processo e ela é PLANA (0,47 -> 0,27 ms/passo, RSS de 44 para 47 MB). O que
+    # acumula é outra coisa — cada corrida constrói e descarta centenas de MB de
+    # tabelas hash, e a assinatura (RSS estável, sem swap, sem I/O, buscas 12× mais
+    # lentas) é de fragmentação de heap, que degrada localidade sem crescer memória.
+    #
+    # `1` e não `2`: a degradação medida é de **1,55× POR TAREFA**, geométrica —
+    #
+    #     tarefa 1 do worker:  2,0 ms/passo      tarefa 6: 13,9
+    #     tarefa 2:            2,5               tarefa 7: 21,9
+    #     tarefa 3:            3,7               tarefa 8: 34,1
+    #     tarefa 4:            5,8               tarefa 9: 50,8
+    #     tarefa 5:            9,0
+    #
+    # então `2` deixaria a segunda corrida de cada worker 1,55× mais lenta, 27 % de
+    # penalidade média. E reciclar é barato de um jeito que eu havia estimado errado:
+    # o `Pool` usa `fork`, o filho HERDA a memória do pai e não reimporta nada — é um
+    # fork, da ordem de milissegundos, não os ~6 s de importação que eu supus.
+    #
+    # SEGURANÇA: o `maxtasks` do `multiprocessing` é checado DEPOIS de `completed +=
+    # 1`, então o worker só sai ENTRE corridas — nenhuma é interrompida no meio.
+    # Verifiquei também que o resultado não depende do estado do processo: a mesma
+    # tarefa rodada como 1ª e como 4ª devolve `cobertura`, `sr`, `ct_cens`,
+    # `val_cobertura` e `passos` idênticos.
+    with mp.Pool(a.processos, maxtasksperchild=1) as pool:
         for i, x in enumerate(pool.imap_unordered(uma, tarefas, chunksize=1), 1):
             res.append(x)
             with open(progresso, "a") as f:
