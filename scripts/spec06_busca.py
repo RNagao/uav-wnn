@@ -645,10 +645,31 @@ def main() -> int:
     # ambiente e não achei — mas o teste ia a 2 400 ambientes, e cada worker cria
     # ~50 mil (≈2 900 episódios por corrida × 17 corridas).
     #
-    # `2` e não `1`: reciclar a cada corrida paga ~6 s de importação por corrida, o
-    # que a 3 min de aborto seria 3 % de desperdício. A cada 2 o custo cai pela
-    # metade e a degradação não chega perto de aparecer.
-    with mp.Pool(a.processos, maxtasksperchild=2) as pool:
+    # NÃO É a construção de ambiente: medi a curva até 40 mil ambientes num só
+    # processo e ela é PLANA (0,47 -> 0,27 ms/passo, RSS de 44 para 47 MB). O que
+    # acumula é outra coisa — cada corrida constrói e descarta centenas de MB de
+    # tabelas hash, e a assinatura (RSS estável, sem swap, sem I/O, buscas 12× mais
+    # lentas) é de fragmentação de heap, que degrada localidade sem crescer memória.
+    #
+    # `1` e não `2`: a degradação medida é de **1,55× POR TAREFA**, geométrica —
+    #
+    #     tarefa 1 do worker:  2,0 ms/passo      tarefa 6: 13,9
+    #     tarefa 2:            2,5               tarefa 7: 21,9
+    #     tarefa 3:            3,7               tarefa 8: 34,1
+    #     tarefa 4:            5,8               tarefa 9: 50,8
+    #     tarefa 5:            9,0
+    #
+    # então `2` deixaria a segunda corrida de cada worker 1,55× mais lenta, 27 % de
+    # penalidade média. E reciclar é barato de um jeito que eu havia estimado errado:
+    # o `Pool` usa `fork`, o filho HERDA a memória do pai e não reimporta nada — é um
+    # fork, da ordem de milissegundos, não os ~6 s de importação que eu supus.
+    #
+    # SEGURANÇA: o `maxtasks` do `multiprocessing` é checado DEPOIS de `completed +=
+    # 1`, então o worker só sai ENTRE corridas — nenhuma é interrompida no meio.
+    # Verifiquei também que o resultado não depende do estado do processo: a mesma
+    # tarefa rodada como 1ª e como 4ª devolve `cobertura`, `sr`, `ct_cens`,
+    # `val_cobertura` e `passos` idênticos.
+    with mp.Pool(a.processos, maxtasksperchild=1) as pool:
         for i, x in enumerate(pool.imap_unordered(uma, tarefas, chunksize=1), 1):
             res.append(x)
             with open(progresso, "a") as f:
