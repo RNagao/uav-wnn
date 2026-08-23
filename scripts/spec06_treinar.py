@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, "scripts")
+import multiprocessing as mp  # noqa: E402
 from uavwnn.agents import APROXIMADORES, BASELINES  # noqa: E402
 from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
 from uavwnn.agents.ac_continuo import AtorCriticoContinuo  # noqa: E402
@@ -308,6 +309,85 @@ def avaliar(cfg: EnvConfig, politica, ctx, sementes) -> dict:
             "por_episodio": linhas}
 
 
+def _uma_corrida(args: tuple) -> dict:
+    """Uma corrida completa — **em processo próprio**, ver o comentário em `main`.
+
+    Recebe só dados planos e reconstrói tudo, porque o que atravessa a fronteira de
+    processo precisa ser serializável e porque reconstruir é o que garante que o
+    filho não herde estado. O corpus do termômetro é determinístico (semente fixa em
+    `corpus_de_observacoes`), então recalculá-lo por semente não muda resultado —
+    custa três episódios.
+    """
+    (replica, aproximador, na, ns, b_max, seed_train, n_val, n_test, raiz,
+     ref_sr, ref_ct, ref_cob) = args
+    r = REPLICAS[replica]
+    cfg_tr, cfg_av = _cfgs(replica, na, ns)
+    bancos = carregar_bancos(na, ns)
+    val = bancos.val.sementes[:n_val] if n_val else bancos.val.sementes
+    test = bancos.test.sementes[:n_test] if n_test else bancos.test.sementes
+    ctx_tr, ctx_av = _ctx(cfg_tr), _ctx(cfg_av)
+    corpus = corpus_de_observacoes(cfg_tr)
+    recompensa = RECOMPENSAS[r["recompensa"]]
+
+    sem = PapeisDeSemente(seed_train=seed_train)
+    aprox, termo, politica, _ = montar_agente(aproximador, cfg_tr, sem, corpus)
+    cfg_corrida = {"replica": replica, "aproximador": aproximador,
+                   "na": na, "ns": ns, "b_max": b_max,
+                   "recompensa": r["recompensa"],
+                   "horizonte": r["horizonte"], "cegos": r["cegos"],
+                   "escala_recompensa": r["escala_recompensa"],
+                   "gamma": GAMMA,
+                   "bits_por_escalar": BITS_POR_ESCALAR}
+    corrida = Corrida(experimento=f"spec06-{replica}", config=cfg_corrida,
+                      sementes=sem, bancos=bancos, raiz=Path(raiz))
+    print(f"  semente {seed_train} -> {corrida.dir}", flush=True)
+
+    rng_cen = sem.rng_cenarios_treino()
+
+    def salvar(destino: Path, _ap=aprox, _t=termo):
+        destino.mkdir(parents=True, exist_ok=True)
+        _ap.salvar(destino)
+        if _t is not None:
+            _t.salvar(destino / "termometro.npz")
+
+    resumo = treinar(
+        corrida,
+        passo_de_treino=lambda orc, _c=cfg_tr, _p=politica, _x=ctx_tr,
+        _r=recompensa, _g=rng_cen, _e=r["escala_recompensa"]:
+            rodar_episodios_de_treino(_c, _p, _x, _r, _g, orc, _e),
+        avaliar_val=lambda _c=cfg_av, _p=politica, _x=ctx_av, _v=val: {
+            k: v for k, v in avaliar(_c, _p, _x, _v).items()
+            if k != "por_episodio"},
+        b_max=b_max,
+        salvar_checkpoint=salvar,
+        metrica=r["metrica"], maior_e_melhor=r["maior_e_melhor"],
+        ocupadas=lambda _a=aprox: (
+            _a.ator.entradas_ocupadas()
+            if hasattr(_a.ator, "entradas_ocupadas")
+            else _a.ator.n_parametros()),
+    )
+
+    # AGORA, e só agora, o banco `test`.
+    final = avaliar(cfg_av, politica, ctx_av, test)
+    corrida.gravar_eval_test(final["por_episodio"])
+    # Pela COBERTURA e não por `SR`: com a aleatória em SR = 0 %, o critério por SR
+    # dispara para qualquer corrida sub-treinada e deixa de distinguir "falhou" de
+    # "não terminou de treinar".
+    catastrofica = (final["cobertura"] <= ref_cob if r["maior_e_melhor"]
+                    else final["ct_cens"] >= ref_ct)
+    print(f"    test: SR={final['sr']:.1%} cob={final['cobertura']:.1%} "
+          f"CT_cens={final['ct_cens']:.1f} CT_succ={final['ct_succ']:.1f}"
+          f"{'  FALHA CATASTRÓFICA' if catastrofica else ''}", flush=True)
+
+    return {"na": na, "ns": ns, "seed_train": seed_train,
+            "dir": str(corrida.dir), "config_hash": corrida.config_hash,
+            **{k: v for k, v in resumo.items() if k != "historico_val"},
+            "test": {k: v for k, v in final.items() if k != "por_episodio"},
+            "falha_catastrofica": bool(catastrofica),
+            "referencia_aleatoria": {"sr": ref_sr, "ct_cens": ref_ct,
+                                     "cobertura": ref_cob}}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1a")
@@ -338,91 +418,56 @@ def main() -> int:
               f"valor prescrita pela T-06.1.\n  Sem ela a asserção da §4.2 aborta "
               f"— medido, no passo 998.\n")
 
-    for na, ns in celulas:
-        cfg_tr, cfg_av = _cfgs(a.replica, na, ns)
-        bancos = carregar_bancos(na, ns)
-        val = bancos.val.sementes[:a.n_val] if a.n_val else bancos.val.sementes
-        test = bancos.test.sementes[:a.n_test] if a.n_test else bancos.test.sementes
-        ctx_tr, ctx_av = _ctx(cfg_tr), _ctx(cfg_av)
-        corpus = corpus_de_observacoes(cfg_tr)
-        recompensa = RECOMPENSAS[r["recompensa"]]
+    # POOL DE UM, RECICLADO A CADA CORRIDA — e a razão foi medida na SPEC-06.
+    #
+    # O processo que treina **degrada 1,55× por corrida**, de forma geométrica:
+    # medido na grade de desempate, o mesmo trabalho passou de 2,0 para 50,8
+    # ms/passo ao longo de 9 corridas no mesmo worker, com composição idêntica,
+    # memória sem pressão, swap zerado e `espera-io` em 0 %. Um worker recém-criado
+    # fazia 4,3 ms/passo enquanto os antigos faziam 51,6, na mesma contenção.
+    #
+    # A causa não é construção de ambiente (medi a curva até 40 mil ambientes num
+    # processo e ela é plana). A assinatura — RSS estável, sem swap, buscas 12× mais
+    # lentas — é de fragmentação de heap por construir e descartar centenas de MB de
+    # tabelas hash a cada corrida.
+    #
+    # AQUI SERIA PIOR QUE NA GRADE. A T-06.5 escala `Na = 1 → 2 → 4 → 8` com `R = 5`,
+    # ou seja até 20 corridas SEQUENCIAIS de `b_max = 19,5 M` passos no mesmo
+    # processo. A vigésima rodaria `1,55¹⁹ ≈ 12 000×` mais lenta — a campanha não
+    # terminaria, e o sintoma pareceria "a WNN não escala com `Na`", que é
+    # exatamente a conclusão que este trabalho quer medir.
+    #
+    # `mp.Pool(1, maxtasksperchild=1)` mantém a semântica sequencial — uma corrida
+    # por vez, na mesma ordem — e dá heap novo a cada uma. O `fork` faz o filho
+    # herdar a memória do pai, então custa milissegundos. O `maxtasks` é checado
+    # depois de `completed += 1`, então nenhuma corrida é interrompida no meio.
+    with mp.Pool(1, maxtasksperchild=1) as pool:
+        for na, ns in celulas:
+            cfg_av = _cfgs(a.replica, na, ns)[1]
+            bancos = carregar_bancos(na, ns)
+            val = bancos.val.sementes[:a.n_val] if a.n_val else bancos.val.sementes
+            ctx_av = _ctx(cfg_av)
 
-        # Referência da falha catastrófica (§4.4): a caminhada aleatória.
-        aleat = BASELINES["random_uniforme"]()
-        aleat.reset(ctx_av, np.random.default_rng(0))
+            # Referência da falha catastrófica (§4.4): a caminhada aleatória. Fica no
+            # pai porque não constrói tabela — não é fonte de fragmentação.
+            aleat = BASELINES["random_uniforme"]()
+            aleat.reset(ctx_av, np.random.default_rng(0))
 
-        def pol_aleat(observacao, _p=aleat, _c=ctx_av):
-            return _p.act(Observacao.decodificar(observacao, _c)).como_array()
+            def pol_aleat(observacao, _p=aleat, _c=ctx_av):
+                return _p.act(Observacao.decodificar(observacao, _c)).como_array()
 
-        ref = [run_episode(cfg_av, pol_aleat, seed=int(s)) for s in val]
-        ref_sr = float(np.mean([x.all_collected for x in ref]))
-        ref_ct = float(np.mean([x.completion_time for x in ref]))
-        ref_cob = float(np.mean([x.collected / x.n_sensors for x in ref]))
-        print(f"[{na}a{ns}s] caminhada aleatória no val: SR={ref_sr:.1%} "
-              f"cobertura={ref_cob:.1%} CT={ref_ct:.1f} s")
-        print("           falha catastrófica medida pela COBERTURA — SR e CT saturam")
+            ref = [run_episode(cfg_av, pol_aleat, seed=int(s)) for s in val]
+            ref_sr = float(np.mean([x.all_collected for x in ref]))
+            ref_ct = float(np.mean([x.completion_time for x in ref]))
+            ref_cob = float(np.mean([x.collected / x.n_sensors for x in ref]))
+            print(f"[{na}a{ns}s] caminhada aleatória no val: SR={ref_sr:.1%} "
+                  f"cobertura={ref_cob:.1%} CT={ref_ct:.1f} s")
+            print("           falha catastrófica medida pela COBERTURA — SR e CT saturam")
 
-        for seed_train in range(a.sementes):
-            sem = PapeisDeSemente(seed_train=seed_train)
-            aprox, termo, politica, _ = montar_agente(a.aproximador, cfg_tr, sem,
-                                                      corpus)
-            cfg_corrida = {"replica": a.replica, "aproximador": a.aproximador,
-                           "na": na, "ns": ns, "b_max": a.b_max,
-                           "recompensa": r["recompensa"],
-                           "horizonte": r["horizonte"], "cegos": r["cegos"],
-                           "escala_recompensa": r["escala_recompensa"],
-                           "gamma": GAMMA,
-                           "bits_por_escalar": BITS_POR_ESCALAR}
-            corrida = Corrida(experimento=f"spec06-{a.replica}", config=cfg_corrida,
-                              sementes=sem, bancos=bancos, raiz=Path(a.raiz))
-            print(f"  semente {seed_train} -> {corrida.dir}")
-
-            rng_cen = sem.rng_cenarios_treino()
-
-            def salvar(destino: Path, _ap=aprox, _t=termo):
-                destino.mkdir(parents=True, exist_ok=True)
-                _ap.salvar(destino)
-                if _t is not None:
-                    _t.salvar(destino / "termometro.npz")
-
-            resumo = treinar(
-                corrida,
-                passo_de_treino=lambda orc, _c=cfg_tr, _p=politica, _x=ctx_tr,
-                _r=recompensa, _g=rng_cen, _e=r["escala_recompensa"]:
-                    rodar_episodios_de_treino(_c, _p, _x, _r, _g, orc, _e),
-                avaliar_val=lambda _c=cfg_av, _p=politica, _x=ctx_av, _v=val: {
-                    k: v for k, v in avaliar(_c, _p, _x, _v).items()
-                    if k != "por_episodio"},
-                b_max=a.b_max,
-                salvar_checkpoint=salvar,
-                metrica=r["metrica"], maior_e_melhor=r["maior_e_melhor"],
-                ocupadas=lambda _a=aprox: (
-                    _a.ator.entradas_ocupadas()
-                    if hasattr(_a.ator, "entradas_ocupadas")
-                    else _a.ator.n_parametros()),
-            )
-
-            # AGORA, e só agora, o banco `test`.
-            final = avaliar(cfg_av, politica, ctx_av, test)
-            corrida.gravar_eval_test(final["por_episodio"])
-            # Pela COBERTURA e não por `SR`: com a aleatória em SR = 0 %, o
-            # critério por SR dispara para qualquer corrida sub-treinada e deixa de
-            # distinguir "falhou" de "não terminou de treinar".
-            catastrofica = (final["cobertura"] <= ref_cob if r["maior_e_melhor"]
-                            else final["ct_cens"] >= ref_ct)
-            print(f"    test: SR={final['sr']:.1%} cob={final['cobertura']:.1%} "
-                  f"CT_cens={final['ct_cens']:.1f} CT_succ={final['ct_succ']:.1f}"
-                  f"{'  FALHA CATASTRÓFICA' if catastrofica else ''}")
-
-            art["corridas"].append({
-                "na": na, "ns": ns, "seed_train": seed_train,
-                "dir": str(corrida.dir), "config_hash": corrida.config_hash,
-                **{k: v for k, v in resumo.items() if k != "historico_val"},
-                "test": {k: v for k, v in final.items() if k != "por_episodio"},
-                "falha_catastrofica": bool(catastrofica),
-                "referencia_aleatoria": {"sr": ref_sr, "ct_cens": ref_ct,
-                                         "cobertura": ref_cob},
-            })
+            for seed_train in range(a.sementes):
+                art["corridas"].append(pool.apply(_uma_corrida, ((
+                    a.replica, a.aproximador, na, ns, a.b_max, seed_train,
+                    a.n_val, a.n_test, a.raiz, ref_sr, ref_ct, ref_cob),)))
 
     n_falhas = sum(c["falha_catastrofica"] for c in art["corridas"])
     print(f"\nfalhas/R = {n_falhas}/{len(art['corridas'])}  "
