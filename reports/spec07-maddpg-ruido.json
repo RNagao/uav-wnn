@@ -1,0 +1,317 @@
+{
+  "config": {
+    "episodios": 20,
+    "sigmas": [
+      5.0,
+      10.0
+    ]
+  },
+  "celulas": {
+    "a_2-s_12": {
+      "num_drones": 2,
+      "num_sensores": 12,
+      "degrau0": {
+        "completion_time": 18.1,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 18.125,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 17.9,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 5.970905201136419,
+          "nees_frac_dentro": 0.7819293478260869,
+          "rmse_estimativa": 3.1692293413115733
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 19.35,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 18.05,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 3.6852616470509894,
+          "nees_frac_dentro": 0.8490566037735849,
+          "rmse_estimativa": 5.510499594683535
+        }
+      }
+    },
+    "a_2-s_24": {
+      "num_drones": 2,
+      "num_sensores": 24,
+      "degrau0": {
+        "completion_time": 28.225,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 28.75,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 28.275,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 20.541260366004153,
+          "nees_frac_dentro": 0.6442224152910513,
+          "rmse_estimativa": 3.8817084624194127
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 30.275,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 27.975,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 6.042120291043456,
+          "nees_frac_dentro": 0.8090430201931519,
+          "rmse_estimativa": 5.165231129082096
+        }
+      }
+    },
+    "a_2-s_36": {
+      "num_drones": 2,
+      "num_sensores": 36,
+      "degrau0": {
+        "completion_time": 31.875,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 32.9,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 35.0,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 32.187862566932964,
+          "nees_frac_dentro": 0.6313380281690141,
+          "rmse_estimativa": 3.7028805628344843
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 33.925,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 32.275,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 3.4058217300573084,
+          "nees_frac_dentro": 0.88558352402746,
+          "rmse_estimativa": 4.300579212586083
+        }
+      }
+    },
+    "a_4-s_12": {
+      "num_drones": 4,
+      "num_sensores": 12,
+      "degrau0": {
+        "completion_time": 10.0,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 9.925,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 10.025,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 4.37143077493054,
+          "nees_frac_dentro": 0.838479809976247,
+          "rmse_estimativa": 3.517383266124456
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 10.55,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 10.075,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 2.472028396046292,
+          "nees_frac_dentro": 0.9184397163120568,
+          "rmse_estimativa": 6.118251356100758
+        }
+      }
+    },
+    "a_4-s_24": {
+      "num_drones": 4,
+      "num_sensores": 24,
+      "degrau0": {
+        "completion_time": 14.025,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 13.375,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 14.25,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 7.904617146504538,
+          "nees_frac_dentro": 0.7237288135593221,
+          "rmse_estimativa": 3.667821634450623
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 14.9,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 13.625,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 3.355989087181761,
+          "nees_frac_dentro": 0.8707964601769912,
+          "rmse_estimativa": 5.900037954658486
+        }
+      }
+    },
+    "a_4-s_36": {
+      "num_drones": 4,
+      "num_sensores": 36,
+      "degrau0": {
+        "completion_time": 16.05,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 15.975,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 15.775,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 7.514447918158131,
+          "nees_frac_dentro": 0.6877880184331797,
+          "rmse_estimativa": 3.5431391106764183
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 16.875,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 16.45,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 3.7425525802785744,
+          "nees_frac_dentro": 0.8455014749262537,
+          "rmse_estimativa": 5.59952016222421
+        }
+      }
+    },
+    "a_8-s_12": {
+      "num_drones": 8,
+      "num_sensores": 12,
+      "degrau0": {
+        "completion_time": 15.75,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 15.825,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 14.9,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 117.63623423274947,
+          "nees_frac_dentro": 0.739448051948052,
+          "rmse_estimativa": 9.943441425490757
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 15.35,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 15.625,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 67.32279614130104,
+          "nees_frac_dentro": 0.7947674418604651,
+          "rmse_estimativa": 14.554761469194204
+        }
+      }
+    },
+    "a_8-s_24": {
+      "num_drones": 8,
+      "num_sensores": 24,
+      "degrau0": {
+        "completion_time": 9.275,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 9.675,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 9.525,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 7.810311726643965,
+          "nees_frac_dentro": 0.8862219451371571,
+          "rmse_estimativa": 4.101628227800483
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 10.3,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 9.675,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 3.1189373172329957,
+          "nees_frac_dentro": 0.9167690417690417,
+          "rmse_estimativa": 6.451104565691896
+        }
+      }
+    },
+    "a_8-s_36": {
+      "num_drones": 8,
+      "num_sensores": 36,
+      "degrau0": {
+        "completion_time": 13.025,
+        "taxa_sucesso": 1.0
+      },
+      "sigma_5": {
+        "degrau1": {
+          "completion_time": 12.825,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 13.25,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 76.28541781826186,
+          "nees_frac_dentro": 0.7834090909090909,
+          "rmse_estimativa": 8.322256341916894
+        }
+      },
+      "sigma_10": {
+        "degrau1": {
+          "completion_time": 13.1,
+          "taxa_sucesso": 1.0
+        },
+        "degrau4": {
+          "completion_time": 12.875,
+          "taxa_sucesso": 1.0,
+          "nees_medio": 13.112090555124981,
+          "nees_frac_dentro": 0.8677570093457944,
+          "rmse_estimativa": 8.401268619382689
+        }
+      }
+    }
+  }
+}
