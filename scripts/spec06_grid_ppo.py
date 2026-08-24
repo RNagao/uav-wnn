@@ -36,8 +36,18 @@ constantes: `T`, `n` e a razão do crítico transferem IDÊNTICOS; `lr` transfer
 cardinalidade (Adam sobre a tabela não é somar `passo` às `N` posições); e `σ` NÃO
 TRANSFERE, porque no PPO ela é aprendida.
 
-    5 × 3 × 2 × 3 = 90 pontos × 3 sementes = 270 corridas
-    dos quais 60 pontos são PAREADOS (T em 16 e 32) e 30 são extensão (T = 300)
+    5 × 3 × 1 × 3 = 45 pontos × 3 sementes = 135 corridas
+
+Dois eixos do desempate NÃO couberam, e por limites do modelo publicado:
+
+    T ∈ {16, 32}   o `conv1d(stride=n)` do `NTNModel` exige `n | 25·T`, e nenhuma
+                   combinação com `n ∈ {12, 24}` satisfaz. Viraram {24, 48, 300}.
+    n = 24         a alocação é DENSA (`n_nodes · 2^n`): 6,7 a 13,4 GB só no ator,
+                   numa máquina de 11,9. Medido: 18 corridas mortas por SIGKILL.
+
+A nossa implementação é esparsa e varreu os dois sem esforço. É assimetria real
+entre os braços, e a perda científica é pequena só porque `n = 24` já foi medido
+como ruim lá (4,9 % contra 31,7 % de `n = 12`).
 
 ORÇAMENTO: 200 000 passos, o MESMO da grade `desempate`. É menos que o
 `timesteps_total = 1 000 000` das oito configurações publicadas, e a escolha é
@@ -210,6 +220,20 @@ def pontos() -> list[dict]:
     return fora
 
 
+def rotulo(p: dict, seed: int) -> str:
+    """Identidade de uma corrida — UMA função, usada pelo despacho E pela retomada.
+
+    Existe porque as duas montavam a string separadamente, e elas desviaram: quando
+    `vf_clip` saiu do ponto e `vf_loss_coeff` entrou, o despacho acompanhou e a
+    retomada não, e o `--retomar` estourou com `KeyError: 'vf_clip'`.
+
+    Duplicar identidade é o tipo de erro que só aparece quando alguém retoma — ou
+    seja, no pior momento.
+    """
+    return (f"lr{p['lr']:.1e}-T{p['resolucao']}-n{p['tupla']}"
+            f"-vfc{p['vf_loss_coeff']:g}-s{seed}")
+
+
 def _comando(p: dict, seed: int, a, bruto: Path, saida: Path) -> list[str]:
     """A invocação do ambiente efêmero. `--isolated` para não herdar o do projeto."""
     return ["uv", "run", "--isolated", "--with", "ray[rllib]", "--with", "torch",
@@ -242,8 +266,7 @@ def uma(tarefa: tuple) -> dict:
     lote por causa de uma.
     """
     p, seed, a = tarefa
-    rot = (f"lr{p['lr']:.1e}-T{p['resolucao']}-n{p['tupla']}"
-           f"-vfc{p['vf_loss_coeff']:g}-s{seed}")
+    rot = rotulo(p, seed)
     dest = Path(a.raiz) / rot
     dest.mkdir(parents=True, exist_ok=True)
     bruto, saida = dest / "bruto.npz", dest / "artefato.json"
@@ -344,8 +367,7 @@ def main() -> int:
                 vistos.add(x["rotulo"])
         antes = len(tarefas)
         tarefas = [t for t in tarefas
-                   if f"lr{t[0]['lr']:.0e}-T{t[0]['resolucao']}-"
-                      f"vf{int(t[0]['vf_clip'])}-s{t[1]}" not in vistos]
+                   if rotulo(t[0], t[1]) not in vistos]
         print(f"RETOMANDO: {len(res)} de {antes} aproveitadas · {len(tarefas)} a fazer")
     else:
         progresso.write_text("")
