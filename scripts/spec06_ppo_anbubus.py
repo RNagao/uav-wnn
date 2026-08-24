@@ -133,10 +133,10 @@ def _analisar_celula(txt: str) -> tuple[int, int]:
 REFERENCIAS = {
     "hopper":  dict(lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
                     minibatch_size=512, tuple_size=8, resolucao=32,
-                    vf_clip_param=3000.0),
+                    vf_clip_param=3000.0, vf_loss_coeff=1.0),
     "reacher": dict(lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
                     minibatch_size=128, tuple_size=10, resolucao=300,
-                    vf_clip_param=10.0),
+                    vf_clip_param=10.0, vf_loss_coeff=1.0),
 }
 
 ANBUBUS = dict(REFERENCIAS["reacher"])
@@ -390,6 +390,11 @@ def main() -> int:
     ap.add_argument("--resolucao", type=int, default=None,
                     help="publicados: 16, 32, 64, 300")
     ap.add_argument("--minilote", type=int, default=None, help="publicados: 128, 512")
+    ap.add_argument("--vf-loss-coeff", type=float, default=None,
+                    help="peso da perda de valor. É o análogo do eixo de crítico do "
+                         "anbubus sob o Algoritmo 4.4, onde ele é `taxa_crítico/"
+                         "taxa_ator` — nos dois casos o número diz quanto o crítico "
+                         "se move em relação ao ator. Padrão do RLlib: 1,0.")
     ap.add_argument("--vf-clip", type=float, default=None,
                     help="3000 no hopper; 10 é o padrão do RLlib")
     ap.add_argument("--ray-cpus", type=int, default=2,
@@ -420,7 +425,8 @@ def main() -> int:
     hp = dict(REFERENCIAS[a.referencia])
     for chave, valor in (("lr", a.lr), ("gamma", a.gamma), ("lambda_", a.lambda_),
                          ("tuple_size", a.tupla), ("resolucao", a.resolucao),
-                         ("minibatch_size", a.minilote), ("vf_clip_param", a.vf_clip)):
+                         ("minibatch_size", a.minilote), ("vf_clip_param", a.vf_clip),
+                         ("vf_loss_coeff", a.vf_loss_coeff)):
         if valor is not None:
             hp[chave] = valor
     algo, kw_env = construir(celula, a.seed, a.lote, hp)

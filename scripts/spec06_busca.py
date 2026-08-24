@@ -1,56 +1,49 @@
-"""Busca aleatória pareada sobre **todos** os hiperparâmetros — `Na = 1`, sem ruído.
+"""Grade de hiperparâmetros da rede da DISSERTAÇÃO — `Na = 1`, sem ruído.
 
-A grade fatorial completa não cabe, e isso é aritmética: `α(3) × σ(3) × T(3) × n(5) ×
-crítico(3) × m(4)` = **540 pontos** × 3 sementes = 1 620 corridas ≈ 26 h. A própria
-T-06.4 diz o mesmo — *"a grade completa não cabe, e isso é aritmética, não preguiça"*.
+Algoritmo 4.4 (§4.3): gradiente funcional no ator, regressão com esquecimento no
+crítico. Três modos:
 
-Ela prescreve **descida coordenada a coordenada**. Este script faz outra coisa e o
-desvio é declarado: **busca aleatória**, sorteando os seis eixos em conjunto.
+    grade       fatorial completo num dos níveis de `GRADE`
+    aleatoria   sorteio sobre todos os eixos, para orçamento pequeno
+    longa       lista explícita de pontos, para corridas de orçamento grande
 
-POR QUE ALEATÓRIA, E NÃO COORDENADA
+O BRAÇO `anbubus` SAIU DAQUI, e a razão é de método
 
-1. **A coordenada não vê interação.** A T-06.4 admite isso (*"a limitação da busca
-   coordenada fica declarada no relatório"*), e a primeira grade deu motivo para
-   suspeitar: `σ` mudou o resultado por **20×** enquanto `α` mudou por 15× — dois
-   eixos de efeito grande, que é o regime em que a coordenada mais erra.
-2. **Cobre todos os eixos com qualquer orçamento.** Com poucos eixos importantes, a
-   aleatória encontra melhores pontos que a grade para o mesmo número de corridas —
-   é o resultado clássico de Bergstra e Bengio (2012), e a nossa situação é
-   exatamente a dele: dos seis eixos, `σ` sozinho separou 3 % de 72 %.
-3. **Ela alimenta a coordenada.** O melhor ponto daqui é o ponto de partida da
-   descida da T-06.4, que fica mais curta por começar mais perto.
+A rede do `anbubus` é um aproximador de função **para PPO** — o `experiment.py` das
+oito tarefas publicadas roda `tune.run("PPO", …)`. Rodá-la sob o Algoritmo 4.4 a
+deixa sem o recorte do objetivo (`clip_param = 0,3`), sem GAE, com 125× mais
+atualizações e com σ fixa em vez de aprendida. Media a rede fora do algoritmo para o
+qual foi feita.
 
-O PAREAMENTO É MAIS FORTE DO QUE NA GRADE
+O resultado disso está medido, e é claro: na corrida de 10 M, **6 abortos de 6**
+contra 0 de 6 da dissertação — mas o ponto "seguro" dela chegou a 77,6 % de cobertura
+e SR 55 % antes de divergir. A rede aprende; ela não sustenta sob este algoritmo.
 
-Os dois modelos recebem os **mesmos sorteios** de `(σ, T, n, m, passo_efetivo)` — não
-apenas o mesmo número de pontos. Só duas coisas diferem, e as duas por necessidade:
+O braço dela vive em `spec06_grid_ppo.py`, com os hiperparâmetros pareados com os
+desta grade onde eles transferem. As 720 corridas da grade `desempate`, que rodaram
+os dois braços aqui, continuam válidas e reprodutíveis: `--modelos ntupla_anbubus`
+ainda funciona, só deixou de ser padrão.
 
-    taxa        convertida para a convenção de cada família, POR AMOSTRA
-    crítico     `φ` na dissertação; razão `taxa_crítico/taxa_ator` no anbubus
-
-Isso torna a comparação **pareada por configuração**, e não só por orçamento: cada
-ponto tem um par exato no outro modelo.
-
-A CONVERSÃO DA TAXA TEM DE SER POR AMOSTRA — e é o eixo `n` que obriga
+A CONVERSÃO DA TAXA É POR AMOSTRA — e é o eixo `n` que obriga
 
 Somar `passo` às `N` posições endereçadas muda `f` em `passo` na convenção de média
 (eq. 4.12) e em `passo·N` na de soma. Como `N = ⌈25·T/n⌉` e a busca varia `T` e `n`,
 **`N` varia de 12 a 200** no espaço amostrado. Uma tabela fixa de taxas equivalentes
 seria válida para um único `(T, n)`.
 
-Então o que se sorteia é o **passo efetivo em `f`** — a grandeza que tem o mesmo
+Então o que se sorteia é o **passo efetivo em `f`** — a grandeza com o mesmo
 significado nas duas convenções — e cada família recebe a taxa que o produz:
 
-    média:  α = passo_efetivo
-    soma:   α = passo_efetivo / N
+    média:  α = passo_efetivo          (dissertação)
+    soma:   α = passo_efetivo / N      (anbubus, quando pedido explicitamente)
 
-O CRÍTICO DE CADA FAMÍLIA, E POR QUE NÃO É O MESMO EIXO
+POR QUE ALEATÓRIA E NÃO COORDENADA, no modo `aleatoria`
 
-O crítico da dissertação (§4.2.1) **acumula** retorno pela eq. (4.8) e não tem taxa —
-o hiperparâmetro dele é `φ`, o fator de esquecimento. O do `anbubus` é gradiente
-funcional treinado por descida, e o hiperparâmetro dele é a **taxa**. Não há como dar
-o mesmo eixo aos dois; dar **um eixo de crítico a cada** é o pareamento honesto, e a
-cardinalidade é igual.
+A T-06.4 prescreve descida coordenada. O desvio é declarado, e tem três razões: a
+coordenada não vê interação (e medimos interação — `σ` mudou o resultado por 20×
+enquanto `α` mudou por 15×); a aleatória cobre todos os eixos com qualquer orçamento
+(Bergstra e Bengio, 2012); e o melhor ponto daqui é o ponto de partida da coordenada,
+que fica mais curta por começar mais perto.
 """
 
 from __future__ import annotations
@@ -110,9 +103,19 @@ tarefas contínuas."""
 PHI = (0.70, 0.85, 0.99, 1.0)
 """Esquecimento do crítico da dissertação. `1,0` é o controle sem esquecimento."""
 
-RAZAO_CRITICO = (0.25, 1.0, 4.0, 16.0)
-"""`taxa_crítico / taxa_ator` no crítico do `anbubus`. Mesma cardinalidade que `PHI`
-— é o eixo de crítico daquela família."""
+RAZAO_CRITICO = (1.0,)
+"""Vestígio: o eixo de crítico da família `anbubus`, que NÃO é mais braço deste
+script.
+
+A rede do `anbubus` é um aproximador para PPO, e o braço dela mudou para
+`spec06_grid_ppo.py`. Rodá-la sob o Algoritmo 4.4 media a rede fora do algoritmo
+para o qual foi feita, e o resultado disso está medido: 6 abortos de 6 na corrida de
+10 M, contra 0 de 6 da dissertação.
+
+A tupla fica com um elemento em vez de sumir porque `_montar` ainda aceita a família
+— quem passar `--modelos ntupla_anbubus` explicitamente continua rodando, e os 720
+pontos da grade `desempate` foram gerados assim. Apagar o caminho tornaria aqueles
+dados irreproduzíveis."""
 
 
 # --- a grade fatorial, em dois níveis de cardinalidade ---------------------
@@ -331,7 +334,9 @@ def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
         detalhe = {"phi": PHI[amostra["idx_critico"]], "taxa_ator": passo}
     else:
         taxa = passo / n_ram
-        razao = RAZAO_CRITICO[amostra["idx_critico"]]
+        # `min(...)`: `RAZAO_CRITICO` virou tupla de um elemento quando o anbubus
+        # deixou de ser braço, e os `idx_critico` da grade `desempate` vão até 2.
+        razao = RAZAO_CRITICO[min(amostra["idx_critico"], len(RAZAO_CRITICO) - 1)]
         ap = APROXIMADORES[aprox](taxa_ator=taxa, taxa_critico=taxa * razao, **comum)
         detalhe = {"razao_critico": razao, "taxa_ator": taxa}
 
@@ -490,10 +495,6 @@ PONTOS_LONGA = [
     ("ntupla_dissertacao", 8e-4, 0.35, 32, 12, 1),   # 50,1 % cob · SR 21,3 % · 0/3
     ("ntupla_dissertacao", 5e-4, 0.20, 32, 12, 1),   # 49,3 % cob · SR 12,7 % · 0/3
     ("ntupla_dissertacao", 8e-4, 0.35, 16, 12, 1),   # 46,0 % cob · SR  0,7 % · 0/3
-    # --- anbubus: os 2 melhores REAIS, que abortam, mais um seguro de piso ------
-    ("ntupla_anbubus",    1.5e-3, 0.35, 32, 12, 2),  # 46,6 % cob · SR 10,3 % · 2/3
-    ("ntupla_anbubus",    1.5e-3, 0.35, 32, 12, 1),  # 29,0 % cob · SR  0,7 % · 1/3
-    ("ntupla_anbubus",     5e-4, 0.20, 32, 12, 2),   # 19,2 % cob · SR  0,0 % · 0/3
 ]
 """Pontos da corrida longa: `(modelo, passo, σ, T, n, idx_critico)`.
 
@@ -615,7 +616,12 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--replica", choices=sorted(REPLICAS), default="1b")
-    ap.add_argument("--modelos", default="ntupla_dissertacao,ntupla_anbubus")
+    ap.add_argument("--modelos", default="ntupla_dissertacao",
+                    help="O `ntupla_anbubus` SAIU do padrão: a rede dele é um "
+                         "aproximador para PPO, e o braço dela vive em "
+                         "`spec06_grid_ppo.py`. Rodá-la sob o Algoritmo 4.4 media a "
+                         "rede fora do algoritmo para o qual foi feita — e foi o que "
+                         "produziu 6 abortos de 6 na corrida de 10 M.")
     ap.add_argument("--modo", choices=("grade", "aleatoria", "longa"), default="grade",
                     help="`grade` = fatorial completo; `aleatoria` = sorteio")
     ap.add_argument("--niveis", choices=tuple(GRADE), default="reduzido",

@@ -109,12 +109,19 @@ def test_hiperparametros_sao_os_do_anbubus(celula):
     # Fixa as DUAS tarefas contínuas, não uma: é a citação completa de
     # `wnn/{hopper,reacher}/thermo/individual_run/experiment.py`, e é o que a grade
     # varre. Pinar só a base deixaria a outra livre para derivar.
+    # `vf_loss_coeff = 1.0` é o PADRÃO do RLlib, não um valor publicado: as oito
+    # configurações não o mencionam, então herdam o padrão. Ele entra aqui como eixo
+    # porque é o análogo da razão `taxa_crítico/taxa_ator` do anbubus sob o Algoritmo
+    # 4.4 — nos dois casos o número diz quanto o crítico se move em relação ao ator —,
+    # e sem ele não há como parear as duas grades nesse eixo.
     assert mod.REFERENCIAS["hopper"] == dict(
         lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
-        minibatch_size=512, tuple_size=8, resolucao=32, vf_clip_param=3000.0)
+        minibatch_size=512, tuple_size=8, resolucao=32, vf_clip_param=3000.0,
+        vf_loss_coeff=1.0)
     assert mod.REFERENCIAS["reacher"] == dict(
         lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
-        minibatch_size=128, tuple_size=10, resolucao=300, vf_clip_param=10.0)
+        minibatch_size=128, tuple_size=10, resolucao=300, vf_clip_param=10.0,
+        vf_loss_coeff=1.0)
 
     # A BASE é o reacher, e a escolha está registrada: é a tarefa contínua com
     # γ = 0,99, o desconto que Lamenza fixa, e a única com λ declarado.
