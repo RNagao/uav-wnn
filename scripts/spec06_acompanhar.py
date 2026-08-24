@@ -1,4 +1,5 @@
-"""Painel único das campanhas da SPEC-06 — grade da dissertação e grade do PPO.
+"""Painel único das campanhas da SPEC-06 — grades da dissertação e do PPO, e a
+escalada multiagente.
 
 Substitui três scripts que faziam pedaços disto: `spec06_eta_ppo.py`, que trazia a
 previsão do PPO, e `spec06_parciais.py`, que trazia o efeito marginal por eixo. Um
@@ -28,7 +29,12 @@ existe quando a corrida termina.
 
     uv run python scripts/spec06_acompanhar.py
     uv run python scripts/spec06_acompanhar.py --eixos     # efeito marginal
+    uv run python scripts/spec06_acompanhar.py --multi     # só a escalada
     watch -n 120 'uv run python scripts/spec06_acompanhar.py'
+
+A escalada multiagente **não tem `metrics.jsonl`**: cada célula é um processo com
+log próprio, e o progresso está no texto que ela imprime. Por isso o modo `multi`
+lê o log, e não um JSONL — a alternativa seria mudar o treino só para o painel.
 """
 
 from __future__ import annotations
@@ -97,6 +103,63 @@ def _taxa_marginal(linhas: list[dict], janela: int = 3) -> float:
     a, b = linhas[max(0, len(linhas) - 1 - janela)], linhas[-1]
     dp, dt = b["passo"] - a["passo"], b["parede_s"] - a["parede_s"]
     return dp / dt if dt > 0 else 0.0
+
+
+# --- escalada multiagente ---------------------------------------------------
+
+_PROG = re.compile(r"\[\s*([\d.]+)%\]\s+([\d,]+)/([\d,]+).*?([\d.]+) passos/s")
+_EVAL = re.compile(r"eval @ ([\d,]+): cob ([\d.]+) · sr ([\d.]+)")
+
+
+def multi(logs: list[Path]) -> None:
+    """Estado das células da escalada, uma linha por log.
+
+    A taxa vem do próprio log (cumulativa, que é o que a célula imprime); o ETA é
+    recalculado sobre a JANELA das duas últimas linhas de progresso, porque a
+    cumulativa mente por baixo quando a tabela enche — o mesmo motivo de
+    `_taxa_marginal`.
+    """
+    achou = [p for p in logs if p.exists()]
+    if not achou:
+        print("escalada multiagente: nenhum log encontrado\n")
+        return
+    print("ESCALADA MULTIAGENTE")
+    fins = []
+    for p in sorted(achou):
+        txt = p.read_text(errors="replace")
+        prog = _PROG.findall(txt)
+        ev = _EVAL.findall(txt)
+        cab = re.search(r"Na=(\d+) Ns=(\d+) · T=(\d+) · N=(\d+)", txt)
+        rot = (f"Na={cab.group(1)} Ns={cab.group(2)} T={cab.group(3)} "
+               f"N={cab.group(4)}" if cab else p.stem)
+        if not prog:
+            print(f"   {_barra(0)}   0%        │ {rot:<22} │ iniciando…")
+            continue
+        frac = float(prog[-1][0]) / 100.0
+        passos = int(prog[-1][1].replace(",", ""))
+        alvo = int(prog[-1][2].replace(",", ""))
+        # taxa marginal entre as duas últimas linhas, via passos/s cumulativo
+        taxa = float(prog[-1][3])
+        if len(prog) > 1:
+            p0, p1 = prog[max(0, len(prog) - 4)], prog[-1]
+            s0, s1 = int(p0[1].replace(",", "")), int(p1[1].replace(",", ""))
+            t0 = s0 / max(float(p0[3]), 1e-9)
+            t1 = s1 / max(float(p1[3]), 1e-9)
+            if t1 > t0:
+                taxa = (s1 - s0) / (t1 - t0)
+        eta = (alvo - passos) / max(taxa, 1e-9)
+        fins.append(eta)
+        fim = time.strftime("%d/%m %H:%M", time.localtime(time.time() + eta))
+        cob = f"cob {float(ev[-1][1]):>5.1%}  sr {float(ev[-1][2]):>5.1%}" if ev else "sem eval ainda"
+        mx = f" máx {max(float(e[1]) for e in ev):>5.1%}" if ev else ""
+        print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ {rot:<22} │ "
+              f"{taxa:>5.0f} p/s │ {cob}{mx} │ ~{fim}")
+        if "parada antecipada" in txt:
+            print(f"   {'':>16}      PAROU  │ {rot:<22} │ platô")
+    if fins:
+        print(f"   -> a última termina em ~{_hm(max(fins)).strip()}\n")
+    else:
+        print()
 
 
 # --- grade do Algoritmo 4.4 -------------------------------------------------
@@ -284,9 +347,18 @@ def main() -> int:
     ap.add_argument("--eixos", action="store_true",
                     help="acrescenta o efeito marginal por eixo das duas grades")
     ap.add_argument("--metrica", default="cobertura")
+    ap.add_argument("--logs-multi", default="reports/spec06-multi-*.log",
+                    help="glob dos logs da escalada multiagente")
+    ap.add_argument("--multi", action="store_true",
+                    help="mostra SÓ a escalada multiagente")
     a = ap.parse_args()
 
     print(f"{time.strftime('%d/%m %H:%M:%S')}\n{REFERENCIAS}\n")
+    logs = sorted(RAIZ.glob(a.logs_multi))
+    if a.multi:
+        multi(logs)
+        return 0
+    multi(logs)
     alg44(RAIZ / a.raiz_alg44, RAIZ / a.progresso_alg44, a.alvo_alg44,
           a.total_alg44)
     ppo(RAIZ / a.progresso_ppo, RAIZ / a.raiz_ppo, a.processos_ppo, a.sementes,

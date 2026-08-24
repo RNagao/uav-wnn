@@ -46,16 +46,22 @@ from uavwnn.refenv import make_env, prune_logging_handlers  # noqa: E402
 # Config vencedora (T-06.4), fixa em todas as células — o análogo do conjunto
 # único de hiperparâmetros do Lamenza.
 PASSO, SIGMA, T_RES, N_TUPLA, PHI, M, GAMMA, D_SAIDA = 8e-4, 0.35, 32, 12, 0.85, 8, 0.99, 3
+"""`T_RES` é o **padrão**, não uma constante: a campanha de 1 drone produziu dois
+modelos que empatam em SR e diferem só em `T` — `T = 32` (67 RAMs) e `T = 16`
+(34 RAMs, metade da memória, indistinguível sob ruído nas 16 células da escada
+L→R). A escalada tem de rodar os dois, senão a fronteira custo×desempenho existe
+em `Na = 1` e desaparece no multiagente. Use `--resolucao`; todo o resto é fixo,
+como o conjunto único de hiperparâmetros do Lamenza exige."""
 SEED_TREINO_BASE = 2_000_000
 
 
-def construir(cfg, na: int):
+def construir(cfg, na: int, t_res: int = T_RES):
     """Rede compartilhada + `na` trajetórias de AC (uma por drone)."""
-    termo = TermometroQuantil(T_RES).ajustar(corpus_de_observacoes(cfg))
+    termo = TermometroQuantil(t_res).ajustar(corpus_de_observacoes(cfg))
     d_obs = cfg.observation_size
     ap = APROXIMADORES["ntupla_dissertacao"](
         n_bits=termo.n_bits, tamanho_tupla=N_TUPLA, phi=PHI, taxa_ator=PASSO,
-        seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=T_RES)
+        seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=t_res)
 
     def codificar(v, _t=termo):
         return _t.codificar(np.asarray(v, float)[None, :])[0]
@@ -99,14 +105,14 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 
 
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
-            progresso_cada: int) -> dict:
+            progresso_cada: int, t_res: int = T_RES) -> dict:
     cfg_tr, cfg_av = _cfgs(replica, na, ns)
     ctx = _ctx(cfg_tr)
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
-    ap, termo, acs = construir(cfg_tr, na)
-    print(f"multiagente · Na={na} Ns={ns} · N={ap.ator.n_ram} RAMs · "
+    ap, termo, acs = construir(cfg_tr, na, t_res)
+    print(f"multiagente · Na={na} Ns={ns} · T={t_res} · N={ap.ator.n_ram} RAMs · "
           f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede")
 
     passos_max = int(cfg_tr.max_episode_length / cfg_tr.algorithm_iteration_interval) + 2
@@ -189,9 +195,9 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     bancos = carregar_bancos(na, ns)
     n_test = min(100, len(bancos.test.sementes))
     metr = avaliar_multi(cfg_av, ap, termo_m, ctx_av, bancos.test.sementes[:n_test])
-    proc = {"ator": {"n_saidas": D_SAIDA}, "resolucao": T_RES,
+    proc = {"ator": {"n_saidas": D_SAIDA}, "resolucao": t_res,
             "config": {"na": na, "ns": ns, "passo": PASSO, "sigma": SIGMA,
-                       "T": T_RES, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
+                       "T": t_res, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
                        "replica": replica, "parameter_sharing": True,
                        "recompensa_por_na": True,
                        "critico": "descentralizado (Alg. 4.4)"},
@@ -215,14 +221,20 @@ def main() -> int:
     ap.add_argument("--replica", default="1b")
     ap.add_argument("--saida", type=Path, default=None)
     ap.add_argument("--progresso-cada", type=int, default=50_000)
+    ap.add_argument("--resolucao", type=int, default=T_RES,
+                    help=f"T do termômetro; {T_RES} (padrão) ou 16 (econômico)")
     ap.add_argument("--smoke", action="store_true", help="b-max=5000, avaliação curta")
     a = ap.parse_args()
     if a.smoke:
         a.b_max = min(a.b_max, 5000); a.progresso_cada = 1000
-    saida = a.saida or Path(f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}")
+    # O sufixo só aparece fora do padrão: as células de `T = 32` já publicadas
+    # mantêm o caminho que `modelo-e-hiperparametros.md` registra.
+    sufixo = "" if a.resolucao == T_RES else f"-T{a.resolucao}"
+    saida = a.saida or Path(
+        f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}{sufixo}")
     print(f"SPEC-06 escalada multiagente · config vencedora "
-          f"(passo {PASSO}, σ {SIGMA}, T {T_RES}, n {N_TUPLA}, φ {PHI}, m {M})\n")
-    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada)
+          f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n")
+    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada, a.resolucao)
     return 0
 
 
