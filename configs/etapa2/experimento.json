@@ -1,0 +1,64 @@
+{
+  "_": "SPEC-08 Etapa 2 — desenho CONGELADO do experimento. É hasheado pelo pré-registro (results/etapa2/analysis_plan.sha256). Alterar este arquivo invalida o pré-registro e o atestado do gate. Escopo D13: ruído só no GPS do drone; degrau 5, H2 e a varredura em T ficam adiados neste incremento.",
+  "celula_base": { "na": 1, "ns": 12 },
+
+  "escada": {
+    "0": { "nome": "sem ruído", "estimador": "verdade (canal global de Lamenza)", "papel": "teto; a política da Etapa 1 reavaliada nos mesmos episódios" },
+    "1": { "nome": "ruído bruto", "estimador": "medida z = p + σ·z_t", "papel": "piso" },
+    "2": { "nome": "passa-baixa", "estimador": "média móvel exponencial", "varre": { "alpha": [0.1, 0.3, 0.5, 0.7, 1.0] }, "variantes": ["sem_comando", "com_comando"], "papel": "filtro barato que o KF precisa bater" },
+    "3": { "nome": "KF velocidade constante", "estimador": "KF 4 estados [x,y,vx,vy], sem controle", "varre": { "q_a": [0.5, 2, 5, 20, 50, 200] }, "papel": "o óbvio que já sabemos que falha" },
+    "4": { "nome": "KF + controle", "estimador": "KF 2 estados [x,y], predição x̂ + u·dt", "papel": "a proposta (achado A3)" }
+  },
+
+  "grade": { "sigma_gps": [1, 3, 5, 10], "T": [8, 32, 128] },
+  "ancora": { "sigma_gps": 5, "T": 32, "_": "célula-âncora A; T_G1 — G1 não singularizou uma resolução, então T=32" },
+
+  "regimes": {
+    "LR": { "treino": "limpo (política da Etapa 1, reaproveitada)", "avaliacao": "ruidosa, degrau d", "responde": "o filtro basta para transferir sem retreinar?" },
+    "RR": { "treino": "ruidoso com o mesmo σ e degrau", "avaliacao": "ruidosa, degrau d", "responde": "quanto o treino sob ruído ainda acrescenta?" }
+  },
+
+  "orcamento": { "S2": 2000000, "_": "S₂ — joelho da curva de aprendizado da Etapa 1; valor de trabalho, não medido" },
+
+  "sementes": {
+    "seed_train": { "principal": 5, "varredura": 3, "base": 1000000, "_": "≥5 para declarar hipótese; 3 só para desenhar a superfície" },
+    "seed_eval": { "banco": "test", "n": 500, "_": "fixo e COMPARTILHADO com a SPEC-06 (CRN); carregar_bancos(1,12).test.sementes" },
+    "seed_noise": { "raiz": 20260815, "_": "ruído pré-sorteado como z~N(0,I₂) por (episódio,t); degraus 1–4 compartilham o mesmo z; degrau 0 consome o fluxo sem usar" }
+  },
+
+  "metrica": {
+    "primaria": "tempo_de_conclusao_censurado",
+    "censura_s": 500,
+    "secundaria_obrigatoria": "taxa_de_sucesso",
+    "ic": { "metodo": "bootstrap_hierarquico", "replicas": 1000, "niveis": ["seed_train", "episodios"] }
+  },
+
+  "equivalencia": {
+    "teste": "TOST",
+    "margem_delta": "0.10 * (t̄₁ − t̄₀)",
+    "_": "autocalibrada: 10% do dano que o ruído causa sem filtro, na mesma célula; célula com (t̄₁−t̄₀) pequeno é NÃO INFORMATIVA, não equivalência trivial; meia-largura reportada sempre ao lado de δ",
+    "comparacoes": ["4≡0", "RR≡LR (degrau 4)"]
+  },
+
+  "superioridade": {
+    "teste": "IC bootstrap da diferença pareada excluindo zero (unilateral)",
+    "correcao": "Holm",
+    "familia": ["4>1", "4>2_sem_comando", "4>2_com_comando", "4>3"]
+  },
+
+  "filtro": {
+    "degrau4": {
+      "modelo": "KF 2 estados x=[x,y], predição x̂⁻ = x̂ + u·dt (u = ação da política no passo anterior)",
+      "R": "σ_gps² · I₂",
+      "Q": "q_w·dt + σ_v0²·dt² (regra de taxa)",
+      "dt": "algorithm_iteration_interval do ambiente",
+      "q_w": "medido em T-08.1 pelo descasamento entre comando e deslocamento; ajustado ANTES do atestado"
+    }
+  },
+
+  "escopo_adiado": {
+    "degrau5": "canais de covariância na observação — H4 saiu com D13; ablação opcional, exige obs estendida + treino R→R",
+    "H2_mlp": "degradação relativa WNN×MLP — exige checkpoint MLP pareado",
+    "varredura_T": "variar T∈{8,128} exige modelos treinados por T; a âncora usa T=32 (o modelo da Etapa 1)"
+  }
+}

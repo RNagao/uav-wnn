@@ -13,10 +13,12 @@ tem a forma `(p_k − p_i + S)/(2S)`, o erro de posição própria é um **deslo
 comum** a todas as entradas: filtrar esse único canal melhora a observação
 inteira (ARQUITETURA §3.7).
 
-Três degraus da escada:
+A escada de ablação (degraus 0–4):
 
 - **0** — sem ruído: `passthrough` para o método do pai, bit a bit (o teto).
 - **1** — ruído bruto: a observação é montada sobre a **medida** `z`, sem filtro.
+- **2** — passa-baixa: média móvel exponencial (com/sem termo de comando).
+- **3** — KF de velocidade constante: o "óbvio" que já sabemos que falha.
 - **4** — KF+controle: montada sobre a **estimativa** `x̂`, com a ação da política
   como entrada de controle.
 
@@ -40,7 +42,11 @@ from numpy.typing import NDArray
 
 from uavwnn.refenv.loader import load_environment
 
-from .kalman import FiltroKalmanControle
+from .kalman import (
+    FiltroKalmanControle,
+    FiltroVelocidadeConstante,
+    PassaBaixa,
+)
 from .ruido import CanalGPS, ConfigRuido, fluxo_ruido
 
 V_MAX = 15.0
@@ -59,6 +65,9 @@ def criar_ambiente_ruidoso(
     q_w: float = 0.0,
     sigma_v0: float = 0.0,
     kappa: float = 0.0,
+    alpha: float = 0.5,
+    usar_comando_pb: bool = False,
+    q_a: float = 1.0,
 ):
     """Instancia a subclasse com os kwargs do `EnvConfig` (mesma API de `make_env`).
 
@@ -75,21 +84,29 @@ def criar_ambiente_ruidoso(
             self.config_ruido = config_ruido
             self.raiz_ruido = raiz_ruido
             self._q_w, self._sigma_v0, self._kappa = q_w, sigma_v0, kappa
+            self._alpha, self._usar_comando_pb, self._q_a = alpha, usar_comando_pb, q_a
             self.indice_ruido = 0          # o runner sobrescreve por episódio (CRN)
             self.log_estimacao: list[dict] = []
             self._preparar_fusao()
 
         # -- estado da fusão, por episódio ---------------------------------
 
+        def _novo_filtro(self):
+            """O estimador do degrau: 2 = passa-baixa, 3 = velocidade constante,
+            4 = KF + controle. Todos compartilham `iniciar/comando/atualizar`."""
+            if self.degrau == 2:
+                return PassaBaixa(alpha=self._alpha, usar_comando=self._usar_comando_pb)
+            if self.degrau == 3:
+                return FiltroVelocidadeConstante(
+                    sigma_gps=self.config_ruido.sigma_gps, q_a=self._q_a)
+            return FiltroKalmanControle(
+                sigma_gps=self.config_ruido.sigma_gps,
+                q_w=self._q_w, sigma_v0=self._sigma_v0, kappa=self._kappa)
+
         def _preparar_fusao(self) -> None:
             n = self.num_drones
-            self._kf = {
-                i: FiltroKalmanControle(
-                    sigma_gps=self.config_ruido.sigma_gps,
-                    q_w=self._q_w, sigma_v0=self._sigma_v0, kappa=self._kappa,
-                )
-                for i in range(n)
-            }
+            self._kf = ({i: self._novo_filtro() for i in range(n)}
+                        if self.degrau in (2, 3, 4) else {})
             self._canais = {
                 i: CanalGPS(self.config_ruido,
                             fluxo_ruido(self.raiz_ruido, "gps", i, self.indice_ruido))
@@ -117,27 +134,40 @@ def criar_ambiente_ruidoso(
         def _posicao_usada(self, i: int, p_true: NDArray[np.float64], t: float) -> NDArray[np.float64]:
             """Posição própria que alimenta a observação do drone `i`.
 
-            Degrau 1: a medida crua. Degrau 4: a estimativa do KF, que usa a ação
-            como entrada de controle. A verdade só vai para o log de métricas.
+            Degrau 1: a medida crua. Degraus 2–4: a estimativa do filtro do
+            degrau (passa-baixa, velocidade constante ou KF+controle). Todos
+            usam a mesma sequência `comando(u) → atualizar(z, t)`; o `atualizar`
+            prediz até `t` internamente (regra de taxa). A verdade só vai para o
+            log de métricas.
             """
             z = self._canais[i].medir(p_true, t)
             if self.degrau == 1:
                 return z
-            # degrau 4
-            kf = self._kf[i]
+            filt = self._kf[i]
+            inov = ess = None
             if not self._iniciado[i]:
-                kf.iniciar(z, t)
+                filt.iniciar(z, t)
                 self._iniciado[i] = True
             else:
-                kf.comando(self._acao[i])
-                kf.atualizar(z, t)
-            x_hat = kf.media
-            # RF-04: a verdade entra SÓ no log, nunca na observação
-            self.log_estimacao.append({
-                "t": t, "drone": i,
-                "erro": (p_true - x_hat).tolist(),
-                "cov": kf.covariancia.tolist(),
-            })
+                filt.comando(self._acao[i])
+                # NIS (T-08.1): a inovação existe num voo real — não usa a
+                # verdade. Tem de ser lida DEPOIS de predizer até `t` e ANTES da
+                # correção; o `atualizar` seguinte reprediz com dt≈0 (no-op).
+                if hasattr(filt, "predizer_ate") and hasattr(filt, "inovacao"):
+                    filt.predizer_ate(t)
+                    inov, ess = filt.inovacao(z)
+                filt.atualizar(z, t)
+            x_hat = filt.media
+            # RF-04: a verdade entra SÓ no log, nunca na observação. `cov` só
+            # quando o filtro a mantém (degraus 3 e 4); o passa-baixa não tem
+            # `P` honesta, então o degrau 2 registra só o erro (para RMSE).
+            entrada = {"t": t, "drone": i, "erro": (p_true - x_hat).tolist()}
+            if hasattr(filt, "covariancia"):
+                entrada["cov"] = filt.covariancia.tolist()
+            if inov is not None:
+                entrada["inovacao"] = inov.tolist()
+                entrada["S"] = ess.tolist()
+            self.log_estimacao.append(entrada)
             return x_hat
 
         def observe_simulation_relative_positions(self):
