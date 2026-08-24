@@ -193,6 +193,92 @@ def bootstrap_pareado(
 
 
 # --------------------------------------------------------------------------
+# equivalência (TOST) — SPEC-08 T-08.2
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Equivalencia:
+    """TOST: a diferença pareada cabe dentro de ±δ? (SPEC-08 T-08.2).
+
+    `equivalente` é o critério de portão — o IC de (1−2α) da diferença inteiro
+    dentro de [−δ, +δ]. `meia_largura` fica ao lado de `delta` de propósito:
+    equivalência declarada com `meia_largura > delta` é **falta de poder
+    disfarçada de resultado** (a amostra não distingue ±δ), e a spec manda marcar
+    a célula como **não informativa** nesse caso.
+    """
+
+    n_pareado: int
+    delta: float
+    delta_media: float
+    ic_lo: float
+    ic_hi: float
+    p_inferior: float   # H0: dif ≤ −δ  (bootstrap: fração de réplicas ≤ −δ)
+    p_superior: float   # H0: dif ≥ +δ  (bootstrap: fração de réplicas ≥ +δ)
+
+    @property
+    def equivalente(self) -> bool:
+        return self.ic_lo >= -self.delta and self.ic_hi <= self.delta
+
+    @property
+    def meia_largura(self) -> float:
+        return 0.5 * (self.ic_hi - self.ic_lo)
+
+    @property
+    def informativa(self) -> bool:
+        """Tem poder para declarar equivalência: o IC é mais estreito que ±δ."""
+        return self.meia_largura <= self.delta
+
+    def como_linha(self) -> dict:
+        return {
+            "n_pareado": self.n_pareado, "delta": self.delta,
+            "delta_media": self.delta_media,
+            "ic_lo": self.ic_lo, "ic_hi": self.ic_hi,
+            "meia_largura": self.meia_largura,
+            "equivalente": self.equivalente, "informativa": self.informativa,
+            "p_inferior": self.p_inferior, "p_superior": self.p_superior,
+        }
+
+
+def tost(
+    a: Sequence[float],
+    b: Sequence[float],
+    delta: float,
+    rng: np.random.Generator,
+    B: int = B_CANONICO,
+    alfa: float = 0.05,
+) -> Equivalencia:
+    """Dois testes unilaterais (TOST) por bootstrap pareado, margem `delta`.
+
+    Equivalência (`A ≡ B` a menos de ±δ) é declarada quando o IC de **(1−2α)**
+    da diferença pareada `média(A) − média(B)` cai INTEIRO em [−δ, +δ] — a forma
+    por IC do TOST, no nível α. Preserva o pareamento como `bootstrap_pareado`:
+    um conjunto de índices por réplica, aplicado aos dois vetores.
+
+    `delta > 0`; reporta também os dois p-valores unilaterais por bootstrap.
+    """
+    if delta <= 0:
+        raise ValueError(f"a margem δ deve ser positiva: {delta}")
+    va, vb = np.asarray(a, float), np.asarray(b, float)
+    if va.shape != vb.shape:
+        raise ValueError(f"pareamento exige mesmo tamanho: {va.shape} vs {vb.shape}")
+    if va.size == 0:
+        raise ValueError("amostra vazia")
+
+    n = va.size
+    idx = rng.integers(0, n, size=(B, n))
+    deltas = va[idx].mean(axis=1) - vb[idx].mean(axis=1)
+    lo, hi = np.percentile(deltas, [100 * alfa, 100 * (1 - alfa)])   # IC (1−2α)
+    return Equivalencia(
+        n_pareado=int(n), delta=float(delta),
+        delta_media=float(va.mean() - vb.mean()),
+        ic_lo=float(lo), ic_hi=float(hi),
+        p_inferior=float(np.mean(deltas <= -delta)),
+        p_superior=float(np.mean(deltas >= delta)),
+    )
+
+
+# --------------------------------------------------------------------------
 # apoios livres de distribuição
 # --------------------------------------------------------------------------
 
