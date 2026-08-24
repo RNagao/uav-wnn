@@ -264,42 +264,67 @@ aquele nível pode ser outra história.
 
 ---
 
-## 9. O MELHOR MODELO TREINADO
+## 9. O MODELO ESCOLHIDO — E A INVERSÃO QUE O ORÇAMENTO PRODUZ
 
-    dissertação · passo 8,0e-4 · σ 0,35 · T = 16 · n = 12 (N = 34) · φ = 0,85 · m = 8
-    semente 0 · 6 750 000 passos (convergiu, não esgotou o orçamento de 10 M)
+**O finalista da grade é `T = 32`.**
 
-    banco `test`, 100 episódios:   cobertura 98,5 %   SR 97,0 %
-                                   CT_cens 52 s       CT_succ 38,2 s
-    checkpoint: 2,6 MB · 400 bits de entrada · 34 RAMs
+    dissertação · passo 8,0e-4 · σ 0,35 · T = 32 · n = 12 (N = 67) · φ = 0,85 · m = 8
+    1º de 120 pontos · 720 corridas · 200 mil passos · 3 sementes
+    cobertura 50,1 %   SR 21,3 %   0/3 abortos
+    hash de config: `15b49e642647`
 
-`runs/spec06-longa/spec06-busca-1b/8b328b1d6887/0/checkpoints/melhor`
+É a mesma config eleita sobre a **parcial** do `desempate` e usada em **todos** os
+dados do projeto — custo T1/T2/T3, SPEC-08 (ruído) e escalada multiagente. A grade
+completa **confirmou** a escolha da parcial; não houve troca de vencedor.
 
-Os quatro pontos da corrida longa, todos em `passo 8,0e-4 σ 0,35 φ 0,85`:
+`T = 16` com os mesmos demais hiperparâmetros ficou em **3º de 120**, com
+cobertura 46,0 % e **SR 0,7 %**.
 
-| T | semente | cobertura | SR | CT_cens | CT_succ | passos | checkpoint |
+### A corrida longa, as duas sementes
+
+| T | semente | cobertura | SR | CT_succ | CT_cens | passos | `melhor` |
 |---|---|---|---|---|---|---|---|
-| **16** | **0** | **98,5 %** | **97,0 %** | 52 s | **38,2 s** | 6,75 M | 2,6 MB |
-| 32 | 1 | 97,8 % | 95,0 % | 62 s | 38,5 s | 6,75 M | 5,9 MB |
-| 32 | 0 | 95,4 % | 91,0 % | 81 s | 39,2 s | 5,9 M | 5,5 MB |
-| 16 | 1 | 92,8 % | 89,0 % | 93 s | 42,5 s | 7,25 M | 2,8 MB |
+| 16 | 0 | 98,5 % | 97,0 % | 38,2 s | 52,1 s | 6,75 M | 1,2 MB |
+| 32 | 1 | 97,8 % | 95,0 % | 38,5 s | 61,6 s | 6,75 M | 2,7 MB |
+| 32 | 0 | 95,4 % | 91,0 % | 39,2 s | 80,6 s | 5,90 M | 2,6 MB |
+| 16 | 1 | 92,8 % | 89,0 % | 42,5 s | 92,8 s | 7,25 M | 1,4 MB |
 
-Referências: guloso 100 % de SR com CT ≈ 34 s; caminhante aleatório 3,3 % de
-cobertura e SR 0 %.
+**Média das duas sementes — os dois empatam em SR:**
 
-**O `CT_succ` de 38,2 s contra os 34 s do guloso é o número que mais diz.** Quando a
-rede completa a coleta, ela leva 12 % mais tempo que a heurística que vê o mapa
-inteiro — e ela decide por observação local, sem sinalização.
+| T | N | cobertura | SR | spread de SR | `melhor` |
+|---|---|---|---|---|---|
+| **32** | 67 | **96,6 %** | **93,0 %** | **4 pp** | 2,6–2,7 MB |
+| 16 | 34 | 95,6 % | 93,0 % | 8 pp | 1,2–1,4 MB |
 
-**`T = 16` ganha de `T = 32`, e isso importa para o custo.** Mesmo SR e metade do
-checkpoint: 2,6 MB contra 5,9 MB, 400 bits contra 800, 34 RAMs contra 67. A grade a
-200 mil passos apontava `T = 32` como melhor; a 6,75 M os dois empatam em desempenho
-e `T = 16` ganha em tamanho. É uma inversão de orçamento, do mesmo tipo das outras
-que esta campanha produziu.
+> **Correção.** Uma versão anterior desta seção declarava `T = 16` o melhor modelo
+> treinado, com SR 97,0 %. Aquele número é a **melhor semente** do `T = 16`,
+> comparada contra **uma** semente do `T = 32`. Com as duas sementes de cada lado os
+> dois empatam em 93,0 %, e o `T = 16` tem o **dobro do spread**. Os tamanhos citados
+> (2,6 MB / 5,9 MB) também estavam inflados ~2×: contavam `melhor` + `final`; o
+> artefato implantável é só o `melhor`.
+
+### O que isso de fato estabelece
+
+**A grade a 200 mil passos não ordena o regime de operação.** 200 mil é 0,4 % do
+orçamento de 10 M — e um ponto que a grade colocou em 3º com **SR 0,7 %** alcança,
+com orçamento longo, o mesmo SR do 1º colocado. A grade serve para **descartar** o
+que aborta ou fica no piso; ela não é evidência confiável de ordenação no topo.
+
+**Há folga de custo não explorada.** Mesmo SR com **metade** do modelo: 34 RAMs
+contra 67, 400 bits de entrada contra 800, 1,2–1,4 MB contra 2,6–2,7 MB. A diferença
+é estrutural (`N = ⌈D·T/n⌉`), não estatística.
+
+**Nada disso troca o modelo dos dados publicados.** Duas sementes não separam 93,0 %
+de 93,0 %, e o `T = 32` chega com o menor spread e com o 1º lugar da grade. O
+`T = 16` fica registrado como **um segundo ponto na fronteira custo×desempenho**,
+existente só em `Na = 1`, e como candidato natural caso a fronteira vire objeto de
+estudo.
 
 **Não há MADDPG para comparar em `Na = 1`.** Os checkpoints publicados de Lamenza
 começam em 2 agentes — registrado em `spec02-baseline-maddpg.md`. A comparação com o
-baseline é da T-06.5, em `Na ≥ 2`; aqui a referência é o guloso.
+baseline é da T-06.5, em `Na ≥ 2`; aqui a referência é o guloso: 100 % de SR com
+CT ≈ 34 s. O `CT_succ` de 38,5 s do finalista é 13 % acima dessa heurística que vê o
+mapa inteiro — decidindo por observação local, sem sinalização.
 
 ---
 

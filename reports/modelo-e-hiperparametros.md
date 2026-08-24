@@ -1,7 +1,8 @@
 # Modelo e hiperparâmetros — procedência dos dados
 
 Registro de **qual modelo e quais hiperparâmetros** geraram cada resultado deste
-projeto, e por que o modelo é **parcial** (não o vencedor definitivo do grid).
+projeto. **Atualizado após o fechamento do grid search:** a config abaixo, antes
+rotulada "parcial", foi **confirmada como 1ª de 120 pontos** na grade completa.
 
 ## A configuração usada em TODOS os dados da dissertação
 
@@ -19,9 +20,11 @@ projeto, e por que o modelo é **parcial** (não o vencedor definitivo do grid).
 | réplica | **1b** (recompensa `punish`/eq. 5-6, escala 1,0, horizonte 500 s) |
 | `c_max` (guarda de estabilidade) | **0,5** |
 
-**Fonte:** é o **ponto #1 de `PONTOS_LONGA`** (`spec06_busca.py`) — o **melhor
-ponto da parcial do grid** (`desempate`): 50,1 % de cobertura, SR 21,3 %, 0/3
-abortos. É a mesma config em 1 drone e no multiagente.
+**Fonte:** é o **ponto #1 de `PONTOS_LONGA`** (`spec06_busca.py`), eleito sobre a
+**parcial** do `desempate` e depois **confirmado pela grade completa** (720 corridas,
+120 pontos, 3 sementes): **1º lugar** com 50,1 % de cobertura, SR 21,3 %, 0/3
+abortos. A grade fechada **não trocou o vencedor**. É a mesma config em 1 drone e no
+multiagente.
 
 `N = ⌈D·T/n⌉` cresce com Na (é o análogo estrutural da entrada do MADDPG crescer):
 **Na=1 → 67 · Na=2 → 72 · Na=4 → 83 · Na=8 → 104**.
@@ -40,14 +43,26 @@ abortos. É a mesma config em 1 drone e no multiagente.
 estabiliza; escalar positivo → não muda a política ótima). Réplica e demais
 hiperparâmetros idênticos ao de 1 drone.
 
-## Por que é PARCIAL (não o vencedor definitivo)
+## O que já se resolveu, e o que continua em aberto
 
-- O **grid search não fechou** — a config foi eleita sobre a **parcial** do
-  `desempate` (17–22 % das 720 corridas).
-- **Uma** semente de treino (o protocolo pede ≥5 para declarar hipótese).
-- O **braço PPO** (`ntupla_anbubus` via PPO) **não foi testado**; a família
-  `anbubus` **abortou** nas corridas longas (1,5e-3 aos 115 k; 5e-4 aos 722 k).
-- **Nenhum portão (G1, G2) declarado.** Vereditos são provisórios.
+**Resolvido pelo fechamento do grid:**
+
+- A grade **fechou** — 720 corridas, 120 pontos por família. A config é **1ª de 120**;
+  a escolha feita sobre a parcial se sustentou.
+- O **braço PPO foi testado** — **153 corridas / 51 pontos** (`spec06_grid_ppo.py`).
+  O melhor ponto chega a **44,6 % de cobertura com SR 0,0 %**; o melhor SR de qualquer
+  ponto é **3,3 %**, e **1 corrida em 153** passa de 5 % de SR. **49 das 153 falharam.**
+  O braço PPO **não** produz um competidor.
+
+**Continua em aberto:**
+
+- **Duas** sementes de treino na corrida longa (o protocolo pede ≥5 para declarar
+  hipótese).
+- **Nenhum portão (G1, G2) declarado.** Vereditos seguem provisórios nesse sentido.
+- A grade ordena a **200 mil passos**, 0,4 % do orçamento de operação. `T = 16`
+  (3º de 120, SR 0,7 % na grade) **empata em SR** com o 1º na corrida longa, usando
+  metade da memória — ver §9 de `spec06-grid-search.md`. A ordenação no topo da grade
+  não é evidência confiável do regime de operação.
 
 ## Reconciliação — para não confundir com outras "provisórias"
 
