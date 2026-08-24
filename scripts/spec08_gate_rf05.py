@@ -39,6 +39,11 @@ from spec06_campanha_wnn import montar  # noqa: E402  (checkpoint→política, p
 SIGMA_ANCORA = 5.0
 Q_A_GRADE = [0.5, 2.0, 5.0, 20.0, 50.0, 200.0]     # degrau 3 (T-08.1)
 Q_W_GRADE = [0.0, 0.25, 1.0, 4.0]                  # degrau 4: descasamento de atuação
+"""Grade padrão. É **curta de propósito**: mantém reprodutíveis os atestados já
+emitidos. Políticas mais agressivas podem ficar otimistas (NEES > 2) mesmo em
+`q_w = 4` — foi o caso do `T = 16` semente 1, NEES 2,80. Para essas, estenda com
+`--q-w-grade`, e registre que a grade foi estendida: mudar a grade para todos
+mudaria o `q_w` escolhido de modelos já atestados e quebraria a comparação."""
 SAIDA = Path("results/etapa2/gate_rf05.json")
 
 
@@ -146,6 +151,8 @@ def main() -> int:
                          "(T-08.1); padrão: guloso de referência")
     ap.add_argument("--aproximador", default=None, help="família (se --checkpoint)")
     ap.add_argument("--saida", type=Path, default=SAIDA)
+    ap.add_argument("--q-w-grade", default=None,
+                    help="grade de q_w separada por vírgula (ver Q_W_GRADE)")
     a = ap.parse_args()
 
     cfg = LAMENZA_003(1, 12, phase="eval")
@@ -172,7 +179,9 @@ def main() -> int:
     print(f"  melhor q_a={d3['melhor']} · NEES {v3}\n")
 
     print("degrau 4 (KF+controle) — varrendo q_w…", flush=True)
-    d4 = _varre(cfg, 4, Q_W_GRADE, "q_w", a.episodios, politica)
+    grade_w = ([float(x) for x in a.q_w_grade.split(",")]
+               if a.q_w_grade else Q_W_GRADE)
+    d4 = _varre(cfg, 4, grade_w, "q_w", a.episodios, politica)
     nees4 = d4["resultado_melhor"].get("nees", {})
     nis4 = d4["resultado_melhor"].get("nis", {})
     print(f"  melhor q_w={d4['melhor']} · NEES {nees4.get('veredito','?')} "

@@ -44,12 +44,18 @@ PRE = Path("results/etapa2/analysis_plan.sha256")
 SEED_ANALISE = 20260823
 
 
-def _b1_guard() -> dict:
-    """Bloqueio B1: sem atestado RF-05 aprovado, nenhuma rodada de RL começa."""
-    if not GATE.exists():
-        sys.exit("B1 (RF-05): results/etapa2/gate_rf05.json ausente — "
+def _b1_guard(gate: Path = GATE) -> dict:
+    """Bloqueio B1: sem atestado RF-05 aprovado, nenhuma rodada de RL começa.
+
+    O caminho é parâmetro porque o atestado é **por modelo**: a consistência do
+    filtro vale sob a mobilidade da política que será avaliada (T-08.1), e
+    políticas diferentes (T = 16 × T = 32) exigem atestados diferentes. Um caminho
+    fixo faria a escada de um modelo rodar com o `q_w` do outro.
+    """
+    if not gate.exists():
+        sys.exit(f"B1 (RF-05): {gate} ausente — "
                  "rode scripts/spec08_gate_rf05.py antes.")
-    g = json.loads(GATE.read_text())
+    g = json.loads(gate.read_text())
     if g.get("status") != "aprovado":
         sys.exit(f"B1 (RF-05): atestado reprovado (status={g.get('status')!r}). "
                  "Nenhuma rodada de RL desta spec executa.")
@@ -151,9 +157,11 @@ def main() -> int:
     ap.add_argument("--episodios", type=int, default=500)
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--saida", type=Path, default=Path("results/etapa2/escada_lr.json"))
+    ap.add_argument("--gate", type=Path, default=GATE,
+                    help="atestado RF-05 do MODELO avaliado (ver _b1_guard)")
     a = ap.parse_args()
 
-    gate = _b1_guard()
+    gate = _b1_guard(a.gate)
     if a.smoke:
         a.sigmas, a.degraus, a.episodios = "5", "0,1,2,3,4", min(a.episodios, 3)
 
@@ -179,7 +187,8 @@ def main() -> int:
                            "sigmas": sigmas, "degraus": degraus,
                            "episodios": len(sementes), "regime": "LR",
                            "sementes_treino": 1},
-                "hash_filtro": gate.get("hash_filtro"), "celulas": {}}
+                "hash_filtro": gate.get("hash_filtro"),
+                "gate": str(a.gate), "celulas": {}}
 
     ct0 = ok0 = None
     if 0 in degraus:
