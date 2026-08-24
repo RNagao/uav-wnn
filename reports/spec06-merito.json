@@ -41,5 +41,33 @@
   "mlp_pareada": {
     "persistente_kb": 7.6328125,
     "mult_fp": 1892
+  },
+  "t2_ciclos": {
+    "x86-64 (com FPU e SIMD)": {
+      "wnn": 4465,
+      "maddpg": 149200,
+      "ganho_wnn": 33.41545352743561
+    },
+    "Cortex-M4F (com FPU)": {
+      "wnn": 4777,
+      "maddpg": 446476,
+      "ganho_wnn": 93.4636801339753
+    },
+    "Cortex-M0 (SEM FPU)": {
+      "wnn": 19809,
+      "maddpg": 9281172,
+      "ganho_wnn": 468.53309101923367
+    }
+  },
+  "t2_wallclock_us": {
+    "wnn_numpy": {
+      "mediana": 173.0,
+      "p99": 321.8
+    },
+    "maddpg_pytorch": {
+      "mediana": 35.0,
+      "p99": 115.1
+    },
+    "nota": "NumPy×PyTorch; a figura defensável é ciclos, não wall-clock"
   }
 }

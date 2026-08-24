@@ -23,10 +23,14 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
+
 sys.path.insert(0, "scripts")
 from spec06_campanha_wnn import montar  # noqa: E402
 from uavwnn.custo.memoria import custo_mlp, custo_ntuple_de_rede  # noqa: E402
-from uavwnn.custo.operacoes import operacoes_mlp, operacoes_ntuple  # noqa: E402
+from uavwnn.custo.operacoes import (  # noqa: E402
+    CICLOS, ciclos, operacoes_mlp, operacoes_ntuple,
+)
 from uavwnn.refenv import LAMENZA_003  # noqa: E402
 
 DIR = Path("reports/img/spec06-merito")
@@ -81,6 +85,24 @@ def coletar() -> dict:
     cmp = custo_mlp([D_OBS, 32, 32, 2], rotulo="MLP pareada 1/12")
     opp = operacoes_mlp([D_OBS, 32, 32, 2])
     m["mlp_pareada"] = {"persistente_kb": cmp.persistente / 1024, "mult_fp": opp.mult_fp}
+
+    # T2 — tempo de inferência por CICLOS (independente de hardware, RNF-12): a
+    # figura honesta, porque wall-clock depende do arcabouço. WNN real vs ator
+    # MADDPG (256×256, saída 2 como Lamenza).
+    ow = operacoes_ntuple(n_ram=N_RAM, tamanho_tupla=N_TUPLA, n_cabecas=D_SAIDA,
+                          n_dims=D_OBS, n_niveis=T)
+    om = operacoes_mlp([MADDPG_D[4], 256, 256, 2])
+    m["t2_ciclos"] = {hw: {"wnn": ciclos(ow, hw), "maddpg": ciclos(om, hw),
+                           "ganho_wnn": ciclos(om, hw) / max(ciclos(ow, hw), 1)}
+                      for hw in CICLOS}
+    # T2 wall-clock MEDIDO nos protótipos (RNF-11): WNN NumPy × MADDPG PyTorch —
+    # arcabouços diferentes; serve só para mostrar que o wall-clock inverte o
+    # veredito dos ciclos por overhead de implementação, não por algoritmo.
+    m["t2_wallclock_us"] = {
+        "wnn_numpy": {"mediana": 173.0, "p99": 321.8},
+        "maddpg_pytorch": {"mediana": 35.0, "p99": 115.1},
+        "nota": "NumPy×PyTorch; a figura defensável é ciclos, não wall-clock",
+    }
     return m
 
 
@@ -102,6 +124,13 @@ def tabela(m: dict) -> None:
               f"{d['entradas_ocupadas']:,} entradas) contra {maddpg4['persistente_kb']:.0f} KB "
               f"do ator MADDPG ({d['persistente_kb']/maddpg4['persistente_kb']:.1f}×). "
               f"Trade-off memória↔computação.")
+    print("\nT2 — ciclos por decisão (independente de hardware, RNF-12):")
+    for hw, c in m["t2_ciclos"].items():
+        print(f"  {hw:>26}: WNN {c['wnn']:>8,}  MADDPG {c['maddpg']:>10,}  "
+              f"→ {c['ganho_wnn']:.0f}× WNN")
+    wc = m["t2_wallclock_us"]
+    print(f"  wall-clock (protótipos): WNN {wc['wnn_numpy']['mediana']:.0f} µs (NumPy) × "
+          f"MADDPG {wc['maddpg_pytorch']['mediana']:.0f} µs (PyTorch) — inverte por implementação")
 
 
 def figuras(m: dict) -> None:
@@ -153,7 +182,22 @@ def figuras(m: dict) -> None:
     ax.set_title("Mapa de mérito: a WNN troca memória por computação")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "mapa_merito.png", dpi=110); plt.close(fig)
-    print(f"[figuras] 3 imagens em {DIR}/")
+
+    # 4. T2 — ciclos por decisão, por classe de hardware (log)
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    hws = list(m["t2_ciclos"].keys())
+    x = np.arange(len(hws)); w = 0.38
+    ax.bar(x - w / 2, [m["t2_ciclos"][h]["wnn"] for h in hws], w,
+           color=AMBAR, label="WNN dissertação")
+    ax.bar(x + w / 2, [m["t2_ciclos"][h]["maddpg"] for h in hws], w,
+           color=TEAL, label="MADDPG 256×256")
+    ax.set_yscale("log"); ax.set_xticks(x)
+    ax.set_xticklabels([h.split(" (")[0] for h in hws])
+    ax.set_ylabel("ciclos por decisão (log)")
+    ax.set_title("T2 — ciclos por decisão: WNN vence, e mais ainda sem FPU (470× no M0)")
+    ax.legend(fontsize=8); fig.tight_layout()
+    fig.savefig(DIR / "t2_ciclos.png", dpi=110); plt.close(fig)
+    print(f"[figuras] 4 imagens em {DIR}/")
 
 
 def main() -> int:
