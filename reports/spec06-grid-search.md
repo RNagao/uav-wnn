@@ -286,7 +286,7 @@ cobertura 46,0 % e **SR 0,7 %**.
 |---|---|---|---|---|---|---|---|
 | 16 | 0 | 98,5 % | 97,0 % | 38,2 s | 52,1 s | 6,75 M | 1,2 MB |
 | 32 | 1 | 97,8 % | 95,0 % | 38,5 s | 61,6 s | 6,75 M | 2,7 MB |
-| 32 | 0 | 95,4 % | 91,0 % | 39,2 s | 80,6 s | 5,90 M | 2,6 MB |
+| 32 | 0 | 95,4 % | 91,0 % | 39,2 s | 80,6 s | 6,75 M | 2,6 MB |
 | 16 | 1 | 92,8 % | 89,0 % | 42,5 s | 92,8 s | 7,25 M | 1,4 MB |
 
 **Média das duas sementes — os dois empatam em SR:**
@@ -302,6 +302,56 @@ cobertura 46,0 % e **SR 0,7 %**.
 > dois empatam em 93,0 %, e o `T = 16` tem o **dobro do spread**. Os tamanhos citados
 > (2,6 MB / 5,9 MB) também estavam inflados ~2×: contavam `melhor` + `final`; o
 > artefato implantável é só o `melhor`.
+
+### O terceiro ponto: a config que colapsou
+
+`PONTOS_LONGA` tinha **três** configs da dissertação. A segunda —
+`5e-4 · σ 0,20 · T = 32`, 2ª de 120 na grade — **colapsou no orçamento longo**:
+SR de **2–3 %** e `CT_cens` de ~488 s contra um horizonte de 500 s. Ou seja: quase
+nunca completa a coleta. Foi interrompida, e nunca recebeu avaliação no banco de
+teste pela rede viva — os números acima vêm do checkpoint `melhor`.
+
+Uma config **2ª colocada na grade** virando inútil a 6,75 M é o mesmo fenômeno da
+inversão do `T = 16`, no sentido oposto. A grade a 200 mil passos erra nos dois
+sentidos.
+
+### O checkpoint `melhor` está PIOR que a rede final — e por quê
+
+A campanha longa começou às 14:07 de 23/08; a correção `539b61e`, que faz a
+avaliação final ler o checkpoint `melhor`, entrou às 18:32. **Os processos já
+rodavam com o código anterior**, logo a tabela acima mede a **rede viva no fim do
+treino**. Medindo os checkpoints `melhor`, que nunca tinham sido avaliados:
+
+| config | `melhor` gravado em | cobertura | SR |
+|---|---|---|---|
+| T=32 s0 | 2,50 M | 90,8 % | **81,0 %** |
+| T=32 s1 | 2,25 M | 97,3 % | 96,0 % |
+| T=16 s0 | 2,50 M | 95,5 % | 93,0 % |
+| T=16 s1 | 4,25 M | 90,9 % | **82,0 %** |
+| 5e-4/0,20 s0 | 6,75 M | 83,8 % | 2,0 % |
+| 5e-4/0,20 s1 | 4,00 M | 81,2 % | 3,0 % |
+
+Média de 2 sementes: **T=32 → 88,5 %** e **T=16 → 87,5 %**, contra 93,0 % das redes
+finais. Os checkpoints salvos estão **4,5–5,5 pp abaixo** do que a campanha
+realmente produziu.
+
+**A causa é o banco de validação saturado.** São **20 episódios**, e a cobertura
+bate **100 %** já em 2,25–2,5 M. O critério é `if m["cobertura"] > melhor` —
+estritamente maior — então, saturado o banco, **nenhum checkpoint posterior
+substitui o primeiro**. No `T=32` semente 0 a validação atingiu 100 % em **seis**
+avaliações distintas, de 2,5 M a 6,5 M, e o checkpoint ficou congelado na primeira.
+
+Isto **não** contradiz a `539b61e`. São dois regimes opostos: a 200 mil passos a
+rede final está perto da divergência e o `melhor` ganha (foram os 14 pp de SR que
+motivaram a correção); a 6,75 M a validação satura e o `melhor` escolhe a rede
+**menos treinada** entre empates. O defeito real é o critério de seleção — banco de
+validação pequeno demais e desempate pelo primeiro máximo.
+
+**Consequência operacional:** o `checkpoints/melhor` que a SPEC-08 e as figuras de
+custo carregam é o de 2,5 M, não o de 6,75 M. As figuras de **custo** (tamanho,
+tempo de inferência, operações) não mudam — dependem de `N` e `n`, não do conteúdo
+das LUTs. As de **desempenho** sob ruído partem de uma rede 5 pp pior do que a
+disponível.
 
 ### O que isso de fato estabelece
 

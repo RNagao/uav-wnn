@@ -1,0 +1,62 @@
+[
+  {
+    "config": "8e-4/0,35/T32",
+    "seed": 0,
+    "hash": "15b49e642647",
+    "passo_melhor": 2500000,
+    "cobertura": 0.9083333333333334,
+    "sr": 0.81,
+    "ct_cens": 129.46,
+    "ct_succ": 42.54320987654321
+  },
+  {
+    "config": "8e-4/0,35/T32",
+    "seed": 1,
+    "hash": "15b49e642647",
+    "passo_melhor": 2250000,
+    "cobertura": 0.9733333333333334,
+    "sr": 0.96,
+    "ct_cens": 55.765,
+    "ct_succ": 37.255208333333336
+  },
+  {
+    "config": "8e-4/0,35/T16",
+    "seed": 0,
+    "hash": "8b328b1d6887",
+    "passo_melhor": 2500000,
+    "cobertura": 0.955,
+    "sr": 0.93,
+    "ct_cens": 72.48,
+    "ct_succ": 40.30107526881721
+  },
+  {
+    "config": "8e-4/0,35/T16",
+    "seed": 1,
+    "hash": "8b328b1d6887",
+    "passo_melhor": 4250000,
+    "cobertura": 0.9091666666666667,
+    "sr": 0.82,
+    "ct_cens": 124.64,
+    "ct_succ": 42.24390243902439
+  },
+  {
+    "config": "5e-4/0,20/T32",
+    "seed": 0,
+    "hash": "e11c9f45b54b",
+    "passo_melhor": 6750000,
+    "cobertura": 0.8383333333333336,
+    "sr": 0.02,
+    "ct_cens": 490.62,
+    "ct_succ": 31.0
+  },
+  {
+    "config": "5e-4/0,20/T32",
+    "seed": 1,
+    "hash": "e11c9f45b54b",
+    "passo_melhor": 4000000,
+    "cobertura": 0.8125,
+    "sr": 0.03,
+    "ct_cens": 486.25,
+    "ct_succ": 41.666666666666664
+  }
+]
