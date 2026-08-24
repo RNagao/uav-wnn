@@ -728,17 +728,41 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         — situação comum no início do treino e, com tuplas grandes, também para
         entradas novas (§3.2.4, p.27: "the model is unable to generalize").
         """
+        # COLETA e depois SOMA, em vez de acumular por RAM — e o ganho foi medido.
+        #
+        # A versão anterior fazia, por posição encontrada, dois `+=` de array e uma
+        # exponenciação escalar `phi ** contador`. O custo cresce com a TAXA DE
+        # ACERTO, que cresce com a ocupação — e é isso que fazia o treino desacelerar
+        # ao longo da corrida sem que contenção, GC ou localidade explicassem:
+        #
+        #     ocupadas       acertos/prever   ms/prever
+        #            0            0/67           0,020
+        #       20 000            4/67           0,072
+        #      120 000           29/67           0,313
+        #      200 000           51/67           0,480   (24× o vazio)
+        #
+        # O `prever` do ator foi vetorizado na T-06.0; este ficou com o laço, e o
+        # perfil o mostrou consumindo 33 % do laço de treino, com `_pesos` chamado
+        # 381 960 vezes em 3 000 passos.
+        #
+        # A ORDEM DA SOMA MUDA, e isso é decisão consciente: `np.sum` usa soma por
+        # pares e o acumulador dava soma sequencial, então os últimos bits diferem.
+        # Os testes diferenciais contra o Ramnet.jl passam com a tolerância que já
+        # tinham; exigir bit a bit aqui seria fixar uma ordem de acumulação que a
+        # eq. (4.9) não prescreve — ela é uma soma sobre `i`, sem ordem.
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
         for m, linha in enumerate(end):
-            num = np.zeros(self.n_saidas)
-            den = np.zeros(self.n_saidas)
+            vals, cnts = [], []
             for i, e in enumerate(linha):
                 item = self.memoria[i].get(int(e))
                 if item is not None:
-                    v, c = item
-                    num += v
-                    den += self._pesos(c)
+                    vals.append(item[0])
+                    cnts.append(item[1])
+            if not vals:
+                continue                      # eq. (4.9): `Σ s = 0 → 0`, explícito
+            num = np.sum(vals, axis=0)
+            den = np.sum(self._pesos(np.asarray(cnts)), axis=0)
             saida[m] = np.divide(num, den, out=np.zeros_like(num), where=den != 0)
         return saida
 
