@@ -96,7 +96,7 @@ def ajustar_termometro(cfg_env, resolucao: int, seed: int, n_ep: int = 5) -> Ter
 
 def construir(cfg: ConfigTreino, cfg_env, termo: TermometroQuantil):
     """Monta o aproximador `ntupla` e o laço AC contínuo (Algoritmo 4.4)."""
-    ap = APROXIMADORES["ntupla"](
+    ap = APROXIMADORES["ntupla_dissertacao"](
         n_bits=termo.n_bits, tamanho_tupla=cfg.tamanho_tupla, phi=cfg.phi,
         taxa_ator=cfg.taxa_ator, seed=cfg.seed, d_saida=cfg.d_saida,
         n_dims_codificador=cfg_env.observation_size, limiares_por_dim=cfg.resolucao)
