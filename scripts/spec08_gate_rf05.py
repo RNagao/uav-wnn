@@ -153,20 +153,34 @@ def main() -> int:
     ap.add_argument("--saida", type=Path, default=SAIDA)
     ap.add_argument("--q-w-grade", default=None,
                     help="grade de q_w separada por vírgula (ver Q_W_GRADE)")
+    ap.add_argument("--na", type=int, default=1)
+    ap.add_argument("--ns", type=int, default=12,
+                    help="a célula onde o filtro será usado — o atestado vale sob "
+                         "a mobilidade daquela política NAQUELE cenário (T-08.1)")
+    ap.add_argument("--maddpg", action="store_true",
+                    help="atesta sob a mobilidade do MADDPG da célula")
     a = ap.parse_args()
 
-    cfg = LAMENZA_003(1, 12, phase="eval")
+    cfg = LAMENZA_003(a.na, a.ns, phase="eval")
     dt = float(cfg.algorithm_iteration_interval)
-    if a.checkpoint is not None:
+    if a.maddpg:
+        from spec02_baseline_maddpg import checkpoints as _ckpts
+        from spec02_maddpg_rollout import carregar_ator
+        disp = {(na, ns): q for na, ns, q in _ckpts()}
+        if (a.na, a.ns) not in disp:
+            sys.exit(f"sem checkpoint MADDPG para Na={a.na} Ns={a.ns}")
+        politica = carregar_ator(disp[(a.na, a.ns)], cfg.observation_size)
+        fonte = "MADDPG"
+    elif a.checkpoint is not None:
         aprox = a.aproximador or json.loads(
-            (a.checkpoint.parent.parent / "config.json").read_text())["config"]["aproximador"]
+            (a.checkpoint.parent.parent / "config.json").read_text())["config"]["aproximador"]  # noqa: E501
         politica, _ = montar(aprox, cfg, a.checkpoint)
         fonte = f"WNN {aprox}"
     else:
-        greedy = load_heuristics().create_greedy_heuristics(0, 12)
+        greedy = load_heuristics().create_greedy_heuristics(0, a.ns)
         politica = lambda o: greedy(o)          # noqa: E731
         fonte = "guloso de referência"
-    print(f"Gate RF-05/RF-04 · célula 1×12 · σ_âncora={SIGMA_ANCORA} · "
+    print(f"Gate RF-05/RF-04 · célula {a.na}×{a.ns} · σ_âncora={SIGMA_ANCORA} · "
           f"{a.episodios} episódios · mobilidade: {fonte}\n")
 
     print("degrau 2 (passa-baixa)…", flush=True)
