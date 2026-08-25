@@ -1,0 +1,30 @@
+{
+  "config": {
+    "busca": true,
+    "replica": "1b",
+    "aproximador": "ntupla_dissertacao",
+    "na": 1,
+    "ns": 12,
+    "b_sweep": 10000000,
+    "id": 2,
+    "passo_efetivo": 0.0008,
+    "sigma": 0.35,
+    "resolucao": 16,
+    "tupla": 12,
+    "passos_m": 8,
+    "idx_critico": 1,
+    "normalizar": false,
+    "phi": 0.85,
+    "taxa_ator": 0.0008,
+    "n_ram": 34,
+    "n_bits": 400
+  },
+  "config_hash": "8b328b1d6887",
+  "sementes": {
+    "seed_train": 0,
+    "seed_eval": 20260901,
+    "seed_tuple": 7919,
+    "ladrilhamento_fixo": false
+  },
+  "experimento": "spec06-busca-1b"
+}

@@ -55,13 +55,35 @@ como o conjunto único de hiperparâmetros do Lamenza exige."""
 SEED_TREINO_BASE = 2_000_000
 
 
-def construir(cfg, na: int, t_res: int = T_RES):
-    """Rede compartilhada + `na` trajetórias de AC (uma por drone)."""
-    termo = TermometroQuantil(t_res).ajustar(corpus_de_observacoes(cfg))
+def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None):
+    """Rede compartilhada + `na` trajetórias de AC (uma por drone).
+
+    Se ``retomar`` for um dir de checkpoint, carrega ator/crítico/termômetro dali
+    (em vez de sortear rede nova e reajustar o termômetro) e **continua** o treino
+    de onde parou — usado para retomar um parcial em outra máquina.
+
+    Ao retomar, `T` vem do **termômetro gravado**, não do argumento: os limiares
+    são estado treinado, e montar a rede com um `T` diferente do que gerou os
+    endereços daria uma rede que lê as LUTs nos lugares errados — o mesmo defeito
+    que o `carregar` do `RedeGradienteFuncional` corrige para o mapeamento.
+    """
     d_obs = cfg.observation_size
+    if retomar is not None:
+        termo = TermometroQuantil.carregar(Path(retomar) / "termometro.npz")
+        gravado = termo.n_bits // d_obs
+        if gravado != t_res:
+            print(f"  T do checkpoint = {gravado} (o --resolucao {t_res} foi "
+                  f"ignorado: os limiares são estado treinado)", flush=True)
+        t_res = gravado
+    else:
+        termo = TermometroQuantil(t_res).ajustar(corpus_de_observacoes(cfg))
     ap = APROXIMADORES["ntupla_dissertacao"](
         n_bits=termo.n_bits, tamanho_tupla=N_TUPLA, phi=PHI, taxa_ator=PASSO,
         seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=t_res)
+    if retomar is not None:
+        rp = Path(retomar)
+        ap.ator = type(ap.ator).carregar(next(rp.glob("*ator.npz")))
+        ap.critico = type(ap.critico).carregar(next(rp.glob("*critico.npz")))
 
     def codificar(v, _t=termo):
         return _t.codificar(np.asarray(v, float)[None, :])[0]
@@ -105,15 +127,21 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 
 
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
-            progresso_cada: int, t_res: int = T_RES) -> dict:
+            progresso_cada: int, t_res: int = T_RES,
+            retomar: Path | None = None) -> dict:
     cfg_tr, cfg_av = _cfgs(replica, na, ns)
     ctx = _ctx(cfg_tr)
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
-    ap, termo, acs = construir(cfg_tr, na, t_res)
+    ap, termo, acs = construir(cfg_tr, na, t_res, retomar)
+    t_res = termo.n_bits // cfg_tr.observation_size     # o efetivo, após retomar
+    if retomar is not None:
+        print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)",
+              flush=True)
     print(f"multiagente · Na={na} Ns={ns} · T={t_res} · N={ap.ator.n_ram} RAMs · "
-          f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede")
+          f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede",
+          flush=True)
 
     passos_max = int(cfg_tr.max_episode_length / cfg_tr.algorithm_iteration_interval) + 2
     handlers = list(__import__("logging").getLogger().handlers)
@@ -200,6 +228,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
                        "T": t_res, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
                        "replica": replica, "parameter_sharing": True,
                        "recompensa_por_na": True,
+                       "retomado_de": str(retomar) if retomar else None,
                        "critico": "descentralizado (Alg. 4.4)"},
             "passos": passos, "episodios": ep, "melhor_val_cobertura": melhor,
             "metrica_test": metr, "fonte": "spec06_treino_multiagente.py"}
@@ -222,7 +251,11 @@ def main() -> int:
     ap.add_argument("--saida", type=Path, default=None)
     ap.add_argument("--progresso-cada", type=int, default=50_000)
     ap.add_argument("--resolucao", type=int, default=T_RES,
-                    help=f"T do termômetro; {T_RES} (padrão) ou 16 (econômico)")
+                    help=f"T do termômetro; {T_RES} (padrão) ou 16 (econômico). "
+                         "Ignorado com --retomar: T vem do checkpoint.")
+    ap.add_argument("--retomar", type=Path, default=None,
+                    help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
+                         "continuar o treino em vez de recomeçar do zero")
     ap.add_argument("--smoke", action="store_true", help="b-max=5000, avaliação curta")
     a = ap.parse_args()
     if a.smoke:
@@ -233,8 +266,10 @@ def main() -> int:
     saida = a.saida or Path(
         f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}{sufixo}")
     print(f"SPEC-06 escalada multiagente · config vencedora "
-          f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n")
-    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada, a.resolucao)
+          f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
+          flush=True)
+    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
+            a.resolucao, a.retomar)
     return 0
 
 

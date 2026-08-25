@@ -64,20 +64,25 @@ SEED_SORTEIO = 20260825
 """Semente do sorteio de condição. Fixa e separada das sementes de cenário: o
 sorteio tem de ser reprodutível E independente do modelo."""
 
-ESCADA = ([(0, 0.0)]
-          + [(d, s) for d in (1, 2, 3, 4) for s in (1.0, 3.0, 5.0, 10.0)])
-"""As 17 condições. O degrau 0 é limpo, então σ não se aplica e entra uma vez só
-— repeti-lo por σ daria 4× mais peso ao caso sem ruído no sorteio."""
+def montar_escada(degraus: list[int], sigmas: list[float]) -> list[tuple[int, float]]:
+    """As condições sorteáveis. O degrau 0 é limpo, então σ não se aplica e ele
+    entra **uma vez só** — repeti-lo por σ daria peso extra ao caso sem ruído."""
+    fora = [(0, 0.0)] if 0 in degraus else []
+    return fora + [(d, s) for d in degraus if d != 0 for s in sigmas]
 
 
-def condicao_do_episodio(seed: int) -> tuple[int, float]:
+def condicao_do_episodio(seed: int, escada: list[tuple[int, float]]) -> tuple[int, float]:
     """Condição da escada para esta semente. **Só depende da semente.**
 
     É o que garante pareamento entre modelos: MADDPG e WNN avaliam o episódio
     `s` sob o mesmo degrau e o mesmo σ, então a diferença medida é do método.
+
+    Depende também do TAMANHO da escada — restringir σ muda o sorteio de todos
+    os episódios. Por isso o rótulo do regime carrega o σ: campanhas com escadas
+    diferentes não podem ir para o mesmo CSV.
     """
     rng = np.random.default_rng(SEED_SORTEIO + int(seed))
-    return ESCADA[int(rng.integers(len(ESCADA)))]
+    return escada[int(rng.integers(len(escada)))]
 
 
 # --- políticas ---------------------------------------------------------------
@@ -127,7 +132,11 @@ def _res_do_config(ckpt: Path) -> int:
     daria o `T` de outra corrida — daí a busca explícita.
     """
     import json as _json
-    for cand in (ckpt.parent.parent / "config.json", ckpt.parent / "config.json"):
+    # A ordem cobre os três leiautes: `models/T16/a1s12/` (config ao lado dos
+    # pesos), `runs/.../<hash>/<semente>/checkpoints/melhor` (dois acima) e o
+    # multiagente (`procedencia.json`, tratado antes desta função).
+    for cand in (ckpt / "config.json", ckpt.parent.parent / "config.json",
+                 ckpt.parent / "config.json"):
         if cand.exists():
             return int(_json.loads(cand.read_text())["config"]["resolucao"])
     raise SystemExit(f"não achei o T de {ckpt}: sem procedencia.json nem config.json")
@@ -311,6 +320,12 @@ def main() -> int:
     ap.add_argument("--runs", type=int, default=100)
     ap.add_argument("--episodios", type=int, default=200)
     ap.add_argument("--ruido", choices=("limpo", "sorteio"), default="limpo")
+    ap.add_argument("--sigmas", default="1,3,5,10",
+                    help="σ do GPS sorteáveis, em metros")
+    ap.add_argument("--degraus", default="1,2,3,4",
+                    help="estimadores sorteáveis. O degrau 0 (limpo) fica de fora "
+                         "por padrão: o regime `limpo` já o mede, com os 20 mil "
+                         "episódios inteiros em vez de uma fração do sorteio.")
     ap.add_argument("--gate", type=Path, default=None,
                     help="atestado RF-05 DESTE modelo nesta célula (degraus 3 e 4)")
     ap.add_argument("--dir-saida", type=Path, default=Path("reports/campanha"))
@@ -335,11 +350,21 @@ def main() -> int:
     ambientes = Ambientes(cfg, gate, limpo=(a.ruido == "limpo"))
     handlers = list(logging.getLogger().handlers)
 
-    arq = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{a.ruido}.csv"
-    arq_ep = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{a.ruido}-episodios.csv"
+    degraus = [int(x) for x in a.degraus.split(",")]
+    sigmas = [float(x) for x in a.sigmas.split(",")]
+    escada = montar_escada(degraus, sigmas)
+    # O rótulo carrega a escada: sortear de {σ=10} e de {σ=1,3,5,10} dá campanhas
+    # diferentes, e escrevê-las no mesmo CSV misturaria regimes sem aviso.
+    regime = a.ruido if a.ruido == "limpo" else (
+        "sigma" + "-".join(f"{s:g}" for s in sigmas))
+    if a.ruido == "sorteio":
+        print(f"  escada sorteável: {len(escada)} condições "
+              f"(degraus {degraus} × σ {[f'{s:g}' for s in sigmas]})", flush=True)
+    arq = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}.csv"
+    arq_ep = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}-episodios.csv"
     feitas = ler_cache(arq, a.episodios)
     faltam = [r for r in range(a.runs) if r not in feitas]
-    print(f"{a.rotulo} · Na={a.na} Ns={a.ns} · regime {a.ruido} · "
+    print(f"{a.rotulo} · Na={a.na} Ns={a.ns} · regime {regime} · "
           f"{len(faltam)} de {a.runs} runs a rodar ({a.episodios} ep cada)", flush=True)
     if not faltam:
         return 0
@@ -351,7 +376,7 @@ def main() -> int:
         cts, oks, cols, eps = [], [], [], []
         for s in range(s0, s0 + a.episodios):
             degrau, sigma = ((0, 0.0) if a.ruido == "limpo"
-                             else condicao_do_episodio(s))
+                             else condicao_do_episodio(s, escada))
             amb = ambientes.obter(degrau, sigma)
             ct, ok, col = rodar_episodio(amb, cfg, politica, s, handlers)
             cts.append(ct); oks.append(ok); cols.append(col)
@@ -361,12 +386,13 @@ def main() -> int:
                         "sucesso": int(ok), "coleta_media": round(col, 4)
                         if col == col else ""})
         ct = np.array(cts, float); ok = np.array(oks, bool)
-        d0, s0d = ((0, 0.0) if a.ruido == "limpo" else condicao_do_episodio(s0))
+        d0, s0d = ((0, 0.0) if a.ruido == "limpo"
+                   else condicao_do_episodio(s0, escada))
         T = trilhas(ambientes.obter(d0, s0d), cfg, politica, s0, handlers)
         lat_med, lat_p99 = latencia()
         linha = {
             "run": r, "modelo": a.rotulo, "num_drones": a.na, "num_sensores": a.ns,
-            "regime": a.ruido, "episodios": a.episodios, "seed_inicial": r * a.episodios,
+            "regime": regime, "episodios": a.episodios, "seed_inicial": r * a.episodios,
             "completion_time_medio": round(float(ct.mean()), 4),
             "completion_time_std_episodios": round(float(ct.std(ddof=1)), 4),
             "taxa_sucesso": round(float(ok.mean()), 6),

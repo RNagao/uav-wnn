@@ -1,0 +1,14 @@
+corrida LONGA sobre os melhores pontos de cada modelo · réplica 1b · Na=1 Ns=12 · sem ruído
+6 pontos ESPECÍFICOS por modelo × 2 sementes = 12 corridas
+   ntupla_dissertacao passo 8.0e-04 σ 0.35 T32 n12 crit 1
+   ntupla_dissertacao passo 5.0e-04 σ 0.20 T32 n12 crit 1
+   ntupla_dissertacao passo 8.0e-04 σ 0.35 T16 n12 crit 1
+       ntupla_anbubus passo 1.5e-03 σ 0.35 T32 n12 crit 2
+       ntupla_anbubus passo 1.5e-03 σ 0.35 T32 n12 crit 1
+       ntupla_anbubus passo 5.0e-04 σ 0.20 T32 n12 crit 2
+B_sweep = 10,000,000 · 12 processos
+estimativa: ~5.0 h de parede
+progresso ao vivo: reports/spec06-longa.progresso.jsonl
+
+  [    5/12] 41.7% · decorrido   9.3 min · resta ~ 13.0 min
+  [   10/12] 83.3% · decorrido 498.9 min · resta ~ 99.8 min

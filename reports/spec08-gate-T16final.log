@@ -1,0 +1,16 @@
+Gate RF-05/RF-04 · célula 1×12 · σ_âncora=5.0 · 100 episódios · mobilidade: WNN ntupla_dissertacao
+
+degrau 2 (passa-baixa)…
+  RMSE 7.73 m (sem P — NEES/NIS não se aplica)
+
+degrau 3 (KF vel. constante) — varrendo q_a…
+  melhor q_a=200.0 · NEES consistente
+
+degrau 4 (KF+controle) — varrendo q_w…
+  melhor q_w=4.0 · NEES consistente (1.98) · NIS consistente
+
+RF-04 (não vazamento)…
+  verde — [32m[32m[1m8 passed[0m[32m in 0.96s[0m[0m
+
+=== APROVADO === → results/etapa2/gate_rf05-T16final.json
+hash_filtro: 4806d704329965bf…
