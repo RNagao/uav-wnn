@@ -1,0 +1,6 @@
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=36 (d_obs=27 é o mesmo)
+wnn-T32 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   69.41 s · SR 95.0% ·   27.8 s · resta  0.8 h
+  [  2/100] run   1 · CT   68.80 s · SR 95.0% ·   26.9 s · resta  0.7 h
+  [  3/100] run   2 · CT   64.53 s · SR 96.0% ·   26.4 s · resta  0.7 h
+  [  4/100] run   3 · CT   63.04 s · SR 96.5% ·   28.2 s · resta  0.7 h

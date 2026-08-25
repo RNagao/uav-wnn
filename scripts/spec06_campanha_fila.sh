@@ -22,6 +22,12 @@
 #     bash scripts/spec06_campanha_fila.sh            # roda
 #     bash scripts/spec06_campanha_fila.sh --listar   # mostra a fila e o estado
 #     PARALELO=3 bash scripts/spec06_campanha_fila.sh # deixa folga p/ outro treino
+#
+# NICE. As corridas rodam com prioridade rebaixada (`nice -n 10`). O treino do
+# Algoritmo 4.4 é SINGLE-THREAD e satura um núcleo; sem o `nice`, N corridas
+# disputando com ele em igualdade roubariam fatias de tempo e o treino perderia
+# vazão. Rebaixadas, elas só pegam núcleo que o treino não quer — e como há 12
+# núcleos e o treino usa 1, isso é quase o tempo todo.
 set -u
 cd "$(dirname "$0")/.."
 RAIZ=$(pwd); PARALELO=${PARALELO:-6}; SIGMAS=${SIGMAS:-10}
@@ -76,13 +82,16 @@ uma() {
   [ "$CKPT" != "-" ] && ARGS+=(--checkpoint "$CKPT")
   [ -n "$DEG" ] && ARGS+=(--gate "$GATE" --sigmas "$SIGMAS" --degraus "$DEG")
   export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+  local NICE=${NICE:-10}
   if [ "$MOD" = "maddpg" ]; then
-    uv run --group baseline python scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
+    nice -n "$NICE" uv run --group baseline python \
+      scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
   else
-    uv run python scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
+    nice -n "$NICE" uv run python \
+      scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
   fi
 }
-export -f uma; export RAIZ SIGMAS
+export -f uma; export RAIZ SIGMAS NICE
 
 if [ "${1:-}" = "--listar" ]; then
   fila | while IFS='|' read -r MOD ROT NA NS REG CKPT GATE TRNS; do

@@ -1,0 +1,25 @@
+maddpg · Na=2 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   18.04 s · SR 100.0% ·    5.4 s · resta  0.1 h
+  [  2/100] run   1 · CT   18.03 s · SR 100.0% ·    5.0 s · resta  0.1 h
+  [  3/100] run   2 · CT   18.29 s · SR 100.0% ·    5.0 s · resta  0.1 h
+  [  4/100] run   3 · CT   18.05 s · SR 100.0% ·    5.0 s · resta  0.1 h
+  [  5/100] run   4 · CT   18.21 s · SR 100.0% ·    5.0 s · resta  0.1 h
+  [  6/100] run   5 · CT   18.06 s · SR 100.0% ·    5.9 s · resta  0.1 h
+  [  7/100] run   6 · CT   18.05 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [  8/100] run   7 · CT   18.46 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [  9/100] run   8 · CT   18.13 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [ 10/100] run   9 · CT   18.28 s · SR 100.0% ·    5.4 s · resta  0.1 h
+  [ 11/100] run  10 · CT   18.44 s · SR 100.0% ·    5.5 s · resta  0.1 h
+  [ 12/100] run  11 · CT   17.99 s · SR 100.0% ·    5.2 s · resta  0.1 h
+  [ 13/100] run  12 · CT   18.35 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [ 14/100] run  13 · CT   18.39 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [ 15/100] run  14 · CT   18.29 s · SR 100.0% ·    5.4 s · resta  0.1 h
+  [ 16/100] run  15 · CT   18.33 s · SR 100.0% ·    5.5 s · resta  0.1 h
+  [ 17/100] run  16 · CT   18.37 s · SR 100.0% ·    5.5 s · resta  0.1 h
+  [ 18/100] run  17 · CT   18.19 s · SR 100.0% ·    5.9 s · resta  0.1 h
+  [ 19/100] run  18 · CT   18.23 s · SR 100.0% ·    5.3 s · resta  0.1 h
+  [ 20/100] run  19 · CT   17.94 s · SR 100.0% ·    5.2 s · resta  0.1 h
+  [ 21/100] run  20 · CT   18.00 s · SR 100.0% ·    5.5 s · resta  0.1 h
+  [ 22/100] run  21 · CT   17.84 s · SR 100.0% ·    5.4 s · resta  0.1 h
+  [ 23/100] run  22 · CT   20.23 s · SR 99.5% ·    5.2 s · resta  0.1 h
+  [ 24/100] run  23 · CT   18.45 s · SR 100.0% ·    5.3 s · resta  0.1 h

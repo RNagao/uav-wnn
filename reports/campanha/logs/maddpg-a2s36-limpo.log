@@ -1,0 +1,9 @@
+maddpg · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   33.43 s · SR 100.0% ·   15.0 s · resta  0.4 h
+  [  2/100] run   1 · CT   33.99 s · SR 100.0% ·   15.4 s · resta  0.4 h
+  [  3/100] run   2 · CT   33.88 s · SR 100.0% ·   15.0 s · resta  0.4 h
+  [  4/100] run   3 · CT   41.02 s · SR 98.5% ·   15.2 s · resta  0.4 h
+  [  5/100] run   4 · CT   33.72 s · SR 100.0% ·   15.0 s · resta  0.4 h
+  [  6/100] run   5 · CT   33.84 s · SR 100.0% ·   15.4 s · resta  0.4 h
+  [  7/100] run   6 · CT   33.59 s · SR 100.0% ·   16.5 s · resta  0.4 h
+  [  8/100] run   7 · CT   38.64 s · SR 99.0% ·   15.9 s · resta  0.4 h
