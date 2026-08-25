@@ -23,11 +23,14 @@ Multiagente: **parameter sharing** + **recompensa/Na**. É o ponto #1 de
 | `ntupla_dissertacao-a1s12` | Na=1, Ns=12 | 67 | SR 91% · cob 95,4% | completo |
 | `ntupla_dissertacao-a2s24` | Na=2, Ns=24 | 72 | SR 91% · cob 96,7% | completo |
 | `ntupla_dissertacao-a4s24` | Na=4, Ns=24 | 83 | **SR 100% · cob 100%** | completo |
-| `ntupla_dissertacao-a8s24` | Na=8, Ns=24 | 104 | SR ~0% · cob ~83% | **incompleto** (não fechou; só melhor validação parcial) |
 
 Cada pasta: `ntupla_dissertacao-ator.npz` (a política), `-critico.npz` (auxiliar
 de treino), `termometro.npz` (limiares — **estado treinado**, viaja com o modelo)
 e `familia.txt`.
+
+> **Na=8 não fechou** (limite provável do crítico descentralizado). O parcial fica
+> em [`em-treino/`](em-treino/README.md) com o comando `--retomar` para **concluir
+> noutra máquina** — retomando de onde parou ou recomeçando do zero.
 
 ## Como carregar
 
