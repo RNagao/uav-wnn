@@ -27,3 +27,4 @@ results/**/episodios.csv
 # artefatos de corrida da SPEC-06: 4,9 GB de checkpoints e métricas por corrida.
 # Os resultados agregados vão em reports/, que é o que a PR precisa carregar.
 runs/spec06-desempate/
+.campanha.pgid

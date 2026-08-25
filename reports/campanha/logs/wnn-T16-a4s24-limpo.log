@@ -1,1 +1,5 @@
-não achei o T de runs/spec06-multi/ntupla_dissertacao-a4s24-T16/checkpoints/final: sem procedencia.json nem config.json
+wnn-T16 · Na=4 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   75.24 s · SR 92.0% ·   33.5 s · resta  0.9 h
+  [  2/100] run   1 · CT   74.36 s · SR 92.0% ·   30.7 s · resta  0.9 h
+  [  3/100] run   2 · CT   72.99 s · SR 92.5% ·   33.8 s · resta  0.9 h
+  [  4/100] run   3 · CT   80.00 s · SR 91.0% ·   33.5 s · resta  0.9 h

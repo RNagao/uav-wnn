@@ -85,3 +85,21 @@ wnn-T32 · Na=2 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 83/100] run  82 · CT  105.41 s · SR 84.5% ·   16.3 s · resta  0.1 h
   [ 84/100] run  83 · CT   77.82 s · SR 90.0% ·   14.9 s · resta  0.1 h
   [ 85/100] run  84 · CT  110.66 s · SR 83.5% ·   16.4 s · resta  0.1 h
+  [ 86/100] run  85 · CT   91.61 s · SR 87.5% ·   16.1 s · resta  0.1 h
+  [ 87/100] run  86 · CT   88.02 s · SR 88.0% ·   16.5 s · resta  0.1 h
+  [ 88/100] run  87 · CT   96.78 s · SR 86.0% ·   16.1 s · resta  0.1 h
+  [ 89/100] run  88 · CT   97.65 s · SR 86.0% ·   16.8 s · resta  0.0 h
+  [ 90/100] run  89 · CT   81.94 s · SR 89.5% ·   17.1 s · resta  0.0 h
+  [ 91/100] run  90 · CT   93.02 s · SR 87.0% ·   16.6 s · resta  0.0 h
+  [ 92/100] run  91 · CT   99.89 s · SR 85.5% ·   16.7 s · resta  0.0 h
+  [ 93/100] run  92 · CT  109.64 s · SR 83.5% ·   17.1 s · resta  0.0 h
+  [ 94/100] run  93 · CT   89.89 s · SR 87.5% ·   16.3 s · resta  0.0 h
+  [ 95/100] run  94 · CT  107.69 s · SR 84.0% ·   16.3 s · resta  0.0 h
+  [ 96/100] run  95 · CT  109.50 s · SR 83.5% ·   17.1 s · resta  0.0 h
+  [ 97/100] run  96 · CT   95.48 s · SR 86.5% ·   17.0 s · resta  0.0 h
+  [ 98/100] run  97 · CT  111.21 s · SR 83.0% ·   15.7 s · resta  0.0 h
+  [ 99/100] run  98 · CT  104.42 s · SR 84.5% ·   15.0 s · resta  0.0 h
+  [100/100] run  99 · CT   92.27 s · SR 87.0% ·   14.7 s · resta  0.0 h
+
+-> reports/campanha/wnn-T32-a2s12-limpo.csv
+-> reports/campanha/wnn-T32-a2s12-limpo-episodios.csv

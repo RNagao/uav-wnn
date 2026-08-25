@@ -20,6 +20,7 @@
 # nesta célula?", e para respondê-la os dois braços precisam do n cheio.
 #
 #     bash scripts/spec06_campanha_fila.sh            # roda
+#     bash scripts/spec06_campanha_fila.sh --parar    # para a fila E as corridas
 #     bash scripts/spec06_campanha_fila.sh --listar   # mostra a fila e o estado
 #     PARALELO=3 bash scripts/spec06_campanha_fila.sh # deixa folga p/ outro treino
 #
@@ -93,6 +94,20 @@ uma() {
 }
 export -f uma; export RAIZ SIGMAS NICE
 
+# PARAR. Matar o PID deste script NÃO basta: o `xargs` é filho e sobrevive ao
+# pai, continuando a lançar corridas — aconteceu, e seis novas subiram depois de
+# eu "parar" a fila. `--parar` mata o grupo inteiro pelo PGID.
+if [ "${1:-}" = "--parar" ]; then
+  ALVO=$(cat .campanha.pgid 2>/dev/null || true)
+  if [ -n "$ALVO" ] && kill -0 -- "-$ALVO" 2>/dev/null; then
+    kill -- "-$ALVO" && echo "grupo $ALVO encerrado (fila + corridas)"
+    rm -f .campanha.pgid
+  else
+    echo "nenhuma fila registrada em .campanha.pgid"
+  fi
+  exit 0
+fi
+
 if [ "${1:-}" = "--listar" ]; then
   fila | while IFS='|' read -r MOD ROT NA NS REG CKPT GATE TRNS; do
     case "$REG" in
@@ -111,4 +126,7 @@ if [ "${1:-}" = "--listar" ]; then
   done
   exit 0
 fi
-fila | xargs -d '\n' -P "$PARALELO" -I{} bash -c 'uma "$@"' _ {}
+# Roda o `xargs` num grupo de processos próprio (`setsid`) e registra o PGID,
+# para que `--parar` derrube fila e corridas de uma vez.
+setsid bash -c "echo \$\$ > '$RAIZ/.campanha.pgid'; exec xargs -d '\n' -P $PARALELO -I{} bash -c 'uma \"\$@\"' _ {}" <<< "$(fila)"
+rm -f "$RAIZ/.campanha.pgid"

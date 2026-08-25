@@ -1,0 +1,2 @@
+run,modelo,num_drones,num_sensores,treinado_em_ns,transferencia,regime,episodios,seed_inicial,completion_time_medio,completion_time_std_episodios,taxa_sucesso,coleta_media,separacao_media_m,params_ator,bytes_ator_fp32,mult_fp,latencia_mediana_us,latencia_p99_us,wall_s
+0,wnn-T16,4,36,24,1,limpo,200,0,73.925,117.7683,0.93,18.3356,77.771,73377,1927106,4,248.37,342.705,42.86

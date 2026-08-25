@@ -1,0 +1,5 @@
+run,modelo,num_drones,num_sensores,treinado_em_ns,transferencia,regime,episodios,seed_inicial,completion_time_medio,completion_time_std_episodios,taxa_sucesso,coleta_media,separacao_media_m,params_ator,bytes_ator_fp32,mult_fp,latencia_mediana_us,latencia_p99_us,wall_s
+0,wnn-T16,4,24,24,0,limpo,200,0,75.2375,126.0862,0.92,24.8932,74.81,73377,1927106,4,236.856,298.358,33.55
+1,wnn-T16,4,24,24,0,limpo,200,200,74.36,126.2046,0.92,24.8752,61.497,73377,1927106,4,219.894,326.265,30.67
+2,wnn-T16,4,24,24,0,limpo,200,400,72.9875,122.3831,0.925,25.3159,47.12,73377,1927106,4,231.89,315.293,33.81
+3,wnn-T16,4,24,24,0,limpo,200,600,80.005,132.8813,0.91,30.2746,57.856,73377,1927106,4,154.044,309.198,33.54
