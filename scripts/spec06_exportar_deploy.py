@@ -151,9 +151,14 @@ distinguível do ruído, acima é sinal de poda excessiva."""
 
 
 def verificar_comportamento(origem: Path, destino: Path, na: int, ns: int,
-                            n_sementes: int) -> dict:
-    """SR dos dois artefatos no banco de teste — a verificação de um export
-    PODADO, cuja ação muda por construção."""
+                            n_sementes: int, sementes=None) -> dict:
+    """SR dos dois artefatos — a verificação de um export PODADO, cuja ação muda
+    por construção.
+
+    `sementes` explícitas têm precedência; sem elas, usa o banco de TESTE (o
+    caso da CLI, pós-hoc). Os treinadores passam o banco de VAL: a poda é uma
+    decisão sobre o modelo, e decisões não podem consumir o teste.
+    """
     import logging
     import random
     from spec06_campanha_wnn import montar
@@ -162,7 +167,8 @@ def verificar_comportamento(origem: Path, destino: Path, na: int, ns: int,
 
     cfg = LAMENZA_003(na, ns, phase="eval")
     H = list(logging.getLogger().handlers)
-    sementes = carregar_bancos(na, ns).test.sementes[:n_sementes]
+    if sementes is None:
+        sementes = carregar_bancos(na, ns).test.sementes[:n_sementes]
 
     def sr_de(caminho):
         pol, _ = montar("ntupla_dissertacao", cfg, caminho)
@@ -191,6 +197,36 @@ def verificar_comportamento(origem: Path, destino: Path, na: int, ns: int,
     cheio, podado = sr_de(origem), sr_de(destino)
     return {"sr_cheio": cheio, "sr_podado": podado,
             "ok": (cheio - podado) * 100 <= TOL_SR_PP}
+
+
+PODA_PADRAO = 0.7
+"""Fração padrão do pós-treino. Medido com 500 sementes: 70 % custa 0,8 pp de SR
+na política forte (dentro do ruído) e nada na fraca; 90 % já custa 3 pp. Ver
+`reports/spec06-memoria-wnn.md`."""
+
+
+def deploy_pos_treino(final: Path, na: int, ns: int, sementes,
+                      poda: float = PODA_PADRAO) -> dict:
+    """O passo padrão pós-treino: grava `<checkpoints>/deploy` podado e VERIFICADO.
+
+    Três invariantes:
+      * o checkpoint de treino fica INTACTO — de rede podada não se retoma
+        treino, e o crítico segue só no `final`/`melhor`;
+      * a verificação usa as `sementes` dadas (o banco de VAL do treinador) —
+        a poda é decisão sobre o modelo e não pode consumir o teste;
+      * se o SR cair além de `TOL_SR_PP`, o deploy é regravado SEM poda
+        (só f32/u16) — o passo nunca piora o artefato publicado, e o motivo
+        fica no dicionário devolvido (vai para a procedência).
+    """
+    destino = final.parent / "deploy"
+    r = exportar(final, destino, poda)
+    v = verificar_comportamento(final, destino, na, ns, 0, sementes=sementes)
+    if not v["ok"]:
+        r = exportar(final, destino, 0.0)
+        return {**r, **v, "poda": 0.0,
+                "motivo": f"poda {poda:.0%} derrubou SR "
+                          f"{v['sr_cheio']:.1%}→{v['sr_podado']:.1%}; deploy sem poda"}
+    return {**r, **v, "poda": poda}
 
 
 def main() -> int:
@@ -235,17 +271,21 @@ def main() -> int:
         rot = f"{origem.parent.name}/{origem.name}"
         if a.poda:
             v = verificar_comportamento(origem, destino, na, ns, a.sementes_verif)
-            falhou |= not v["ok"]
+            if not v["ok"]:
+                # FALLBACK, como no pós-treino: um artefato reprovado não pode
+                # ficar no disco parecendo publicável. Regrava sem poda — o
+                # export nunca piora o que seria publicado.
+                t = exportar(origem, destino, 0.0)
             print(f"{rot:<22}{t['origem_kb']:>8.0f}K{t['deploy_kb']:>9.0f}K"
                   f"{t['reducao']:>8.1f}×{v['sr_cheio']:>9.1%}{v['sr_podado']:>10.1%}  "
-                  f"{'OK' if v['ok'] else 'CAIU >' + f'{TOL_SR_PP:.0f}pp'}")
+                  f"{'OK' if v['ok'] else f'CAIU >{TOL_SR_PP:.0f}pp → deploy SEM poda'}")
         else:
             v = verificar(origem, destino, na, ns)
             falhou |= not v["ok"]
             print(f"{rot:<22}{t['origem_kb']:>8.0f}K{t['deploy_kb']:>9.0f}K"
                   f"{t['reducao']:>8.1f}×{v['dif_max']:>12.2e}  "
                   f"{'OK' if v['ok'] else 'FALHOU (> ' + f'{TOL_REL:.0e}' + ')'}")
-    if falhou:
+    if falhou and not a.poda:
         print("\nalgum export mudou a ação além do tolerado — NÃO publique estes.")
         return 1
     if a.poda:

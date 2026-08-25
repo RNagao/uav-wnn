@@ -46,10 +46,35 @@ T32 a2s24:
   float32  SR 91,0 %  CT 80,860 s   → idênticos
 ```
 
+## Poda (padrão pós-treino desde 25/08)
+
+Os treinadores (`spec06_treino_multiagente.py`, `spec06_busca.py` no modo
+`longa`) gravam `checkpoints/deploy` **podado a 70 %** e verificado no banco de
+VAL, com fallback automático para sem-poda se o SR cair mais de 2 pp. O
+checkpoint de treino fica intacto — de rede podada não se retoma treino.
+
+Estado destes artefatos (verificação com 200 sementes de teste):
+
+| modelo | deploy | poda | SR cheio → podado |
+|---|---|---|---|
+| T16/a1s12 | **144 KB** | 70 % | 97,5 % → 96,0 % |
+| T16/a2s24 | **276 KB** | 70 % | 88,0 % → 93,0 % |
+| T16/a4s24 | 943 KB | **sem poda** (caiu 4,0 pp) | 95,5 % → 91,5 % |
+| T16/a8s24 | **325 KB** | 70 % | 87,5 % → 90,5 % |
+| T32/a1s12 | **276 KB** | 70 % | 80,5 % → 83,0 % |
+| T32/a2s24 | **500 KB** | 70 % | 94,0 % → 93,0 % |
+| T32/a4s24 | 1896 KB | **sem poda** (caiu 3,5 pp) | 98,0 % → 94,5 % |
+
+A fração tolerável é POR CÉLULA — as duas `a4s24` perdem mais de 2 pp a 70 % e
+ficam sem poda. Curioso e ainda sem explicação: três células MELHORARAM com a
+poda (+3 a +5 pp); com 200 sementes o ruído é ±2,3 pp, então o efeito no
+`T16/a2s24` (+5 pp) parece real — hipótese: a cauda removida continha resíduos
+de exploração que atrapalhavam, o mesmo mecanismo do dithering.
+
 ## Reproduzir
 
 ```bash
-uv run python scripts/spec06_exportar_deploy.py --todos
+uv run python scripts/spec06_exportar_deploy.py --todos --poda 0.7
 ```
 
 ## O que isto NÃO resolve

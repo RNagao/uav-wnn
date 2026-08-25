@@ -445,6 +445,21 @@ def uma(args: tuple) -> dict:
     if nz is not None:
         nz.congelar()
     salvar_checkpoint("final")
+    # Poda pós-treino padrão — SÓ em corrida de orçamento real: um ponto de
+    # grade a 200 mil passos não vira artefato de implantação, e a verificação
+    # (100 episódios de val) custaria mais que o ponto inteiro.
+    if b >= 1_000_000:
+        try:
+            from spec06_exportar_deploy import deploy_pos_treino
+            dep = deploy_pos_treino(corrida.dir / "checkpoints" / "final",
+                                    cfg_av.num_drones, cfg_av.num_sensors,
+                                    sementes=bancos.val.sementes[:100])
+            print(f"  deploy podado ({dep.get('poda', 0):.0%}): "
+                  f"{dep['deploy_kb']:.0f} KB · SR {dep['sr_cheio']:.1%}"
+                  f"→{dep['sr_podado']:.1%} (val)"
+                  + (f" · {dep['motivo']}" if "motivo" in dep else ""), flush=True)
+        except Exception as e:                                # noqa: BLE001
+            print(f"  aviso: deploy pós-treino falhou ({e})", flush=True)
 
     # AVALIA O CHECKPOINT DE MELHOR VALIDAÇÃO, não a rede viva — e a diferença foi
     # medida, não presumida.

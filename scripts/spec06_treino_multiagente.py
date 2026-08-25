@@ -232,6 +232,25 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
                        "critico": "descentralizado (Alg. 4.4)"},
             "passos": passos, "episodios": ep, "melhor_val_cobertura": melhor,
             "metrica_test": metr, "fonte": "spec06_treino_multiagente.py"}
+    # Poda pós-treino PADRÃO: `checkpoints/deploy` podado e verificado no VAL.
+    # Nunca falha o treino — um erro aqui perde o artefato de deploy, não a
+    # corrida — e nunca toca `final`/`melhor`.
+    try:
+        from spec06_exportar_deploy import deploy_pos_treino
+        dep = deploy_pos_treino(saida / "checkpoints" / "final", na, ns,
+                                sementes=bancos.val.sementes[:100])
+        proc["deploy"] = {k: dep[k] for k in
+                          ("poda", "deploy_kb", "sr_cheio", "sr_podado")
+                          if k in dep} | ({"motivo": dep["motivo"]}
+                                          if "motivo" in dep else {})
+        print(f"deploy podado ({dep.get('poda', 0):.0%}): "
+              f"{dep['deploy_kb']:.0f} KB · SR {dep['sr_cheio']:.1%}"
+              f"→{dep['sr_podado']:.1%} (val)"
+              + (f" · {dep['motivo']}" if "motivo" in dep else ""), flush=True)
+    except Exception as e:                                    # noqa: BLE001
+        proc["deploy"] = {"erro": str(e)}
+        print(f"aviso: deploy pós-treino falhou ({e}); final/melhor intactos",
+              flush=True)
     saida.mkdir(parents=True, exist_ok=True)
     (saida / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
     (melhor_dir / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
