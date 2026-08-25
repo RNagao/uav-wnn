@@ -4,3 +4,33 @@ wnn-T16 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [  2/100] run   1 · CT   75.63 s · SR 94.5% ·   26.2 s · resta  0.7 h
   [  3/100] run   2 · CT   81.25 s · SR 93.0% ·   25.8 s · resta  0.7 h
   [  4/100] run   3 · CT   69.12 s · SR 96.0% ·   27.2 s · resta  0.7 h
+  [  5/100] run   4 · CT   85.78 s · SR 92.5% ·   26.7 s · resta  0.7 h
+  [  6/100] run   5 · CT   81.25 s · SR 93.0% ·   27.3 s · resta  0.7 h
+  [  7/100] run   6 · CT   75.01 s · SR 94.5% ·   27.7 s · resta  0.7 h
+  [  8/100] run   7 · CT   72.68 s · SR 95.0% ·   30.4 s · resta  0.7 h
+  [  9/100] run   8 · CT   76.89 s · SR 94.0% ·   30.6 s · resta  0.7 h
+  [ 10/100] run   9 · CT   65.98 s · SR 96.5% ·   29.1 s · resta  0.7 h
+  [ 11/100] run  10 · CT   69.41 s · SR 95.5% ·   28.9 s · resta  0.7 h
+  [ 12/100] run  11 · CT   82.24 s · SR 93.0% ·   30.0 s · resta  0.7 h
+  [ 13/100] run  12 · CT   79.67 s · SR 93.5% ·   30.4 s · resta  0.7 h
+  [ 14/100] run  13 · CT   81.53 s · SR 93.0% ·   28.9 s · resta  0.7 h
+  [ 15/100] run  14 · CT   75.15 s · SR 94.5% ·   28.6 s · resta  0.7 h
+  [ 16/100] run  15 · CT   71.08 s · SR 95.5% ·   29.3 s · resta  0.7 h
+  [ 17/100] run  16 · CT   74.46 s · SR 94.5% ·   27.6 s · resta  0.7 h
+  [ 18/100] run  17 · CT   76.96 s · SR 94.0% ·   28.6 s · resta  0.6 h
+  [ 19/100] run  18 · CT   69.07 s · SR 95.5% ·   27.9 s · resta  0.6 h
+  [ 20/100] run  19 · CT   73.29 s · SR 94.5% ·   29.3 s · resta  0.6 h
+  [ 21/100] run  20 · CT   62.44 s · SR 97.5% ·   29.3 s · resta  0.6 h
+  [ 22/100] run  21 · CT   84.21 s · SR 92.5% ·   29.4 s · resta  0.6 h
+  [ 23/100] run  22 · CT   73.86 s · SR 95.0% ·   29.4 s · resta  0.6 h
+  [ 24/100] run  23 · CT   65.43 s · SR 96.5% ·   31.9 s · resta  0.6 h
+  [ 25/100] run  24 · CT   62.12 s · SR 97.5% ·   32.7 s · resta  0.6 h
+  [ 26/100] run  25 · CT   84.47 s · SR 92.5% ·   31.9 s · resta  0.6 h
+  [ 27/100] run  26 · CT   83.82 s · SR 92.5% ·   32.4 s · resta  0.6 h
+  [ 28/100] run  27 · CT   79.64 s · SR 93.0% ·   30.9 s · resta  0.6 h
+  [ 29/100] run  28 · CT   64.04 s · SR 97.0% ·   32.8 s · resta  0.6 h
+  [ 30/100] run  29 · CT   70.53 s · SR 95.5% ·   31.8 s · resta  0.6 h
+  [ 31/100] run  30 · CT   71.90 s · SR 95.0% ·   32.1 s · resta  0.6 h
+  [ 32/100] run  31 · CT   78.43 s · SR 93.5% ·   31.2 s · resta  0.6 h
+  [ 33/100] run  32 · CT   74.10 s · SR 94.5% ·   31.3 s · resta  0.5 h
+  [ 34/100] run  33 · CT   77.17 s · SR 94.0% ·   28.8 s · resta  0.5 h

@@ -1,27 +1,39 @@
-"""Progresso da campanha comparável (`spec06_campanha_completa.py`).
-
-Lê os CSVs — não os logs — porque cada run é anexada assim que fecha, e o CSV é
-a mesma fonte que o relatório vai usar. O ETA sai do tempo por run já gravado
-(`wall_s`), que é o único preditor honesto: a vazão muda por ordem de grandeza
-entre `Na=1` e `Na=8`, e uma taxa global mentiria nos dois extremos.
+"""Monitor em tempo real da campanha comparável (`spec06_campanha_completa.py`).
 
     uv run python scripts/spec06_campanha_painel.py
-    watch -n 120 'uv run python scripts/spec06_campanha_painel.py'
+    watch -n 60 -c 'uv run python scripts/spec06_campanha_painel.py'
+
+O UNIVERSO VEM DA FILA, NÃO DOS ARQUIVOS. Ler só os CSVs existentes mostraria
+"3 de 3 prontas" quando faltam 84 — o painel tem de saber o que ainda não
+começou. Por isso chama `spec06_campanha_fila.sh --listar`, que é a mesma fonte
+que o executor usa.
+
+O ETA DE CADA CORRIDA sai do `wall_s` já gravado por run, não de uma taxa global:
+a vazão muda por ordem de grandeza entre `Na=1/Ns=12` e `Na=8/Ns=36`, e uma taxa
+única mentiria nos dois extremos. O ETA GLOBAL divide o trabalho restante pela
+vazão agregada observada — e é otimista por construção, porque as corridas
+pesadas tendem a ficar para o fim.
 """
 
 from __future__ import annotations
 
 import csv
+import re
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 DIR = RAIZ / "reports" / "campanha"
+FILA = RAIZ / "scripts" / "spec06_campanha_fila.sh"
 ALVO = 100
+LOG_TREINO = sorted(RAIZ.glob("reports/spec06-multi-*.log"))
+
+_LINHA = re.compile(r"^(\S+)\s+Na=(\d+)\s+Ns=(\d+)\s+(\S+)\s+(\d+)/100\s+(.*)$")
 
 
-def _barra(f: float, larg: int = 14) -> str:
+def _barra(f: float, larg: int = 12) -> str:
     c = int(max(0.0, min(1.0, f)) * larg)
     return "█" * c + "░" * (larg - c)
 
@@ -33,33 +45,131 @@ def _hm(seg: float) -> str:
     return f"{h:>3}h{m:02d}m" if h else f"    {m:>2}m"
 
 
+def universo() -> list[dict]:
+    """A fila inteira, do próprio script que a executa."""
+    try:
+        saida = subprocess.run(["bash", str(FILA), "--listar"], capture_output=True,
+                               text=True, timeout=60, cwd=RAIZ).stdout
+    except Exception as e:                      # noqa: BLE001
+        print(f"não consegui ler a fila ({e})"); return []
+    itens = []
+    for l in saida.splitlines():
+        m = _LINHA.match(l.rstrip())
+        if m:
+            rot, na, ns, reg, feitas, st = m.groups()
+            itens.append({"rotulo": rot, "na": int(na), "ns": int(ns), "regime": reg,
+                          "estado": st.strip(),
+                          "transf": "transf" in st})
+    return itens
+
+
+def progresso(it: dict) -> tuple[int, float, float, float]:
+    """`(runs, wall_medio, ct_medio, sr_medio)` do CSV daquela corrida."""
+    arq = DIR / f"{it['rotulo']}-a{it['na']}s{it['ns']}-{it['regime']}.csv"
+    if not arq.exists():
+        return 0, 0.0, float("nan"), float("nan")
+    L = list(csv.DictReader(arq.open(newline="")))
+    if not L:
+        return 0, 0.0, float("nan"), float("nan")
+    n = len(L)
+    w = sum(float(x["wall_s"]) for x in L) / n
+    ct = sum(float(x["completion_time_medio"]) for x in L) / n
+    sr = sum(float(x["taxa_sucesso"]) for x in L) / n
+    return n, w, ct, sr
+
+
+def em_voo() -> set[tuple[str, int, int, str]]:
+    """Corridas com processo vivo — para separar 'andando' de 'parada no meio'."""
+    try:
+        ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True,
+                            timeout=20).stdout
+    except Exception:                            # noqa: BLE001
+        return set()
+    vivos = set()
+    for l in ps.splitlines():
+        if "spec06_campanha_completa.py" not in l or ".venv/bin/python3" not in l:
+            continue
+        r = re.search(r"--rotulo (\S+).*--na (\d+).*--ns (\d+).*--ruido (\S+)", l)
+        if not r:
+            continue
+        reg = r.group(4)
+        if reg == "sorteio":
+            s = re.search(r"--sigmas (\S+)", l); d = re.search(r"--degraus (\S+)", l)
+            sig = (s.group(1) if s else "10").replace(",", "-")
+            reg = f"sigma{sig}-" + {"1": "sem-kf", "4": "com-kf"}.get(
+                d.group(1) if d else "", "mix")
+        vivos.add((r.group(1), int(r.group(2)), int(r.group(3)), reg))
+    return vivos
+
+
 def main() -> int:
-    if not DIR.exists():
-        print("campanha ainda não começou"); return 0
+    itens = universo()
+    if not itens:
+        return 1
+    vivos = em_voo()
     print(f"{time.strftime('%d/%m %H:%M:%S')}   CAMPANHA COMPARÁVEL\n")
-    print(f"   {'':14} {'':>6} {'modelo · célula · regime':<34} "
-          f"{'CT médio':>10} {'SR':>7} {'resta':>8}")
-    faltas = []
-    for arq in sorted(DIR.glob("*.csv")):
-        if arq.name.endswith("-episodios.csv"):
-            continue
-        linhas = list(csv.DictReader(arq.open(newline="")))
-        if not linhas:
-            continue
-        n = len(linhas)
-        # média das runs — a figura que a campanha existe para produzir
-        ct = sum(float(x["completion_time_medio"]) for x in linhas) / n
-        sr = sum(float(x["taxa_sucesso"]) for x in linhas) / n
-        wall = sum(float(x["wall_s"]) for x in linhas) / n
-        eta = wall * (ALVO - n)
-        faltas.append(eta)
-        rot = arq.stem.replace("-", " · ", 1).replace("-", " · ")
-        marca = "PRONTO" if n >= ALVO else f"{n:>3}/{ALVO}"
-        print(f"   {_barra(n / ALVO)} {marca:>6} {rot:<34} "
-              f"{ct:>9.1f}s {sr:>6.1%} {_hm(eta) if n < ALVO else '':>8}")
-    if faltas:
-        print(f"\n   -> a última fecha em ~{_hm(max(faltas)).strip()} "
-              f"(6 em paralelo; a soma sequencial seria maior)")
+
+    feitas = fila = bloqueadas = 0
+    runs_ok = runs_tot = 0
+    voando, parciais = [], []
+    for it in itens:
+        n, w, ct, sr = progresso(it)
+        it.update(runs=n, wall=w, ct=ct, sr=sr)
+        chave = (it["rotulo"], it["na"], it["ns"], it["regime"])
+        it["voando"] = chave in vivos
+        runs_tot += ALVO
+        runs_ok += min(n, ALVO)
+        if "PULA" in it["estado"]:
+            bloqueadas += 1
+        elif n >= ALVO:
+            feitas += 1
+        elif it["voando"]:
+            voando.append(it)
+        elif n > 0:
+            parciais.append(it)
+        else:
+            fila += 1
+
+    frac = runs_ok / runs_tot if runs_tot else 0.0
+    print(f"   {_barra(frac, 28)} {frac:>5.1%}   "
+          f"{runs_ok:,}/{runs_tot:,} runs  ·  {runs_ok*200:,} episódios\n")
+    print(f"   {feitas} prontas · {len(voando)} em voo · {len(parciais)} paradas no meio"
+          f" · {fila} na fila · {bloqueadas} bloqueadas\n")
+
+    def linha(it, marca=""):
+        rot = f"{it['rotulo']} a{it['na']}s{it['ns']} {it['regime']}"
+        tt = "ᵗ" if it["transf"] else " "
+        eta = it["wall"] * (ALVO - it["runs"]) if it["wall"] else float("nan")
+        met = (f"{it['ct']:>7.1f}s {it['sr']:>6.1%}" if it["ct"] == it["ct"]
+               else f"{'—':>7} {'—':>6}")
+        print(f"   {_barra(it['runs']/ALVO)} {it['runs']:>3}/{ALVO} "
+              f"{rot:<34}{tt} {met} {_hm(eta) if marca != 'x' else '  parada':>8}")
+
+    if voando:
+        print("   EM VOO")
+        for it in sorted(voando, key=lambda x: -x["runs"]):
+            linha(it)
+    if parciais:
+        print("\n   PARADAS NO MEIO (relançar a fila as retoma do cache)")
+        for it in sorted(parciais, key=lambda x: -x["runs"]):
+            linha(it, "x")
+
+    # ETA global pela vazão agregada observada, não por corrida
+    if voando:
+        vazao = sum(1.0 / it["wall"] for it in voando if it["wall"] > 0)  # runs/s
+        resta = runs_tot - runs_ok - bloqueadas * ALVO
+        if vazao > 0:
+            print(f"\n   restam {resta:,} runs · vazão {vazao*3600:.0f} runs/h"
+                  f" · ETA global ~{_hm(resta / vazao).strip()}"
+                  "  (otimista: as pesadas ficam para o fim)")
+    if bloqueadas:
+        print(f"\n   {bloqueadas} bloqueadas — sem checkpoint ou sem atestado; "
+              "a fila as pula e avisa")
+
+    for lg in LOG_TREINO:
+        ult = [l for l in lg.read_text(errors="replace").splitlines() if l.startswith("[")]
+        if ult and "PAROU" not in ult[-1] and "parada antecipada" not in lg.read_text():
+            print(f"\n   treino em curso · {lg.stem}: {ult[-1].strip()}")
     return 0
 
 
