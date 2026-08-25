@@ -6,3 +6,7 @@ multiagente · Na=8 Ns=24 · T=32 · N=104 RAMs · B=1248 bits · 8 trajetórias
 [ 1.0%] 100,055/10,000,000 · 646 ep · 76 passos/s · ETA 36.3 h
 [ 1.5%] 150,113/10,000,000 · 960 ep · 84 passos/s · ETA 32.7 h
 [ 2.0%] 200,151/10,000,000 · 1,272 ep · 89 passos/s · ETA 30.6 h
+   eval @ 250,111: cob 0.942 · sr 0.250  (melhor)
+[ 2.5%] 250,288/10,000,000 · 1,585 ep · 89 passos/s · ETA 30.5 h
+[ 3.0%] 300,327/10,000,000 · 1,888 ep · 88 passos/s · ETA 30.8 h
+[ 3.5%] 350,370/10,000,000 · 2,191 ep · 90 passos/s · ETA 29.8 h

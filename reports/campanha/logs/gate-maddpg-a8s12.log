@@ -1,0 +1,16 @@
+Gate RF-05/RF-04 · célula 8×12 · σ_âncora=5.0 · 100 episódios · mobilidade: MADDPG
+
+degrau 2 (passa-baixa)…
+  RMSE 7.42 m (sem P — NEES/NIS não se aplica)
+
+degrau 3 (KF vel. constante) — varrendo q_a…
+  melhor q_a=200.0 · NEES consistente
+
+degrau 4 (KF+controle) — varrendo q_w…
+  melhor q_w=1.0 · NEES consistente (2.14) · NIS consistente
+
+RF-04 (não vazamento)…
+  verde — [32m[32m[1m8 passed[0m[32m in 1.08s[0m[0m
+
+=== APROVADO === → results/etapa2/gate_rf05-maddpg-a8s12.json
+hash_filtro: 9fd94149ac6e3c5c…
