@@ -1,54 +1,54 @@
 #!/bin/bash
-# Fila da campanha comparável — 6 corridas em paralelo, retomável.
+# Fila da campanha comparável — MADDPG × WNN T16 × WNN T32.
 #
-# Cada corrida grava o CSV run a run e relê o cache ao reiniciar: matar e
-# relançar não perde nada além da run em voo. É por isso que a fila é um
-# arquivo e não um laço no Python — interromper tem de ser barato.
+# CÉLULAS: Na=1/Ns=12 (só WNN — Lamenza não publica single-drone) e as 9 células
+# multiagente da tab. 7.1 (Na ∈ {2,4,8} × Ns ∈ {12,24,36}), que são exatamente as
+# que o submodule publica checkpoint.
 #
-#     bash scripts/spec06_campanha_fila.sh            # roda a fila
-#     bash scripts/spec06_campanha_fila.sh --listar   # só mostra o que falta
+# TRANSFERÊNCIA: `d_obs` depende só de Na, não de Ns — a mesma rede WNN roda em
+# qualquer Ns. Mas a WNN foi treinada em Ns=24 e o MADDPG tem checkpoint por
+# célula, então em Ns=12 e Ns=36 o MADDPG joga em casa e a WNN transfere. O CSV
+# marca isso em `treinado_em_ns`/`transferencia`; ignorar a coluna ao montar a
+# tabela final produziria uma comparação injusta sem parecer.
 #
-# O regime de ruído é σ = 10 (o maior da escada), degraus 1–4 sorteados por
-# episódio. O regime `limpo` mede o degrau 0 com os 20 mil episódios inteiros.
+# Cada corrida grava run a run e relê o cache ao reiniciar: matar e relançar não
+# perde nada além da run em voo.
+#
+#     bash scripts/spec06_campanha_fila.sh            # roda
+#     bash scripts/spec06_campanha_fila.sh --listar   # mostra a fila e o estado
+#     PARALELO=3 bash scripts/spec06_campanha_fila.sh # deixa folga p/ outro treino
 set -u
 cd "$(dirname "$0")/.."
-RAIZ=$(pwd)
-PARALELO=${PARALELO:-6}
-SIGMAS=${SIGMAS:-10}
+RAIZ=$(pwd); PARALELO=${PARALELO:-6}; SIGMAS=${SIGMAS:-10}
 G=results/etapa2
-T16=models/T16
-T32=models/T32
+NS_TREINO=24          # o Ns em que as redes WNN multiagente foram treinadas
 
-# modelo|rótulo|Na|Ns|regime|checkpoint|gate
-FILA=$(cat <<EOF
-wnn|wnn-T16|1|12|limpo|$T16/a1s12|$G/gate_rf05-T16final.json
-wnn|wnn-T16|1|12|sorteio|$T16/a1s12|$G/gate_rf05-T16final.json
-wnn|wnn-T32|1|12|limpo|runs/spec06-longa/spec06-busca-1b/15b49e642647/0/checkpoints/final|$G/gate_rf05-T32final.json
-wnn|wnn-T32|1|12|sorteio|runs/spec06-longa/spec06-busca-1b/15b49e642647/0/checkpoints/final|$G/gate_rf05-T32final.json
-wnn|wnn-T16|2|24|limpo|$T16/a2s24|$G/gate_rf05-wnn-T16-a2s24.json
-wnn|wnn-T16|2|24|sorteio|$T16/a2s24|$G/gate_rf05-wnn-T16-a2s24.json
-wnn|wnn-T16|4|24|limpo|$T16/a4s24|$G/gate_rf05-wnn-T16-a4s24.json
-wnn|wnn-T16|4|24|sorteio|$T16/a4s24|$G/gate_rf05-wnn-T16-a4s24.json
-wnn|wnn-T16|8|24|limpo|$T16/a8s24|$G/gate_rf05-wnn-T16-a8s24.json
-wnn|wnn-T16|8|24|sorteio|$T16/a8s24|$G/gate_rf05-wnn-T16-a8s24.json
-wnn|wnn-T32|2|24|limpo|$T32/a2s24|$G/gate_rf05-wnn-T32-a2s24.json
-wnn|wnn-T32|2|24|sorteio|$T32/a2s24|$G/gate_rf05-wnn-T32-a2s24.json
-wnn|wnn-T32|4|24|limpo|$T32/a4s24|$G/gate_rf05-wnn-T32-a4s24.json
-wnn|wnn-T32|4|24|sorteio|$T32/a4s24|$G/gate_rf05-wnn-T32-a4s24.json
-maddpg|maddpg|2|24|limpo|-|$G/gate_rf05-maddpg-a2s24.json
-maddpg|maddpg|2|24|sorteio|-|$G/gate_rf05-maddpg-a2s24.json
-maddpg|maddpg|4|24|limpo|-|$G/gate_rf05-maddpg-a4s24.json
-maddpg|maddpg|4|24|sorteio|-|$G/gate_rf05-maddpg-a4s24.json
-maddpg|maddpg|8|24|limpo|-|$G/gate_rf05-maddpg-a8s24.json
-maddpg|maddpg|8|24|sorteio|-|$G/gate_rf05-maddpg-a8s24.json
-EOF
-)
+ckpt_wnn() {   # $1=T (16|32)  $2=Na
+  if [ "$2" = 1 ]; then echo "models/T$1/a1s12"; else echo "models/T$1/a${2}s${NS_TREINO}"; fi
+}
+gate_de() {    # $1=rótulo  $2=Na  $3=Ns
+  echo "$G/gate_rf05-$1-a${2}s${3}.json"
+}
+
+fila() {
+  for REG in limpo sorteio; do
+    for T in 16 32; do
+      echo "wnn|wnn-T$T|1|12|$REG|$(ckpt_wnn $T 1)|$(gate_de wnn-T$T 1 12)|12"
+    done
+    for NA in 2 4 8; do
+      for NS in 12 24 36; do
+        echo "maddpg|maddpg|$NA|$NS|$REG|-|$(gate_de maddpg $NA $NS)|$NS"
+        for T in 16 32; do
+          echo "wnn|wnn-T$T|$NA|$NS|$REG|$(ckpt_wnn $T $NA)|$(gate_de wnn-T$T $NA $NS)|$NS_TREINO"
+        done
+      done
+    done
+  done
+}
 
 uma() {
-  IFS='|' read -r MOD ROT NA NS REG CKPT GATE <<< "$1"
+  IFS='|' read -r MOD ROT NA NS REG CKPT GATE TRNS <<< "$1"
   cd "$RAIZ"
-  # Sem o checkpoint (T=32 multiagente ainda treinando) a corrida é pulada, e
-  # dizer isso é melhor que morrer no meio da fila.
   if [ "$CKPT" != "-" ] && [ ! -d "$CKPT" ]; then
     echo "PULADA: $ROT a${NA}s${NS} $REG — sem $CKPT"; return 0
   fi
@@ -59,7 +59,8 @@ uma() {
   local SUF; SUF=$([ "$REG" = "limpo" ] && echo limpo || echo "sigma${SIGMAS//,/-}")
   local LOG="reports/campanha/logs/${ROT}-a${NA}s${NS}-${SUF}.log"
   local ARGS=(--modelo "$MOD" --rotulo "$ROT" --na "$NA" --ns "$NS" --ruido "$REG"
-              --runs 100 --episodios 200 --dir-saida reports/campanha)
+              --runs 100 --episodios 200 --treinado-em-ns "$TRNS"
+              --dir-saida reports/campanha)
   [ "$CKPT" != "-" ] && ARGS+=(--checkpoint "$CKPT")
   [ "$REG" = "sorteio" ] && ARGS+=(--gate "$GATE" --sigmas "$SIGMAS" --degraus 1,2,3,4)
   export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -69,10 +70,20 @@ uma() {
     uv run python scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
   fi
 }
-export -f uma
-export RAIZ SIGMAS
+export -f uma; export RAIZ SIGMAS
 
 if [ "${1:-}" = "--listar" ]; then
-  echo "$FILA" | nl -w3 -s'  '; exit 0
+  fila | while IFS='|' read -r MOD ROT NA NS REG CKPT GATE TRNS; do
+    SUF=$([ "$REG" = "limpo" ] && echo limpo || echo "sigma${SIGMAS//,/-}")
+    CSV="reports/campanha/${ROT}-a${NA}s${NS}-${SUF}.csv"
+    F=0; [ -f "$CSV" ] && F=$(( $(wc -l < "$CSV") - 1 ))
+    ST=roda
+    [ "$CKPT" != "-" ] && [ ! -d "$CKPT" ] && ST="PULA (sem checkpoint)"
+    [ "$REG" = "sorteio" ] && [ ! -f "$GATE" ] && ST="PULA (sem atestado)"
+    [ "$F" -ge 100 ] && ST=PRONTA
+    X=$([ "$MOD" = wnn ] && [ "$TRNS" != "$NS" ] && echo " ·transf" || echo "")
+    printf '%-9s Na=%-2s Ns=%-3s %-8s %3s/100  %s%s\n' "$ROT" "$NA" "$NS" "$SUF" "$F" "$ST" "$X"
+  done
+  exit 0
 fi
-echo "$FILA" | xargs -d '\n' -P "$PARALELO" -I{} bash -c 'uma "$@"' _ {}
+fila | xargs -d '\n' -P "$PARALELO" -I{} bash -c 'uma "$@"' _ {}

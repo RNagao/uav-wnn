@@ -243,7 +243,8 @@ def rodar_episodio(amb, cfg, politica, seed: int, handlers):
 
 # --- campanha ----------------------------------------------------------------
 
-COLUNAS = ["run", "modelo", "num_drones", "num_sensores", "regime", "episodios",
+COLUNAS = ["run", "modelo", "num_drones", "num_sensores", "treinado_em_ns",
+           "transferencia", "regime", "episodios",
            "seed_inicial", "completion_time_medio", "completion_time_std_episodios",
            "taxa_sucesso", "coleta_media", "separacao_media_m", "params_ator",
            "bytes_ator_fp32", "mult_fp", "latencia_mediana_us", "latencia_p99_us",
@@ -328,6 +329,9 @@ def main() -> int:
                          "episódios inteiros em vez de uma fração do sorteio.")
     ap.add_argument("--gate", type=Path, default=None,
                     help="atestado RF-05 DESTE modelo nesta célula (degraus 3 e 4)")
+    ap.add_argument("--treinado-em-ns", type=int, default=None,
+                    help="Ns em que a rede foi TREINADA, se diferente de --ns. "
+                         "Marca a corrida como transferência no CSV.")
     ap.add_argument("--dir-saida", type=Path, default=Path("reports/campanha"))
     a = ap.parse_args()
 
@@ -347,6 +351,16 @@ def main() -> int:
     from uavwnn.refenv import LAMENZA_003
     cfg = LAMENZA_003(a.na, a.ns, phase="eval")
     politica, custo, ops, latencia = montar_politica(a, cfg)
+
+    # `d_obs` depende só de Na, NÃO de Ns — então uma rede treinada em Ns=24 roda
+    # em Ns=12/36 sem retreino. Mas isso é TRANSFERÊNCIA, e o MADDPG tem
+    # checkpoint próprio para cada uma das 9 células (joga em casa nas três).
+    # Sem esta coluna a assimetria some no CSV e a tabela final mentiria.
+    treinado_ns = a.treinado_em_ns if a.treinado_em_ns is not None else a.ns
+    transf = treinado_ns != a.ns
+    if transf:
+        print(f"  TRANSFERÊNCIA: rede treinada em Ns={treinado_ns}, avaliada em "
+              f"Ns={a.ns} (d_obs={cfg.observation_size} é o mesmo)", flush=True)
     ambientes = Ambientes(cfg, gate, limpo=(a.ruido == "limpo"))
     handlers = list(logging.getLogger().handlers)
 
@@ -392,6 +406,7 @@ def main() -> int:
         lat_med, lat_p99 = latencia()
         linha = {
             "run": r, "modelo": a.rotulo, "num_drones": a.na, "num_sensores": a.ns,
+            "treinado_em_ns": treinado_ns, "transferencia": int(transf),
             "regime": regime, "episodios": a.episodios, "seed_inicial": r * a.episodios,
             "completion_time_medio": round(float(ct.mean()), 4),
             "completion_time_std_episodios": round(float(ct.std(ddof=1)), 4),

@@ -3,3 +3,5 @@ SPEC-06 escalada multiagente · config vencedora (passo 0.0008, σ 0.35, T 32, n
 RETOMANDO de models/T32/em-treino/a8s24 (ator/crítico/termômetro carregados)
 multiagente · Na=8 Ns=24 · T=32 · N=104 RAMs · B=1248 bits · 8 trajetórias compartilhando a rede
 [ 0.5%] 50,009/10,000,000 · 325 ep · 60 passos/s · ETA 46.0 h
+[ 1.0%] 100,055/10,000,000 · 646 ep · 76 passos/s · ETA 36.3 h
+[ 1.5%] 150,113/10,000,000 · 960 ep · 84 passos/s · ETA 32.7 h
