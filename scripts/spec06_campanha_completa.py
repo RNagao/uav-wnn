@@ -64,6 +64,24 @@ SEED_SORTEIO = 20260825
 """Semente do sorteio de condição. Fixa e separada das sementes de cenário: o
 sorteio tem de ser reprodutível E independente do modelo."""
 
+NOME_DEGRAU = {0: "limpo", 1: "ruído bruto, SEM filtro", 2: "passa-baixa",
+               3: "KF velocidade constante", 4: "KF + controle"}
+
+_APELIDO = {1: "sem-kf", 4: "com-kf"}
+"""Rótulo dos dois degraus que a comparação principal usa. `1` é o piso (a medida
+crua) e `4` é a proposta; `sem-kf`/`com-kf` diz isso no nome do arquivo, que é o
+que alguém lê ao abrir a pasta. Os degraus 2 e 3 caem no genérico `d2`/`d3` —
+existem para a escada da SPEC-08, não para esta comparação."""
+
+
+def _rotulo_regime(degraus: list[int], sigmas: list[float]) -> str:
+    s = "sigma" + "-".join(f"{x:g}" for x in sigmas)
+    if len(degraus) == 1:
+        d = degraus[0]
+        return f"{s}-{_APELIDO.get(d, f'd{d}')}"
+    return s
+
+
 def montar_escada(degraus: list[int], sigmas: list[float]) -> list[tuple[int, float]]:
     """As condições sorteáveis. O degrau 0 é limpo, então σ não se aplica e ele
     entra **uma vez só** — repeti-lo por σ daria peso extra ao caso sem ruído."""
@@ -367,13 +385,18 @@ def main() -> int:
     degraus = [int(x) for x in a.degraus.split(",")]
     sigmas = [float(x) for x in a.sigmas.split(",")]
     escada = montar_escada(degraus, sigmas)
-    # O rótulo carrega a escada: sortear de {σ=10} e de {σ=1,3,5,10} dá campanhas
-    # diferentes, e escrevê-las no mesmo CSV misturaria regimes sem aviso.
-    regime = a.ruido if a.ruido == "limpo" else (
-        "sigma" + "-".join(f"{s:g}" for s in sigmas))
+    # O rótulo carrega a escada inteira: sortear de {σ=10} e de {σ=1,3,5,10}, ou
+    # fixar o degrau 1 em vez do 4, dá campanhas diferentes — escrevê-las no
+    # mesmo CSV misturaria regimes sem aviso.
+    regime = a.ruido if a.ruido == "limpo" else _rotulo_regime(degraus, sigmas)
     if a.ruido == "sorteio":
-        print(f"  escada sorteável: {len(escada)} condições "
-              f"(degraus {degraus} × σ {[f'{s:g}' for s in sigmas]})", flush=True)
+        if len(escada) == 1:
+            d, s = escada[0]
+            print(f"  regime FIXO: degrau {d} ({NOME_DEGRAU[d]}) · σ={s:g} — "
+                  f"todos os {a.runs * a.episodios:,} episódios", flush=True)
+        else:
+            print(f"  escada sorteável: {len(escada)} condições "
+                  f"(degraus {degraus} × σ {[f'{s:g}' for s in sigmas]})", flush=True)
     arq = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}.csv"
     arq_ep = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}-episodios.csv"
     feitas = ler_cache(arq, a.episodios)

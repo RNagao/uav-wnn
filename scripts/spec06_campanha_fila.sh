@@ -14,6 +14,11 @@
 # Cada corrida grava run a run e relê o cache ao reiniciar: matar e relançar não
 # perde nada além da run em voo.
 #
+# REGIMES: `limpo` (sem ruído), `sem-kf` (σ=10, medida crua — o piso) e `com-kf`
+# (σ=10, KF + entrada de controle — a proposta). Cada um é uma campanha inteira
+# de 20 mil episódios no MESMO degrau, não um sorteio: a pergunta é "o KF ajuda
+# nesta célula?", e para respondê-la os dois braços precisam do n cheio.
+#
 #     bash scripts/spec06_campanha_fila.sh            # roda
 #     bash scripts/spec06_campanha_fila.sh --listar   # mostra a fila e o estado
 #     PARALELO=3 bash scripts/spec06_campanha_fila.sh # deixa folga p/ outro treino
@@ -31,7 +36,7 @@ gate_de() {    # $1=rótulo  $2=Na  $3=Ns
 }
 
 fila() {
-  for REG in limpo sorteio; do
+  for REG in limpo sem-kf com-kf; do
     for T in 16 32; do
       echo "wnn|wnn-T$T|1|12|$REG|$(ckpt_wnn $T 1)|$(gate_de wnn-T$T 1 12)|12"
     done
@@ -52,17 +57,24 @@ uma() {
   if [ "$CKPT" != "-" ] && [ ! -d "$CKPT" ]; then
     echo "PULADA: $ROT a${NA}s${NS} $REG — sem $CKPT"; return 0
   fi
-  if [ "$REG" = "sorteio" ] && [ ! -f "$GATE" ]; then
+  # Só o `com-kf` depende do atestado: `sem-kf` é a medida crua, não há filtro
+  # para atestar. Exigir gate nele bloquearia metade da comparação à toa.
+  if [ "$REG" = "com-kf" ] && [ ! -f "$GATE" ]; then
     echo "PULADA: $ROT a${NA}s${NS} $REG — sem atestado $GATE"; return 0
   fi
   mkdir -p reports/campanha/logs
-  local SUF; SUF=$([ "$REG" = "limpo" ] && echo limpo || echo "sigma${SIGMAS//,/-}")
+  local SUF DEG RUIDO
+  case "$REG" in
+    limpo)  SUF=limpo;                        RUIDO=limpo;   DEG="" ;;
+    sem-kf) SUF="sigma${SIGMAS//,/-}-sem-kf"; RUIDO=sorteio; DEG=1  ;;
+    com-kf) SUF="sigma${SIGMAS//,/-}-com-kf"; RUIDO=sorteio; DEG=4  ;;
+  esac
   local LOG="reports/campanha/logs/${ROT}-a${NA}s${NS}-${SUF}.log"
-  local ARGS=(--modelo "$MOD" --rotulo "$ROT" --na "$NA" --ns "$NS" --ruido "$REG"
+  local ARGS=(--modelo "$MOD" --rotulo "$ROT" --na "$NA" --ns "$NS" --ruido "$RUIDO"
               --runs 100 --episodios 200 --treinado-em-ns "$TRNS"
               --dir-saida reports/campanha)
   [ "$CKPT" != "-" ] && ARGS+=(--checkpoint "$CKPT")
-  [ "$REG" = "sorteio" ] && ARGS+=(--gate "$GATE" --sigmas "$SIGMAS" --degraus 1,2,3,4)
+  [ -n "$DEG" ] && ARGS+=(--gate "$GATE" --sigmas "$SIGMAS" --degraus "$DEG")
   export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
   if [ "$MOD" = "maddpg" ]; then
     uv run --group baseline python scripts/spec06_campanha_completa.py "${ARGS[@]}" > "$LOG" 2>&1
@@ -74,12 +86,16 @@ export -f uma; export RAIZ SIGMAS
 
 if [ "${1:-}" = "--listar" ]; then
   fila | while IFS='|' read -r MOD ROT NA NS REG CKPT GATE TRNS; do
-    SUF=$([ "$REG" = "limpo" ] && echo limpo || echo "sigma${SIGMAS//,/-}")
+    case "$REG" in
+      limpo)  SUF=limpo ;;
+      sem-kf) SUF="sigma${SIGMAS//,/-}-sem-kf" ;;
+      com-kf) SUF="sigma${SIGMAS//,/-}-com-kf" ;;
+    esac
     CSV="reports/campanha/${ROT}-a${NA}s${NS}-${SUF}.csv"
     F=0; [ -f "$CSV" ] && F=$(( $(wc -l < "$CSV") - 1 ))
     ST=roda
     [ "$CKPT" != "-" ] && [ ! -d "$CKPT" ] && ST="PULA (sem checkpoint)"
-    [ "$REG" = "sorteio" ] && [ ! -f "$GATE" ] && ST="PULA (sem atestado)"
+    [ "$REG" = "com-kf" ] && [ ! -f "$GATE" ] && ST="PULA (sem atestado)"
     [ "$F" -ge 100 ] && ST=PRONTA
     X=$([ "$MOD" = wnn ] && [ "$TRNS" != "$NS" ] && echo " ·transf" || echo "")
     printf '%-9s Na=%-2s Ns=%-3s %-8s %3s/100  %s%s\n' "$ROT" "$NA" "$NS" "$SUF" "$F" "$ST" "$X"
