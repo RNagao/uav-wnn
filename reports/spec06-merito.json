@@ -1,8 +1,14 @@
 {
   "wnn": {
-    "dissertação": {
-      "persistente_kb": 1844.74609375,
-      "residente_kb": 1845.12890625,
+    "T=32 (1/12)": {
+      "persistente_kb": 974.984375,
+      "variante_principal": "ordenado",
+      "persistente_kb_por_variante": {
+        "ordenado": 974.984375,
+        "hash": 1844.74609375,
+        "denso": 3220.703125
+      },
+      "residente_kb": 975.3671875,
       "entradas_ocupadas": 70950,
       "mult_fp": 4,
       "soma_fp": 203,
@@ -10,15 +16,21 @@
       "soma_int": 804,
       "total_sem_mac": 1208
     },
-    "anbubus (abort)": {
-      "persistente_kb": 1724.68359375,
-      "residente_kb": 1725.06640625,
-      "entradas_ocupadas": 63850,
+    "T=16 (1/12)": {
+      "persistente_kb": 502.166015625,
+      "variante_principal": "ordenado",
+      "persistente_kb_por_variante": {
+        "ordenado": 502.166015625,
+        "hash": 942.033203125,
+        "denso": 1634.3671875
+      },
+      "residente_kb": 502.37109375,
+      "entradas_ocupadas": 36547,
       "mult_fp": 4,
-      "soma_fp": 203,
-      "lookups": 201,
-      "soma_int": 804,
-      "total_sem_mac": 1208
+      "soma_fp": 104,
+      "lookups": 102,
+      "soma_int": 408,
+      "total_sem_mac": 614
     }
   },
   "maddpg": {

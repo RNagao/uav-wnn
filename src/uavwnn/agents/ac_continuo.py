@@ -261,7 +261,16 @@ class NTuplaDissertacaoAprox(_PrefixoCheckpoint):
         # `RedeRegressaoEsquecimento` na família da dissertação e como
         # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
         self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
+        # O crítico é OPCIONAL: ele só existe para treinar (estima "quão boa é
+        # esta situação" e nunca escolhe ação), então um artefato de implantação
+        # traz só o ator. Sem esta tolerância, carregar um modelo de deploy morria
+        # com `FileNotFoundError` no crítico — e a mensagem não dizia que o
+        # arquivo era dispensável.
+        critico = d / f"{prefixo}-critico.npz"
+        if critico.exists():
+            self.critico = RedeGradienteFuncional.carregar(critico)
+        else:
+            self._sem_critico = True
 
     def custo(self) -> dict[str, Any]:
         """T1 e T3 pelo harness da SPEC-03, via a porta esparsa de T-05.7.
@@ -431,7 +440,16 @@ class NTuplaAnbubusAprox(_PrefixoCheckpoint):
         # `RedeRegressaoEsquecimento` na família da dissertação e como
         # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
         self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
+        # O crítico é OPCIONAL: ele só existe para treinar (estima "quão boa é
+        # esta situação" e nunca escolhe ação), então um artefato de implantação
+        # traz só o ator. Sem esta tolerância, carregar um modelo de deploy morria
+        # com `FileNotFoundError` no crítico — e a mensagem não dizia que o
+        # arquivo era dispensável.
+        critico = d / f"{prefixo}-critico.npz"
+        if critico.exists():
+            self.critico = RedeGradienteFuncional.carregar(critico)
+        else:
+            self._sem_critico = True
 
     def custo(self) -> dict[str, Any]:
         from ..custo import custo_ntuple_de_rede, operacoes_ntuple

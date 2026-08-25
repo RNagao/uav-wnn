@@ -2,3 +2,87 @@
 25/08 12:43:39  lançada wnn-T16 a2s36 limpo
 25/08 12:45:09  treino em 92 p/s (86% da base) — RECUA para alvo 1; não mato as em voo, só deixo de repor
 25/08 12:54:09  lançada wnn-T32 a2s36 limpo
+25/08 13:03:09  treino em 128 p/s (120%) · alvo 1 · em voo 1
+25/08 13:06:09  lançada wnn-T16 a4s12 limpo
+25/08 13:10:39  treino em 93 p/s (87%) — mantém alvo 1
+25/08 13:18:09  treino em 93 p/s (87%) — mantém alvo 1
+25/08 13:21:09  lançada wnn-T32 a4s12 limpo
+25/08 13:27:09  treino em 134 p/s (126%) · alvo 1 · em voo 1
+25/08 13:40:39  lançada maddpg a4s36 limpo
+25/08 13:43:39  treino em 94 p/s (88%) — mantém alvo 1
+25/08 13:51:09  treino em 94 p/s (88%) — mantém alvo 1
+25/08 13:52:39  lançada wnn-T16 a4s36 limpo
+25/08 13:58:39  treino em 144 p/s (135%) · alvo 1 · em voo 1
+25/08 14:07:39  treino em 95 p/s (89%) — mantém alvo 1
+25/08 14:24:09  treino em 95 p/s (89%) — mantém alvo 1
+25/08 14:30:09  lançada wnn-T32 a4s36 limpo
+25/08 14:31:39  treino em 154 p/s (145%) · alvo 1 · em voo 1
+25/08 14:39:09  treino em 96 p/s (90%) — mantém alvo 1
+25/08 14:48:09  treino em 96 p/s (90%) — mantém alvo 1
+25/08 15:04:39  treino em 96 p/s (90%) — mantém alvo 1
+25/08 15:04:39  lançada maddpg a8s12 limpo
+25/08 15:12:09  treino em 96 p/s (90%) — mantém alvo 1
+25/08 15:18:10  lançada wnn-T16 a8s12 limpo
+25/08 15:19:40  treino em 173 p/s (162%) · alvo 1 · em voo 1
+25/08 15:28:40  treino em 97 p/s (91%) — mantém alvo 1
+25/08 15:45:10  treino em 97 p/s (91%) — mantém alvo 1
+25/08 15:52:40  treino em 97 p/s (91%) — mantém alvo 1
+25/08 16:00:10  treino em 97 p/s (91%) — mantém alvo 1
+25/08 16:09:10  treino em 97 p/s (91%) — mantém alvo 1
+25/08 16:12:10  lançada maddpg a8s24 limpo
+25/08 16:19:40  lançada wnn-T16 a8s24 limpo
+25/08 16:25:40  treino em 202 p/s (190%) · alvo 1 · em voo 1
+25/08 16:33:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 16:40:40  treino em 98 p/s (92%) — mantém alvo 1
+25/08 16:49:40  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:06:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:13:40  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:21:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:30:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:30:10  lançada maddpg a8s36 limpo
+25/08 17:46:40  treino em 98 p/s (92%) — mantém alvo 1
+25/08 17:46:40  lançada wnn-T16 a8s36 limpo
+25/08 17:54:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 18:03:10  treino em 98 p/s (92%) — mantém alvo 1
+25/08 18:10:40  treino em 277 p/s (261%) · alvo 1 · em voo 1
+25/08 18:27:10  treino em 99 p/s (93%) — mantém alvo 1
+25/08 18:34:40  treino em 99 p/s (93%) — mantém alvo 1
+25/08 18:43:40  treino em 99 p/s (93%) — mantém alvo 1
+25/08 18:51:10  treino em 99 p/s (93%) — mantém alvo 1
+25/08 19:07:40  treino em 99 p/s (93%) — mantém alvo 1
+25/08 19:10:40  lançada wnn-T16 a1s12 sem-kf
+25/08 19:15:10  treino em 99 p/s (93%) — mantém alvo 1
+25/08 19:19:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:21:11  lançada wnn-T32 a1s12 sem-kf
+25/08 19:22:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:24:11  treino em 99 p/s (93%) — mantém alvo 1
+25/08 19:24:11  lançada wnn-T32 a1s12 sem-kf
+25/08 19:25:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:27:11  lançada wnn-T32 a1s12 sem-kf
+25/08 19:28:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:30:11  treino em 99 p/s (93%) — mantém alvo 1
+25/08 19:30:11  lançada wnn-T32 a1s12 sem-kf
+25/08 19:31:41  treino terminou — alvo livre em 5
+25/08 19:31:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:33:11  lançada wnn-T32 a1s12 sem-kf
+25/08 19:34:41  lançada wnn-T32 a1s12 sem-kf
+25/08 19:36:12  lançada wnn-T32 a1s12 sem-kf
+25/08 19:37:42  lançada wnn-T32 a1s12 sem-kf
+25/08 19:39:12  lançada wnn-T32 a1s12 sem-kf
+25/08 19:40:42  lançada wnn-T32 a1s12 sem-kf
+25/08 19:42:12  lançada wnn-T32 a1s12 sem-kf
+25/08 19:43:42  lançada wnn-T32 a1s12 sem-kf
+25/08 19:45:12  lançada wnn-T32 a1s12 sem-kf
+25/08 19:46:42  lançada wnn-T32 a1s12 sem-kf
+25/08 19:48:12  lançada wnn-T32 a1s12 sem-kf
+25/08 19:49:42  lançada wnn-T32 a1s12 sem-kf
+25/08 19:51:13  lançada wnn-T32 a1s12 sem-kf
+25/08 19:52:43  lançada wnn-T32 a1s12 sem-kf
+25/08 19:54:13  lançada wnn-T32 a1s12 sem-kf
+25/08 19:55:43  lançada wnn-T32 a1s12 sem-kf
+25/08 19:57:13  lançada wnn-T32 a1s12 sem-kf
+25/08 19:58:43  lançada wnn-T32 a1s12 sem-kf
+25/08 20:00:13  lançada wnn-T32 a1s12 sem-kf
+25/08 20:01:43  lançada wnn-T32 a1s12 sem-kf
+25/08 20:03:13  lançada wnn-T32 a1s12 sem-kf
+25/08 20:04:43  lançada wnn-T32 a1s12 sem-kf

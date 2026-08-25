@@ -35,3 +35,71 @@ maddpg · Na=8 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 34/100] run  33 · CT    9.59 s · SR 100.0% ·    9.0 s · resta  0.2 h
   [ 35/100] run  34 · CT    9.61 s · SR 100.0% ·    8.6 s · resta  0.2 h
   [ 36/100] run  35 · CT    9.70 s · SR 100.0% ·    7.9 s · resta  0.2 h
+maddpg · Na=8 Ns=24 · regime limpo · 64 de 100 runs a rodar (200 ep cada)
+  [  1/64] run  36 · CT    9.48 s · SR 100.0% ·    6.8 s · resta  0.1 h
+  [  2/64] run  37 · CT    9.67 s · SR 100.0% ·    7.2 s · resta  0.1 h
+  [  3/64] run  38 · CT    9.60 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [  4/64] run  39 · CT    9.56 s · SR 100.0% ·    5.8 s · resta  0.1 h
+  [  5/64] run  40 · CT    9.60 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [  6/64] run  41 · CT    9.65 s · SR 100.0% ·    6.1 s · resta  0.1 h
+  [  7/64] run  42 · CT    9.66 s · SR 100.0% ·    5.9 s · resta  0.1 h
+  [  8/64] run  43 · CT    9.56 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [  9/64] run  44 · CT    9.68 s · SR 100.0% ·    6.1 s · resta  0.1 h
+  [ 10/64] run  45 · CT    9.66 s · SR 100.0% ·    6.1 s · resta  0.1 h
+  [ 11/64] run  46 · CT    9.60 s · SR 100.0% ·    7.1 s · resta  0.1 h
+  [ 12/64] run  47 · CT    9.63 s · SR 100.0% ·    6.2 s · resta  0.1 h
+  [ 13/64] run  48 · CT    9.60 s · SR 100.0% ·    5.9 s · resta  0.1 h
+  [ 14/64] run  49 · CT    9.60 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [ 15/64] run  50 · CT    9.69 s · SR 100.0% ·    7.1 s · resta  0.1 h
+  [ 16/64] run  51 · CT    9.65 s · SR 100.0% ·    6.2 s · resta  0.1 h
+  [ 17/64] run  52 · CT    9.61 s · SR 100.0% ·    6.6 s · resta  0.1 h
+  [ 18/64] run  53 · CT    9.64 s · SR 100.0% ·    5.8 s · resta  0.1 h
+  [ 19/64] run  54 · CT    9.70 s · SR 100.0% ·    6.9 s · resta  0.1 h
+  [ 20/64] run  55 · CT    9.55 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [ 21/64] run  56 · CT    9.63 s · SR 100.0% ·    6.2 s · resta  0.1 h
+  [ 22/64] run  57 · CT    9.63 s · SR 100.0% ·    5.7 s · resta  0.1 h
+  [ 23/64] run  58 · CT    9.64 s · SR 100.0% ·    6.0 s · resta  0.1 h
+  [ 24/64] run  59 · CT    9.53 s · SR 100.0% ·    6.2 s · resta  0.1 h
+  [ 25/64] run  60 · CT    9.70 s · SR 100.0% ·    7.0 s · resta  0.1 h
+  [ 26/64] run  61 · CT    9.61 s · SR 100.0% ·    6.3 s · resta  0.1 h
+  [ 27/64] run  62 · CT    9.52 s · SR 100.0% ·    6.2 s · resta  0.1 h
+  [ 28/64] run  63 · CT    9.68 s · SR 100.0% ·    5.8 s · resta  0.1 h
+  [ 29/64] run  64 · CT    9.67 s · SR 100.0% ·    5.8 s · resta  0.1 h
+  [ 30/64] run  65 · CT    9.67 s · SR 100.0% ·    6.1 s · resta  0.1 h
+  [ 31/64] run  66 · CT    9.57 s · SR 100.0% ·    5.9 s · resta  0.1 h
+  [ 32/64] run  67 · CT    9.36 s · SR 100.0% ·    6.0 s · resta  0.1 h
+  [ 33/64] run  68 · CT    9.74 s · SR 100.0% ·    6.3 s · resta  0.1 h
+  [ 34/64] run  69 · CT    9.71 s · SR 100.0% ·    7.0 s · resta  0.1 h
+  [ 35/64] run  70 · CT    9.77 s · SR 100.0% ·    6.9 s · resta  0.1 h
+  [ 36/64] run  71 · CT    9.65 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 37/64] run  72 · CT    9.65 s · SR 100.0% ·    6.4 s · resta  0.0 h
+  [ 38/64] run  73 · CT    9.62 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 39/64] run  74 · CT    9.71 s · SR 100.0% ·    8.0 s · resta  0.0 h
+  [ 40/64] run  75 · CT    9.54 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 41/64] run  76 · CT    9.65 s · SR 100.0% ·    6.6 s · resta  0.0 h
+  [ 42/64] run  77 · CT    9.60 s · SR 100.0% ·    6.3 s · resta  0.0 h
+  [ 43/64] run  78 · CT    9.71 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 44/64] run  79 · CT    9.60 s · SR 100.0% ·    6.0 s · resta  0.0 h
+  [ 45/64] run  80 · CT    9.63 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 46/64] run  81 · CT    9.68 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 47/64] run  82 · CT    9.66 s · SR 100.0% ·    6.3 s · resta  0.0 h
+  [ 48/64] run  83 · CT    9.74 s · SR 100.0% ·    6.5 s · resta  0.0 h
+  [ 49/64] run  84 · CT    9.65 s · SR 100.0% ·    7.0 s · resta  0.0 h
+  [ 50/64] run  85 · CT    9.61 s · SR 100.0% ·    6.1 s · resta  0.0 h
+  [ 51/64] run  86 · CT    9.63 s · SR 100.0% ·    6.7 s · resta  0.0 h
+  [ 52/64] run  87 · CT    9.59 s · SR 100.0% ·    7.1 s · resta  0.0 h
+  [ 53/64] run  88 · CT    9.71 s · SR 100.0% ·    5.9 s · resta  0.0 h
+  [ 54/64] run  89 · CT    9.55 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 55/64] run  90 · CT    9.59 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 56/64] run  91 · CT    9.74 s · SR 100.0% ·    6.5 s · resta  0.0 h
+  [ 57/64] run  92 · CT    9.54 s · SR 100.0% ·    6.4 s · resta  0.0 h
+  [ 58/64] run  93 · CT    9.66 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 59/64] run  94 · CT    9.72 s · SR 100.0% ·    5.9 s · resta  0.0 h
+  [ 60/64] run  95 · CT    9.81 s · SR 100.0% ·    6.3 s · resta  0.0 h
+  [ 61/64] run  96 · CT    9.79 s · SR 100.0% ·    6.3 s · resta  0.0 h
+  [ 62/64] run  97 · CT    9.84 s · SR 100.0% ·    6.0 s · resta  0.0 h
+  [ 63/64] run  98 · CT    9.61 s · SR 100.0% ·    6.1 s · resta  0.0 h
+  [ 64/64] run  99 · CT    9.69 s · SR 100.0% ·    7.0 s · resta  0.0 h
+
+-> reports/campanha/maddpg-a8s24-limpo.csv
+-> reports/campanha/maddpg-a8s24-limpo-episodios.csv
