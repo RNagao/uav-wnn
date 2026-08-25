@@ -78,3 +78,28 @@ wnn-T16 · Na=2 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 77/100] run  76 · CT   86.19 s · SR 91.0% ·   23.9 s · resta  0.2 h
   [ 78/100] run  77 · CT   99.60 s · SR 88.0% ·   23.1 s · resta  0.1 h
   [ 79/100] run  78 · CT   78.85 s · SR 92.5% ·   22.8 s · resta  0.1 h
+wnn-T16 · Na=2 Ns=24 · regime limpo · 21 de 100 runs a rodar (200 ep cada)
+  [  1/21] run  79 · CT   85.75 s · SR 91.0% ·   11.3 s · resta  0.1 h
+  [  2/21] run  80 · CT   82.00 s · SR 92.0% ·   12.7 s · resta  0.1 h
+  [  3/21] run  81 · CT   87.37 s · SR 91.0% ·   13.3 s · resta  0.1 h
+  [  4/21] run  82 · CT   94.03 s · SR 89.5% ·   13.1 s · resta  0.1 h
+  [  5/21] run  83 · CT   90.72 s · SR 90.0% ·   13.3 s · resta  0.1 h
+  [  6/21] run  84 · CT   93.38 s · SR 89.5% ·   11.8 s · resta  0.1 h
+  [  7/21] run  85 · CT   81.97 s · SR 92.0% ·   12.3 s · resta  0.0 h
+  [  8/21] run  86 · CT   62.66 s · SR 96.0% ·   13.1 s · resta  0.0 h
+  [  9/21] run  87 · CT  101.25 s · SR 87.5% ·   12.8 s · resta  0.0 h
+  [ 10/21] run  88 · CT   90.90 s · SR 90.0% ·   13.6 s · resta  0.0 h
+  [ 11/21] run  89 · CT   89.65 s · SR 90.0% ·   12.3 s · resta  0.0 h
+  [ 12/21] run  90 · CT  101.78 s · SR 87.5% ·   13.4 s · resta  0.0 h
+  [ 13/21] run  91 · CT   88.41 s · SR 90.5% ·   11.5 s · resta  0.0 h
+  [ 14/21] run  92 · CT   84.00 s · SR 91.5% ·   11.6 s · resta  0.0 h
+  [ 15/21] run  93 · CT   91.66 s · SR 90.0% ·   12.5 s · resta  0.0 h
+  [ 16/21] run  94 · CT   84.51 s · SR 91.5% ·   12.6 s · resta  0.0 h
+  [ 17/21] run  95 · CT   93.57 s · SR 89.5% ·   12.6 s · resta  0.0 h
+  [ 18/21] run  96 · CT   87.26 s · SR 91.0% ·   12.2 s · resta  0.0 h
+  [ 19/21] run  97 · CT   81.45 s · SR 92.0% ·   13.5 s · resta  0.0 h
+  [ 20/21] run  98 · CT   82.14 s · SR 92.0% ·   12.3 s · resta  0.0 h
+  [ 21/21] run  99 · CT   90.36 s · SR 90.0% ·   13.8 s · resta  0.0 h
+
+-> reports/campanha/wnn-T16-a2s24-limpo.csv
+-> reports/campanha/wnn-T16-a2s24-limpo-episodios.csv

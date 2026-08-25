@@ -60,3 +60,8 @@ wnn-T32 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 58/100] run  57 · CT   81.47 s · SR 92.5% ·   29.4 s · resta  0.4 h
   [ 59/100] run  58 · CT   55.23 s · SR 98.0% ·   30.3 s · resta  0.4 h
   [ 60/100] run  59 · CT   65.84 s · SR 95.5% ·   29.9 s · resta  0.3 h
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=36 (d_obs=27 é o mesmo)
+wnn-T32 · Na=2 Ns=36 · regime limpo · 40 de 100 runs a rodar (200 ep cada)
+  [  1/40] run  60 · CT   59.84 s · SR 97.0% ·   15.8 s · resta  0.2 h
+  [  2/40] run  61 · CT   60.85 s · SR 97.0% ·   17.0 s · resta  0.2 h
+  [  3/40] run  62 · CT   68.17 s · SR 95.0% ·   15.3 s · resta  0.2 h

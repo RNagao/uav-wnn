@@ -301,11 +301,24 @@ def trilhas(amb, cfg, politica, seed, handlers):
     return T
 
 
-def ler_cache(arq: Path, episodios: int) -> dict[int, dict]:
+def ler_cache(arq: Path, episodios: int, colunas: list[str]) -> dict[int, dict]:
     """Runs já feitas. Recusa cache com `E` diferente — média sobre runs de
-    tamanhos distintos não significa nada."""
-    if not arq.exists():
+    tamanhos distintos não significa nada — e cache de outro ESQUEMA.
+
+    A checagem de esquema vem antes da de `E` porque é ela que dá mensagem útil:
+    lendo um CSV de 18 colunas com o leitor de 20, o `episodios` some e o erro
+    vira um `KeyError` sem relação com a causa.
+    """
+    if not arq.exists() or not arq.stat().st_size:
         return {}
+    with arq.open(newline="") as f:
+        atual = next(csv.reader(f), [])
+    if atual != colunas:
+        faltam = [c for c in colunas if c not in atual]
+        sys.exit(f"{arq}: cabeçalho é de outro esquema ({len(atual)} colunas "
+                 f"contra {len(colunas)}"
+                 + (f"; faltam {faltam}" if faltam else "") + ").\n"
+                 "Migre o arquivo ou apague-o para refazer as runs.")
     feitas = {}
     with arq.open(newline="") as f:
         for lin in csv.DictReader(f):
@@ -317,13 +330,30 @@ def ler_cache(arq: Path, episodios: int) -> dict[int, dict]:
 
 
 def anexar(arq: Path, colunas: list[str], linhas: list[dict]) -> None:
-    novo = not arq.exists()
+    """Anexa, RECUSANDO escrever sob um cabeçalho de outro esquema.
+
+    Sem esta guarda o arquivo fica misto e ninguém percebe: quando as colunas de
+    transferência entraram, a fila retomou CSVs já começados e gravou linhas de
+    20 campos sob cabeçalhos de 18. O `csv.DictWriter` não reclama — ele só
+    escreve os valores em ordem — e o defeito só apareceu ao tentar reler.
+    """
     arq.parent.mkdir(parents=True, exist_ok=True)
+    if arq.exists() and arq.stat().st_size:
+        with arq.open(newline="") as f:
+            atual = next(csv.reader(f), [])
+        if atual and atual != colunas:
+            faltam = [c for c in colunas if c not in atual]
+            sys.exit(
+                f"{arq}: cabeçalho é de outro esquema "
+                f"({len(atual)} colunas contra {len(colunas)}"
+                + (f"; faltam {faltam}" if faltam else "") + ").\n"
+                "Anexar aqui produziria um arquivo misto. Migre o arquivo ou "
+                "apague-o para refazer as runs.")
+    else:
+        with arq.open("a", newline="") as f:
+            csv.DictWriter(f, fieldnames=colunas).writeheader()
     with arq.open("a", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=colunas)
-        if novo:
-            w.writeheader()
-        w.writerows(linhas)
+        csv.DictWriter(f, fieldnames=colunas).writerows(linhas)
 
 
 def main() -> int:
@@ -399,7 +429,7 @@ def main() -> int:
                   f"(degraus {degraus} × σ {[f'{s:g}' for s in sigmas]})", flush=True)
     arq = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}.csv"
     arq_ep = a.dir_saida / f"{a.rotulo}-a{a.na}s{a.ns}-{regime}-episodios.csv"
-    feitas = ler_cache(arq, a.episodios)
+    feitas = ler_cache(arq, a.episodios, COLUNAS)
     faltam = [r for r in range(a.runs) if r not in feitas]
     print(f"{a.rotulo} · Na={a.na} Ns={a.ns} · regime {regime} · "
           f"{len(faltam)} de {a.runs} runs a rodar ({a.episodios} ep cada)", flush=True)
