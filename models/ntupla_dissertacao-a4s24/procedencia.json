@@ -1,0 +1,31 @@
+{
+  "ator": {
+    "n_saidas": 3
+  },
+  "resolucao": 32,
+  "config": {
+    "na": 4,
+    "ns": 24,
+    "passo": 0.0008,
+    "sigma": 0.35,
+    "T": 32,
+    "n": 12,
+    "phi": 0.85,
+    "m": 8,
+    "gamma": 0.99,
+    "replica": "1b",
+    "parameter_sharing": true,
+    "recompensa_por_na": true,
+    "critico": "descentralizado (Alg. 4.4)"
+  },
+  "passos": 6752728,
+  "episodios": 44370,
+  "melhor_val_cobertura": 1.0,
+  "metrica_test": {
+    "sr": 1.0,
+    "ct_cens": 29.68,
+    "cobertura": 1.0,
+    "n": 100
+  },
+  "fonte": "spec06_treino_multiagente.py"
+}
