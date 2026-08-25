@@ -135,6 +135,7 @@ def multi(logs: list[Path]) -> None:
         if not prog:
             print(f"   {_barra(0)}   0%        │ {rot:<22} │ iniciando…")
             continue
+        parou = "parada antecipada" in txt or "checkpoint (melhor):" in txt
         frac = float(prog[-1][0]) / 100.0
         passos = int(prog[-1][1].replace(",", ""))
         alvo = int(prog[-1][2].replace(",", ""))
@@ -147,15 +148,23 @@ def multi(logs: list[Path]) -> None:
             t1 = s1 / max(float(p1[3]), 1e-9)
             if t1 > t0:
                 taxa = (s1 - s0) / (t1 - t0)
+        cob = (f"cob {float(ev[-1][1]):>5.1%}  sr {float(ev[-1][2]):>5.1%}"
+               if ev else "sem eval ainda")
+        mx = f" máx {max(float(e[1]) for e in ev):>5.1%}" if ev else ""
+        # Uma corrida que já parou não tem ETA: mostrar um faz o painel prometer
+        # trabalho que não existe, e a soma "a última termina em" fica errada.
+        if parou:
+            fim = re.search(r"Na=\d+ Ns=\d+: (.*)", txt)
+            print(f"   {_barra(1.0)} PAROU {' ':>6} │ {rot:<22} │ "
+                  f"{passos:>9,} passos │ {cob}{mx}")
+            if fim:
+                print(f"   {'':>22} └─ teste: {fim.group(1)}")
+            continue
         eta = (alvo - passos) / max(taxa, 1e-9)
         fins.append(eta)
         fim = time.strftime("%d/%m %H:%M", time.localtime(time.time() + eta))
-        cob = f"cob {float(ev[-1][1]):>5.1%}  sr {float(ev[-1][2]):>5.1%}" if ev else "sem eval ainda"
-        mx = f" máx {max(float(e[1]) for e in ev):>5.1%}" if ev else ""
         print(f"   {_barra(frac)} {frac:>4.0%} {_hm(eta)} │ {rot:<22} │ "
               f"{taxa:>5.0f} p/s │ {cob}{mx} │ ~{fim}")
-        if "parada antecipada" in txt:
-            print(f"   {'':>16}      PAROU  │ {rot:<22} │ platô")
     if fins:
         print(f"   -> a última termina em ~{_hm(max(fins)).strip()}\n")
     else:

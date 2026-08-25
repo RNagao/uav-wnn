@@ -1,0 +1,44 @@
+{
+  "2": {
+    "melhor": {
+      "cobertura": 0.951,
+      "sr": 0.86,
+      "ct_cens": 110.7
+    },
+    "final": {
+      "cobertura": 0.964,
+      "sr": 0.89,
+      "ct_cens": 96.0
+    },
+    "n": 100,
+    "passos": 6752000
+  },
+  "4": {
+    "melhor": {
+      "cobertura": 0.968,
+      "sr": 0.9,
+      "ct_cens": 85.1
+    },
+    "final": {
+      "cobertura": 0.982,
+      "sr": 0.94,
+      "ct_cens": 65.1
+    },
+    "n": 100,
+    "passos": 6752000
+  },
+  "8": {
+    "melhor": {
+      "cobertura": 0.953,
+      "sr": 0.8,
+      "ct_cens": 137.8
+    },
+    "final": {
+      "cobertura": 0.98,
+      "sr": 0.88,
+      "ct_cens": 97.5
+    },
+    "n": 100,
+    "passos": 6752000
+  }
+}
