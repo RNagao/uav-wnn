@@ -64,3 +64,24 @@ wnn-T32 · Na=2 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 62/100] run  61 · CT  111.42 s · SR 83.0% ·   15.0 s · resta  0.2 h
   [ 63/100] run  62 · CT   80.91 s · SR 89.5% ·   15.1 s · resta  0.2 h
   [ 64/100] run  63 · CT   86.86 s · SR 88.5% ·   16.5 s · resta  0.2 h
+  [ 65/100] run  64 · CT   97.58 s · SR 86.0% ·   16.4 s · resta  0.2 h
+  [ 66/100] run  65 · CT   97.94 s · SR 86.0% ·   15.4 s · resta  0.2 h
+  [ 67/100] run  66 · CT  101.01 s · SR 85.5% ·   15.8 s · resta  0.1 h
+  [ 68/100] run  67 · CT   91.42 s · SR 87.0% ·   14.9 s · resta  0.1 h
+  [ 69/100] run  68 · CT  106.44 s · SR 84.0% ·   16.1 s · resta  0.1 h
+  [ 70/100] run  69 · CT  104.65 s · SR 84.5% ·   15.2 s · resta  0.1 h
+  [ 71/100] run  70 · CT   87.35 s · SR 88.0% ·   14.9 s · resta  0.1 h
+  [ 72/100] run  71 · CT   76.86 s · SR 90.5% ·   15.2 s · resta  0.1 h
+  [ 73/100] run  72 · CT   71.78 s · SR 91.5% ·   15.3 s · resta  0.1 h
+  [ 74/100] run  73 · CT  118.22 s · SR 81.5% ·   14.7 s · resta  0.1 h
+  [ 75/100] run  74 · CT  124.03 s · SR 80.5% ·   15.6 s · resta  0.1 h
+  [ 76/100] run  75 · CT  113.85 s · SR 82.5% ·   16.7 s · resta  0.1 h
+  [ 77/100] run  76 · CT   97.75 s · SR 86.0% ·   15.7 s · resta  0.1 h
+  [ 78/100] run  77 · CT   92.51 s · SR 87.0% ·   15.4 s · resta  0.1 h
+  [ 79/100] run  78 · CT   95.67 s · SR 86.5% ·   15.4 s · resta  0.1 h
+  [ 80/100] run  79 · CT   79.56 s · SR 90.0% ·   15.3 s · resta  0.1 h
+  [ 81/100] run  80 · CT  100.64 s · SR 85.5% ·   16.7 s · resta  0.1 h
+  [ 82/100] run  81 · CT  102.03 s · SR 85.0% ·   15.3 s · resta  0.1 h
+  [ 83/100] run  82 · CT  105.41 s · SR 84.5% ·   16.3 s · resta  0.1 h
+  [ 84/100] run  83 · CT   77.82 s · SR 90.0% ·   14.9 s · resta  0.1 h
+  [ 85/100] run  84 · CT  110.66 s · SR 83.5% ·   16.4 s · resta  0.1 h

@@ -78,15 +78,32 @@ def progresso(it: dict) -> tuple[int, float, float, float]:
     return n, w, ct, sr
 
 
+def _cmdlines() -> list[str]:
+    """Linhas de comando completas, de `/proc`, NÃO do `ps`.
+
+    O `ps` respeita `$COLUMNS` e TRUNCA — e o `watch` define `COLUMNS` para a
+    largura do terminal. Sob `watch -n 60`, as linhas vinham cortadas em ~120
+    caracteres, o `--ruido` (que fica além disso) sumia, e o painel declarava
+    "0 em voo" com oito processos a 99,9 % de CPU. `/proc/<pid>/cmdline` não tem
+    formatação para atrapalhar.
+    """
+    saida = []
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit():
+            continue
+        try:
+            saida.append(
+                (d / "cmdline").read_bytes().replace(b"\x00", b" ").decode(
+                    "utf-8", "replace"))
+        except OSError:
+            continue                            # o processo morreu no meio da leitura
+    return saida
+
+
 def em_voo() -> set[tuple[str, int, int, str]]:
     """Corridas com processo vivo — para separar 'andando' de 'parada no meio'."""
-    try:
-        ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True,
-                            timeout=20).stdout
-    except Exception:                            # noqa: BLE001
-        return set()
     vivos = set()
-    for l in ps.splitlines():
+    for l in _cmdlines():
         if "spec06_campanha_completa.py" not in l or ".venv/bin/python3" not in l:
             continue
         r = re.search(r"--rotulo (\S+).*--na (\d+).*--ns (\d+).*--ruido (\S+)", l)

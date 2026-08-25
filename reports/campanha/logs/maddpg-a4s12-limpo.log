@@ -72,3 +72,33 @@ maddpg · Na=4 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 71/100] run  70 · CT   10.03 s · SR 100.0% ·    5.9 s · resta  0.0 h
   [ 72/100] run  71 · CT   10.10 s · SR 100.0% ·    6.3 s · resta  0.0 h
   [ 73/100] run  72 · CT   10.23 s · SR 100.0% ·    5.6 s · resta  0.0 h
+  [ 74/100] run  73 · CT    9.99 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 75/100] run  74 · CT   10.31 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 76/100] run  75 · CT    9.93 s · SR 100.0% ·    5.4 s · resta  0.0 h
+  [ 77/100] run  76 · CT    9.98 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [ 78/100] run  77 · CT   10.16 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [ 79/100] run  78 · CT   10.02 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 80/100] run  79 · CT   10.20 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 81/100] run  80 · CT   10.07 s · SR 100.0% ·    5.2 s · resta  0.0 h
+  [ 82/100] run  81 · CT   10.10 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 83/100] run  82 · CT   10.20 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 84/100] run  83 · CT   10.00 s · SR 100.0% ·    5.7 s · resta  0.0 h
+  [ 85/100] run  84 · CT   10.10 s · SR 100.0% ·    5.6 s · resta  0.0 h
+  [ 86/100] run  85 · CT   10.11 s · SR 100.0% ·    5.3 s · resta  0.0 h
+  [ 87/100] run  86 · CT   10.10 s · SR 100.0% ·    5.3 s · resta  0.0 h
+  [ 88/100] run  87 · CT   10.06 s · SR 100.0% ·    5.4 s · resta  0.0 h
+  [ 89/100] run  88 · CT   10.14 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [ 90/100] run  89 · CT    9.91 s · SR 100.0% ·    5.4 s · resta  0.0 h
+  [ 91/100] run  90 · CT    9.77 s · SR 100.0% ·    5.2 s · resta  0.0 h
+  [ 92/100] run  91 · CT   10.16 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 93/100] run  92 · CT   10.17 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 94/100] run  93 · CT   10.20 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 95/100] run  94 · CT    9.77 s · SR 100.0% ·    5.6 s · resta  0.0 h
+  [ 96/100] run  95 · CT   10.16 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [ 97/100] run  96 · CT   10.18 s · SR 100.0% ·    5.8 s · resta  0.0 h
+  [ 98/100] run  97 · CT   10.05 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [ 99/100] run  98 · CT   10.01 s · SR 100.0% ·    5.5 s · resta  0.0 h
+  [100/100] run  99 · CT   10.03 s · SR 100.0% ·    5.2 s · resta  0.0 h
+
+-> reports/campanha/maddpg-a4s12-limpo.csv
+-> reports/campanha/maddpg-a4s12-limpo-episodios.csv

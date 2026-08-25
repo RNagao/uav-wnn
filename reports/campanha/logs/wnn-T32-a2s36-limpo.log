@@ -33,3 +33,14 @@ wnn-T32 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 31/100] run  30 · CT   61.15 s · SR 97.0% ·   34.3 s · resta  0.6 h
   [ 32/100] run  31 · CT   64.62 s · SR 96.0% ·   30.8 s · resta  0.6 h
   [ 33/100] run  32 · CT   66.33 s · SR 95.5% ·   31.5 s · resta  0.6 h
+  [ 34/100] run  33 · CT   66.08 s · SR 95.5% ·   29.7 s · resta  0.6 h
+  [ 35/100] run  34 · CT   68.96 s · SR 95.0% ·   30.4 s · resta  0.6 h
+  [ 36/100] run  35 · CT   58.94 s · SR 97.5% ·   30.6 s · resta  0.5 h
+  [ 37/100] run  36 · CT   70.56 s · SR 94.5% ·   30.5 s · resta  0.5 h
+  [ 38/100] run  37 · CT   59.45 s · SR 97.0% ·   30.0 s · resta  0.5 h
+  [ 39/100] run  38 · CT   57.38 s · SR 97.5% ·   30.3 s · resta  0.5 h
+  [ 40/100] run  39 · CT   63.02 s · SR 96.0% ·   30.4 s · resta  0.5 h
+  [ 41/100] run  40 · CT   64.55 s · SR 96.0% ·   30.6 s · resta  0.5 h
+  [ 42/100] run  41 · CT   74.08 s · SR 94.0% ·   31.7 s · resta  0.5 h
+  [ 43/100] run  42 · CT   71.93 s · SR 94.5% ·   30.9 s · resta  0.5 h
+  [ 44/100] run  43 · CT   57.79 s · SR 97.5% ·   31.0 s · resta  0.5 h

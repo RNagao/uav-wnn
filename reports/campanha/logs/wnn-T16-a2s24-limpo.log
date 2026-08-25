@@ -42,3 +42,17 @@ wnn-T16 · Na=2 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 41/100] run  40 · CT   84.66 s · SR 91.5% ·   26.2 s · resta  0.4 h
   [ 42/100] run  41 · CT   87.11 s · SR 91.0% ·   24.0 s · resta  0.4 h
   [ 43/100] run  42 · CT   95.37 s · SR 88.5% ·   22.6 s · resta  0.4 h
+  [ 44/100] run  43 · CT   95.64 s · SR 89.0% ·   24.6 s · resta  0.4 h
+  [ 45/100] run  44 · CT   68.34 s · SR 95.0% ·   22.3 s · resta  0.4 h
+  [ 46/100] run  45 · CT   97.42 s · SR 88.5% ·   23.9 s · resta  0.4 h
+  [ 47/100] run  46 · CT   74.64 s · SR 93.5% ·   22.4 s · resta  0.3 h
+  [ 48/100] run  47 · CT   94.56 s · SR 89.0% ·   22.2 s · resta  0.3 h
+  [ 49/100] run  48 · CT   88.18 s · SR 90.5% ·   23.2 s · resta  0.3 h
+  [ 50/100] run  49 · CT   90.70 s · SR 90.0% ·   22.6 s · resta  0.3 h
+  [ 51/100] run  50 · CT   79.17 s · SR 92.5% ·   24.3 s · resta  0.3 h
+  [ 52/100] run  51 · CT   80.96 s · SR 92.0% ·   23.7 s · resta  0.3 h
+  [ 53/100] run  52 · CT   82.84 s · SR 91.5% ·   22.7 s · resta  0.3 h
+  [ 54/100] run  53 · CT   85.95 s · SR 91.0% ·   22.6 s · resta  0.3 h
+  [ 55/100] run  54 · CT   83.27 s · SR 92.0% ·   24.1 s · resta  0.3 h
+  [ 56/100] run  55 · CT   74.31 s · SR 93.5% ·   22.6 s · resta  0.3 h
+  [ 57/100] run  56 · CT   88.87 s · SR 90.5% ·   23.4 s · resta  0.3 h
