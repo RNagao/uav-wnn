@@ -42,8 +42,16 @@ dá três ordens de folga sobre o erro por valor e ainda é 10⁴ vezes menor qu
 menor diferença de ação que o ambiente distingue."""
 
 
-def exportar(origem: Path, destino: Path) -> dict:
-    """Grava só o ator, com `uint16`/`float32`. Devolve o resumo de tamanhos."""
+def exportar(origem: Path, destino: Path, poda: float = 0.0) -> dict:
+    """Grava só o ator, com `uint16`/`float32`. Devolve o resumo de tamanhos.
+
+    `poda` remove a fração pedida das entradas de menor |v|. A base empírica
+    (500 sementes, banco de teste): na convenção de média cada entrada contribui
+    `v/N` à saída, então a cauda de |v| pequeno quase não move a ação — 50 % da
+    massa está em 6,3 % das entradas. Medido: podar 70 % custa 0,8 pp de SR no
+    T16 (96,8→96,0 %) e nada no T32; 90 % custa 3 pp no T16. O produto continua
+    verificado POR COMPORTAMENTO antes de publicado.
+    """
     fonte = next(origem.glob("*ator.npz"))
     z = np.load(fonte, allow_pickle=False)
     cfg = json.loads(str(z["config"]))
@@ -57,8 +65,26 @@ def exportar(origem: Path, destino: Path) -> dict:
 
     destino.mkdir(parents=True, exist_ok=True)
     saida = {k: z[k] for k in z.files}
+    if poda > 0:
+        # Os vetores são paralelos por RAM (`tamanhos_ram` diz onde cada uma
+        # começa); a poda é GLOBAL por |v|, então refazemos os três coerentes.
+        d = int(cfg["n_saidas"])
+        vals = z["valores"].reshape(-1, d)
+        tam = z["tamanhos_ram"]
+        ram_de = np.repeat(np.arange(tam.size), tam)
+        mag = np.abs(vals).max(axis=1)
+        manter = np.ones(mag.size, bool)
+        manter[np.argsort(mag)[: int(mag.size * poda)]] = False
+        saida["enderecos"] = end[manter]
+        # MANTÉM a forma (entradas, d): o `carregar` fatia `valores[j]` como o
+        # vetor da entrada `j` — achatar para 1-D fazia cada fatia virar um
+        # escalar, a rede lia lixo, e o SR ia a zero (medido: 97,5 % → 0,0 %).
+        saida["valores"] = vals[manter]
+        saida["tamanhos_ram"] = np.bincount(
+            ram_de[manter], minlength=tam.size).astype(np.int64)
+        end = saida["enderecos"]
     saida["enderecos"] = end.astype(np.uint16)
-    saida["valores"] = z["valores"].astype(np.float32)
+    saida["valores"] = np.asarray(saida["valores"]).astype(np.float32)
     # `mapeamento` indexa bits de entrada (n_bits ≤ 1248 aqui) — uint16 basta.
     saida["mapeamento"] = z["mapeamento"].astype(np.uint16)
     alvo = destino / fonte.name
@@ -118,6 +144,55 @@ def verificar(origem: Path, destino: Path, na: int, ns: int, n_obs: int = 400) -
             "dif_mediana": float(np.median(d)), "ok": bool(d.max() <= TOL_REL)}
 
 
+TOL_SR_PP = 2.0
+"""Queda de SR tolerada num export PODADO, em pontos percentuais. Com 200
+sementes o ruído binomial é ~±2,8 pp em SR 90 %; abaixo de 2 pp a queda não é
+distinguível do ruído, acima é sinal de poda excessiva."""
+
+
+def verificar_comportamento(origem: Path, destino: Path, na: int, ns: int,
+                            n_sementes: int) -> dict:
+    """SR dos dois artefatos no banco de teste — a verificação de um export
+    PODADO, cuja ação muda por construção."""
+    import logging
+    import random
+    from spec06_campanha_wnn import montar
+    from uavwnn.campanha import carregar_bancos
+    from uavwnn.refenv import LAMENZA_003, make_env, prune_logging_handlers
+
+    cfg = LAMENZA_003(na, ns, phase="eval")
+    H = list(logging.getLogger().handlers)
+    sementes = carregar_bancos(na, ns).test.sementes[:n_sementes]
+
+    def sr_de(caminho):
+        pol, _ = montar("ntupla_dissertacao", cfg, caminho)
+        oks = []
+        for s in sementes:
+            random.seed(int(s)); np.random.seed(int(s))
+            env = make_env(cfg); obs, _ = env.reset()
+            prune_logging_handlers(H)
+            ok = False
+            for _ in range(int(cfg.max_episode_length
+                                / cfg.algorithm_iteration_interval) + 2):
+                obs, _, term, trunc, infos = env.step(
+                    {a: pol(obs[a]) for a in env.agents})
+                if infos and "avg_reward" in next(iter(infos.values())):
+                    ok = bool(next(iter(infos.values())).get("all_collected", False))
+                    break
+                if any(term.values()) or any(trunc.values()):
+                    break
+            oks.append(ok)
+            try:
+                env.close()
+            except Exception:                                # pragma: no cover
+                pass
+        return float(np.mean(oks))
+
+    cheio, podado = sr_de(origem), sr_de(destino)
+    return {"sr_cheio": cheio, "sr_podado": podado,
+            "ok": (cheio - podado) * 100 <= TOL_SR_PP}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -126,6 +201,12 @@ def main() -> int:
     ap.add_argument("--todos", action="store_true",
                     help="exporta models/T*/a*s* para models/deploy/")
     ap.add_argument("--destino", type=Path, default=None)
+    ap.add_argument("--poda", type=float, default=0.0,
+                    help="fração das entradas de menor |v| a REMOVER do ator "
+                         "(0.7 = remove 70%%). Muda a política de propósito, então "
+                         "a verificação passa a ser por COMPORTAMENTO (SR no banco "
+                         "de teste), não por igualdade de ação.")
+    ap.add_argument("--sementes-verif", type=int, default=200)
     a = ap.parse_args()
 
     if a.todos:
@@ -143,20 +224,35 @@ def main() -> int:
         alvos = [(a.origem, dst, a.na, a.ns)]
 
     falhou = False
-    print(f"{'modelo':<22}{'treino':>10}{'deploy':>10}{'redução':>9}"
-          f"{'dif. máx':>12}  veredito")
+    if a.poda:
+        print(f"{'modelo':<22}{'treino':>10}{'deploy':>10}{'redução':>9}"
+              f"{'SR cheio':>10}{'SR podado':>11}  veredito")
+    else:
+        print(f"{'modelo':<22}{'treino':>10}{'deploy':>10}{'redução':>9}"
+              f"{'dif. máx':>12}  veredito")
     for origem, destino, na, ns in alvos:
-        t = exportar(origem, destino)
-        v = verificar(origem, destino, na, ns)
-        falhou |= not v["ok"]
+        t = exportar(origem, destino, a.poda)
         rot = f"{origem.parent.name}/{origem.name}"
-        print(f"{rot:<22}{t['origem_kb']:>8.0f}K{t['deploy_kb']:>9.0f}K"
-              f"{t['reducao']:>8.1f}×{v['dif_max']:>12.2e}  "
-              f"{'OK' if v['ok'] else 'FALHOU (> ' + f'{TOL_REL:.0e}' + ')'}")
+        if a.poda:
+            v = verificar_comportamento(origem, destino, na, ns, a.sementes_verif)
+            falhou |= not v["ok"]
+            print(f"{rot:<22}{t['origem_kb']:>8.0f}K{t['deploy_kb']:>9.0f}K"
+                  f"{t['reducao']:>8.1f}×{v['sr_cheio']:>9.1%}{v['sr_podado']:>10.1%}  "
+                  f"{'OK' if v['ok'] else 'CAIU >' + f'{TOL_SR_PP:.0f}pp'}")
+        else:
+            v = verificar(origem, destino, na, ns)
+            falhou |= not v["ok"]
+            print(f"{rot:<22}{t['origem_kb']:>8.0f}K{t['deploy_kb']:>9.0f}K"
+                  f"{t['reducao']:>8.1f}×{v['dif_max']:>12.2e}  "
+                  f"{'OK' if v['ok'] else 'FALHOU (> ' + f'{TOL_REL:.0e}' + ')'}")
     if falhou:
         print("\nalgum export mudou a ação além do tolerado — NÃO publique estes.")
         return 1
-    print(f"\n-> models/deploy/  ({len(alvos)} modelos, ação idêntica até {TOL_REL:.0e})")
+    if a.poda:
+        print(f"\n-> {len(alvos)} modelos PODADOS ({a.poda:.0%}) — SR verificado em "
+              f"{a.sementes_verif} sementes, queda ≤ {TOL_SR_PP:.0f} pp")
+    else:
+        print(f"\n-> models/deploy/  ({len(alvos)} modelos, ação idêntica até {TOL_REL:.0e})")
     return 0
 
 
