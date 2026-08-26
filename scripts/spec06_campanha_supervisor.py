@@ -248,18 +248,28 @@ def main() -> int:
                 bons = 0
                 diz(f"treino em {taxa:.0f} p/s ({frac:.0%}) — mantém alvo {alvo}")
 
-        # 3) repõe até o alvo
+        # 3) repõe até o alvo — TODAS as vagas neste ciclo, não uma por ciclo.
+        #
+        # Lançar uma por ciclo fazia a subida levar `alvo × ciclo`: com alvo 6 e
+        # ciclo de 90 s, nove minutos com a máquina ociosa antes de encher. O
+        # `lancar` já espera 8 s para confirmar que o processo subiu, então o
+        # laço aqui é limitado pelas vagas, não pelo relógio.
         if len(vivos) < alvo:
             ocupadas = set(vivos)
-            for cand in pendentes():
-                if cand in ocupadas or falhas.get(cand, 0) >= FALHAS_ATE_DESISTIR:
-                    continue
-                if lancar(cand, falhas):
+            candidatos = [c for c in pendentes()
+                          if c not in ocupadas
+                          and falhas.get(c, 0) < FALHAS_ATE_DESISTIR]
+            subiu = 0
+            for cand in candidatos:
+                if len(vivos) + subiu >= alvo:
                     break
-            else:
+                if lancar(cand, falhas):
+                    subiu += 1
+                    ocupadas.add(cand)
+            if not subiu and not candidatos:
                 mortas = sum(1 for v in falhas.values() if v >= FALHAS_ATE_DESISTIR)
                 if not vivos:
-                    diz(f"nada pendente e nada em voo — campanha completa"
+                    diz("nada pendente e nada em voo — campanha completa"
                         + (f" ({mortas} corridas desistidas)" if mortas else ""))
                     return 0
 
