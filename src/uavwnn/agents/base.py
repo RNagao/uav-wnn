@@ -125,8 +125,15 @@ class Observacao:
         bruto_s = v[2 * n_a:2 * n_a + 2 * n_s].reshape(n_s, 2)
         S = ctx.scenario_size
 
-        val_a = ~np.isclose(bruto_a, PADDING).all(axis=1) if n_a else np.zeros(0, bool)
-        val_s = ~np.isclose(bruto_s, PADDING).all(axis=1)
+        # `==` e não `np.isclose`: o `PADDING` é escrito por `fill(-1)` no
+        # `environment.py` e a normalização toca só a fatia dos válidos, então o
+        # sentinela chega exato — nenhuma aritmética passa por ele. Medido:
+        # `np.isclose` sobre (24,2) custa 10,9 µs contra 0,64 µs do `==`, 17×,
+        # e são duas chamadas por decisão. Era metade do `decodificar`, que por
+        # sua vez é metade da decisão inteira. A comparação exata também é mais
+        # ESTRITA: a tolerância de 1e-5 aceitaria um válido próximo de −1.
+        val_a = ~(bruto_a == PADDING).all(axis=1) if n_a else np.zeros(0, bool)
+        val_s = ~(bruto_s == PADDING).all(axis=1)
 
         # p_outro − p_k = −(p_k − p_outro) = −(bruto·2S − S) = S − bruto·2S
         rel_a = S - bruto_a * 2 * S

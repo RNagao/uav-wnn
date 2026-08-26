@@ -39,8 +39,12 @@ class Codificador(Protocol):
 
 
 def _valido(coluna: NDArray[np.float32]) -> NDArray[np.bool_]:
-    """Máscara dos valores que não são padding."""
-    return ~np.isclose(coluna, PADDING)
+    """Máscara dos valores que não são padding.
+
+    `==` e não `np.isclose`, pelo mesmo motivo do `Observacao.decodificar`: o
+    sentinela vem de `fill(-1)` e chega exato. Ver a nota lá.
+    """
+    return coluna != PADDING
 
 
 def _aplicar(obs: NDArray[np.float32], limiares: NDArray[np.float64]) -> NDArray[np.bool_]:
