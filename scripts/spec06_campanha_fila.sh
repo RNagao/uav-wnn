@@ -41,7 +41,11 @@ G=results/etapa2
 NS_TREINO=24          # o Ns em que as redes WNN multiagente foram treinadas
 
 ckpt_wnn() {   # $1=T (16|32)  $2=Na
-  if [ "$2" = 1 ]; then echo "models/T$1/a1s12"; else echo "models/T$1/a${2}s${NS_TREINO}"; fi
+  # `models/deploy/` e NÃO `models/`: o artefato que a tese reporta em tamanho é
+  # o podado, e desempenho tem de sair do MESMO artefato. Medir o modelo cheio e
+  # publicar o tamanho do podado afirmaria um artefato que nunca foi avaliado.
+  if [ "$2" = 1 ]; then echo "models/deploy/T$1/a1s12"
+  else echo "models/deploy/T$1/a${2}s${NS_TREINO}"; fi
 }
 gate_de() {    # $1=rótulo  $2=Na  $3=Ns
   echo "$G/gate_rf05-$1-a${2}s${3}.json"

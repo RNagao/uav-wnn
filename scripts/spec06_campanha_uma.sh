@@ -17,8 +17,9 @@ G=results/etapa2
 
 case "$ROT" in
   maddpg)  MOD=maddpg; CKPT=- ;;
-  wnn-T16) MOD=wnn; CKPT=$([ "$NA" = 1 ] && echo models/T16/a1s12 || echo models/T16/a${NA}s${NS_TREINO}) ;;
-  wnn-T32) MOD=wnn; CKPT=$([ "$NA" = 1 ] && echo models/T32/a1s12 || echo models/T32/a${NA}s${NS_TREINO}) ;;
+  # `models/deploy/`: o artefato podado, o mesmo cujo tamanho a tese reporta.
+  wnn-T16) MOD=wnn; CKPT=$([ "$NA" = 1 ] && echo models/deploy/T16/a1s12 || echo models/deploy/T16/a${NA}s${NS_TREINO}) ;;
+  wnn-T32) MOD=wnn; CKPT=$([ "$NA" = 1 ] && echo models/deploy/T32/a1s12 || echo models/deploy/T32/a${NA}s${NS_TREINO}) ;;
   *) echo "rótulo desconhecido: $ROT"; exit 1 ;;
 esac
 case "$REG" in
