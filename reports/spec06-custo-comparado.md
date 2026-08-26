@@ -15,7 +15,7 @@ Reprodução: `uv run --group baseline python scripts/spec06_custo_comparado.py`
 | **T1 memória** | MADDPG | 1,9× (287 KB contra 537 KB) |
 | **T3 operações** | **WNN** | **18 241×** (4 contra 72 964 mult. fp) |
 | **T2 ciclos** (Cortex-M0) | **WNN** | **1 913×** |
-| T2 wall-clock | MADDPG | 2,6× — mas ver §4 |
+| T2 wall-clock | MADDPG | 1,8× — mas ver §4 |
 
 ---
 
@@ -89,20 +89,51 @@ drone pequeno.
 
 ## 4. T2 — wall-clock, e por que ele não decide
 
-| célula | modelo | mediana (µs) | p99 (µs) |
-|---|---|---|---|
-| 1d/12s | wnn-T16 | 70,2 | 118,9 |
-| 2d/24s | maddpg | **33,2** | **56,1** |
-| 2d/24s | wnn-T16 | 83,7 | 122,5 |
-| 2d/24s | wnn-T32 | 87,6 | 134,4 |
+**Os números publicados na 1ª versão desta tabela comparavam coisas diferentes**,
+e a explicação que dei para eles estava errada. As duas correções, medidas:
 
-**O wall-clock inverte o veredito dos ciclos, e a razão é implementação.** A WNN
-roda em NumPy interpretado; o MADDPG, em PyTorch com kernels BLAS compilados. A
-diferença de 2,6× mede arcabouços, não algoritmos.
+**A medida era assimétrica.** `_latencia_torch` cronometrava `rede(x)` — o
+forward puro sobre um tensor já pronto. `_latencia_wnn` cronometrava
+`politica(x)` — decodificar, termometrizar, consultar, amostrar, projetar. Uma
+media uma multiplicação de matrizes; a outra, uma decisão inteira. Corrigido no
+código; medindo os dois de observação bruta a ação:
 
-Registro os dois porque omitir o wall-clock seria escolher a métrica conveniente
-— e porque ele diz uma coisa verdadeira: **do jeito que está implementada hoje, a
-WNN é mais lenta em x86.** A vantagem de 58–703× é o que uma implementação em C
+| célula | modelo | decisão completa |
+|---|---|---|
+| 2d/24s | maddpg | **50,6 µs** |
+| 2d/24s | wnn-T16 | 91,5 µs — **1,8×**, não 2,6× |
+
+**E não é o PyTorch.** Eu havia escrito que o MADDPG ganha por ter "kernels BLAS
+compilados" contra NumPy interpretado. É falso, e a medida é direta: a **mesma
+rede** do MADDPG, reimplementada em NumPy puro, roda em **18,2 µs** contra os
+**36,7 µs** do `forward` em torch. Para uma rede 27→256→256→2, o despacho do
+PyTorch custa o dobro do trabalho aritmético — torch é o arcabouço *mais lento*
+aqui, não o mais rápido.
+
+**A causa real é o nosso próprio decodificador.** Perfilando `politica(x)` da
+WNN com `cProfile`, 3 000 chamadas:
+
+| etapa | fração |
+|---|---|
+| `Observacao.decodificar` | **52 %** |
+| consulta às LUTs (`LUTPlana.prever`) | 22 % |
+| `para_acao` (projeção) | 14 % |
+
+`decodificar` faz duas chamadas a `np.isclose` sobre matrizes `(n_a,2)` e
+`(n_s,2)` para achar o preenchimento, mascara com `NaN` e monta uma dataclass —
+27 mil reduções de ufunc e 12 mil `.all()` para 3 000 decisões. **O MADDPG não
+tem camada equivalente**: alimenta o vetor de 27 floats direto na multiplicação.
+
+Ou seja: a parte que implementa a alegação da tese — a consulta sem multiplicação
+— é 22 % do tempo. Os outros 78 % são o cano em volta, e o cano da WNN é mais
+caro que o do baseline por decisão nossa de implementação, não por propriedade do
+método. Comparando só os núcleos, termômetro + `prever` dá **19,3 µs** contra os
+**18,2 µs** da matriz em NumPy — empate, com quatro ordens de grandeza menos
+multiplicações.
+
+Registro tudo porque omitir o wall-clock seria escolher a métrica conveniente — e
+porque ele diz uma coisa verdadeira: **do jeito que está implementada hoje, a WNN
+é mais lenta em x86.** A vantagem de 31–703× é o que uma implementação em C
 entregaria, e o modelo de ciclos é a estimativa dela.
 
 ---
@@ -117,7 +148,8 @@ implementou.
 o `T=16` chega a 296 KB contra 287 KB — **empate**. O que era a fraqueza clara do
 método virou paridade.
 
-**O alvo importa.** Em x86 com PyTorch o MADDPG é melhor nos dois eixos práticos.
+**O alvo importa.** Em x86 o MADDPG é melhor nos dois eixos práticos — mas por
+1,8×, e a maior parte disso é o nosso decodificador, não o aproximador.
 Num Cortex-M0 sem FPU a conta inverte: 13 mil ciclos contra 9,2 milhões, e 296 KB
 contra 287 KB de memória — a WNN passa a ser a única das duas que roda.
 
@@ -129,3 +161,6 @@ contra 287 KB de memória — a WNN passa a ser a única das duas que roda.
   comparado com o da WNN.
 - Os modelos WNN medidos são os de `models/deploy/` — podados a 70 % e em
   `float32`/`uint16`. É o artefato que a campanha avaliou.
+- Os `latencia_mediana_us` das 33 corridas de campanha já gravadas usam a medida
+  ANTIGA e assimétrica do MADDPG. Só são comparáveis entre corridas do mesmo
+  modelo, não entre modelos. As próximas campanhas usam a medida corrigida.

@@ -117,7 +117,7 @@ def montar_politica(a, cfg):
         pol = carregar_ator(disp[(a.na, a.ns)], cfg.observation_size)
         cst = tamanho(disp[(a.na, a.ns)])
         ops = operacoes_ator(cst["obs_dim"])
-        return pol, cst, ops, lambda: _latencia_torch(pol, cfg.observation_size)
+        return pol, cst, ops, lambda: _latencia_torch(pol, cfg)
 
     from spec06_campanha_wnn import montar
     from uavwnn.custo.memoria import custo_ntuple_de_rede
@@ -169,16 +169,32 @@ def _res_do_config(ckpt: Path, d_obs: int) -> int:
     return n_bits // d_obs
 
 
-def _latencia_torch(politica, obs_dim: int, repeticoes: int = 2000):
+def _latencia_torch(politica, cfg, repeticoes: int = 2000):
+    """`politica(x)` — observação bruta a ação, o MESMO ponto do `_latencia_wnn`.
+
+    ANTES media `rede(x)`: o forward puro sobre um tensor já pronto, sem a
+    conversão de/para NumPy e sem o reescalonamento da ação. A WNN era medida
+    com o pipeline inteiro — decodificar, termometrizar, consultar, amostrar,
+    projetar. Comparar as duas era comparar uma multiplicação de matrizes com
+    uma decisão, e a diferença publicada (2,6×) tinha 0,6× de artefato.
+
+    A observação também passa a ser REAL, não `torch.randn`, pelo mesmo motivo
+    que o `_latencia_wnn` já usava: o custo do caminho depende do que ele toca.
+    """
     import torch
-    rede = politica.rede
-    x = torch.randn(1, obs_dim)
+    from uavwnn.refenv import make_env
+    env = make_env(cfg); obs, _ = env.reset()
+    x = obs[next(iter(obs))]
     with torch.no_grad():
         for _ in range(200):
-            rede(x)
+            politica(x)
         t = np.empty(repeticoes)
         for i in range(repeticoes):
-            t0 = time.perf_counter_ns(); rede(x); t[i] = time.perf_counter_ns() - t0
+            t0 = time.perf_counter_ns(); politica(x); t[i] = time.perf_counter_ns() - t0
+    try:
+        env.close()
+    except Exception:  # pragma: no cover
+        pass
     us = t / 1000.0
     return float(np.median(us)), float(np.percentile(us, 99))
 
