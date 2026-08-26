@@ -4,3 +4,23 @@ RETOMANDO de models/T16/a2s24 (ator/crítico/termômetro carregados)
 multiagente · Na=2 Ns=24 · T=16 · N=36 RAMs · B=432 bits · 2 trajetórias compartilhando a rede
 retomando de 6,752,492 passos, 40,521 episódios (melhor-val 1.000) · alvo 50,000,000
 [14.0%] 7,002,513/50,000,000 · 42,095 ep · 487 passos/s · ETA 24.5 h
+[14.5%] 7,252,651/50,000,000 · 43,691 ep · 483 passos/s · ETA 24.6 h
+[15.0%] 7,502,720/50,000,000 · 45,303 ep · 486 passos/s · ETA 24.3 h
+[15.5%] 7,752,766/50,000,000 · 46,906 ep · 487 passos/s · ETA 24.1 h
+   eval @ 8,002,640: cob 0.977 · sr 0.940 · CT 71.7 s
+Traceback (most recent call last):
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m356[0m, in [35m<module>[0m
+    raise SystemExit([31mmain[0m[1;31m()[0m)
+                     [31m~~~~[0m[1;31m^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m350[0m, in [35mmain[0m
+    [31mtreinar[0m[1;31m(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,[0m
+    [31m~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+            [1;31ma.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)[0m
+            [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m247[0m, in [35mtreinar[0m
+    with [31m(saida / "metrics.jsonl").open[0m[1;31m("a")[0m as fh:
+         [31m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^[0m
+  File [35m"/usr/local/lib/python3.13/pathlib/_local.py"[0m, line [35m537[0m, in [35mopen[0m
+    return [31mio.open[0m[1;31m(self, mode, buffering, encoding, errors, newline)[0m
+           [31m~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mFileNotFoundError[0m: [35m[Errno 2] No such file or directory: 'runs/spec06-50M/T16-a2s24/metrics.jsonl'[0m

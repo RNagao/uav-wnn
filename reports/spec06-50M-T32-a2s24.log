@@ -3,3 +3,24 @@ SPEC-06 escalada multiagente · config vencedora (passo 0.0008, σ 0.35, T 32, n
 RETOMANDO de models/T32/a2s24 (ator/crítico/termômetro carregados)
 multiagente · Na=2 Ns=24 · T=32 · N=72 RAMs · B=864 bits · 2 trajetórias compartilhando a rede
 retomando de 7,502,112 passos, 47,155 episódios (melhor-val 1.000) · alvo 50,000,000
+[15.5%] 7,752,203/50,000,000 · 48,718 ep · 334 passos/s · ETA 35.2 h
+[16.0%] 8,002,277/50,000,000 · 50,315 ep · 337 passos/s · ETA 34.6 h
+[16.5%] 8,252,407/50,000,000 · 51,909 ep · 337 passos/s · ETA 34.4 h
+[17.0%] 8,502,445/50,000,000 · 53,499 ep · 340 passos/s · ETA 33.9 h
+   eval @ 8,752,165: cob 0.967 · sr 0.860 · CT 108.0 s
+Traceback (most recent call last):
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m356[0m, in [35m<module>[0m
+    raise SystemExit([31mmain[0m[1;31m()[0m)
+                     [31m~~~~[0m[1;31m^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m350[0m, in [35mmain[0m
+    [31mtreinar[0m[1;31m(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,[0m
+    [31m~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+            [1;31ma.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)[0m
+            [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m247[0m, in [35mtreinar[0m
+    with [31m(saida / "metrics.jsonl").open[0m[1;31m("a")[0m as fh:
+         [31m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^[0m
+  File [35m"/usr/local/lib/python3.13/pathlib/_local.py"[0m, line [35m537[0m, in [35mopen[0m
+    return [31mio.open[0m[1;31m(self, mode, buffering, encoding, errors, newline)[0m
+           [31m~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mFileNotFoundError[0m: [35m[Errno 2] No such file or directory: 'runs/spec06-50M/T32-a2s24/metrics.jsonl'[0m

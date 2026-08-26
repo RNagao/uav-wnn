@@ -159,7 +159,9 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
     avisou_plato = False
+    saida.mkdir(parents=True, exist_ok=True)
     melhor_dir = saida / "checkpoints" / "melhor"
+    ultimo_dir = saida / "checkpoints" / "ultimo"
 
     def _salvar(dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -244,6 +246,12 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             # A curva também em JSONL: o log é prosa, e uma corrida de 31 h
             # precisa ser plotável sem reparsear texto. `ocupadas` entra porque é
             # o que diz se a LUT ainda está crescendo depois do platô da cobertura.
+            _salvar(ultimo_dir)
+            (ultimo_dir / "procedencia.json").write_text(json.dumps({
+                "passos": passos, "episodios": ep,
+                "melhor_val_cobertura": melhor,
+                "config": {"na": na, "ns": ns, "T": t_res},
+                "parcial": True, "fonte": "spec06_treino_multiagente.py"}, indent=2))
             with (saida / "metrics.jsonl").open("a") as fh:
                 fh.write(json.dumps({
                     "passo": passos, "episodios": ep, "cobertura": m["cobertura"],
