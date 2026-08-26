@@ -128,7 +128,15 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             progresso_cada: int, t_res: int = T_RES,
-            retomar: Path | None = None) -> dict:
+            retomar: Path | None = None, sem_parada: bool = False) -> dict:
+    """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
+
+    A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
+    passos no `a2s24`, contra os 6,75 M em que a paciência de 8 finalmente
+    disparou). Com `sem_parada` a curva de avaliação continua sendo gravada até o
+    fim, que é o que permite responder se os passos além do platô da cobertura
+    ainda compram `SR` — a métrica que não satura.
+    """
     cfg_tr, cfg_av = _cfgs(replica, na, ns)
     ctx = _ctx(cfg_tr)
     r = REPLICAS[replica]
@@ -149,6 +157,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     val = carregar_bancos(na, ns).val.sementes[:20]
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
+    avisou_plato = False
     melhor_dir = saida / "checkpoints" / "melhor"
 
     def _salvar(dest: Path) -> None:
@@ -209,9 +218,14 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
                 melhor = m["cobertura"]; _salvar(melhor_dir)
             print(f"   eval @ {passos:,}: cob {m['cobertura']:.3f} · sr {m['sr']:.3f}"
                   f"{'  (melhor)' if eh_melhor else ''}", flush=True)
-            if parada.registrar(m["cobertura"]):
+            plato = parada.registrar(m["cobertura"])
+            if plato and not sem_parada:
                 print(f"   parada antecipada (platô) em {passos:,} passos", flush=True)
                 break
+            if plato and not avisou_plato:
+                avisou_plato = True
+                print(f"   platô da cobertura em {passos:,} passos "
+                      f"(--sem-parada: seguindo até {b_max:,})", flush=True)
 
     # final: salva o estado final e avalia o MELHOR checkpoint (fix 539b61e)
     _salvar(saida / "checkpoints" / "final")
@@ -275,6 +289,9 @@ def main() -> int:
     ap.add_argument("--retomar", type=Path, default=None,
                     help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
+    ap.add_argument("--sem-parada", action="store_true",
+                    help="ignora a parada antecipada da §4.4 e gasta --b-max "
+                         "inteiro; a avaliação periódica continua rodando")
     ap.add_argument("--smoke", action="store_true", help="b-max=5000, avaliação curta")
     a = ap.parse_args()
     if a.smoke:
@@ -288,7 +305,7 @@ def main() -> int:
           f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
           flush=True)
     treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
-            a.resolucao, a.retomar)
+            a.resolucao, a.retomar, a.sem_parada)
     return 0
 
 
