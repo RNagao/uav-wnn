@@ -183,10 +183,19 @@ def main() -> int:
         print(f"\n   {bloqueadas} bloqueadas — sem checkpoint ou sem atestado; "
               "a fila as pula e avisa")
 
+    # "em curso" pela EXISTÊNCIA DO PROCESSO, não pelo log: um treino morto por
+    # fora não deixa marcador nenhum, e o painel o anunciava vivo por horas.
+    treinos = [c for c in _cmdlines()
+               if re.search(r"python3?\s+scripts/spec06_treino_multiagente\.py", c)]
     for lg in LOG_TREINO:
-        ult = [l for l in lg.read_text(errors="replace").splitlines() if l.startswith("[")]
-        if ult and "PAROU" not in ult[-1] and "parada antecipada" not in lg.read_text():
-            print(f"\n   treino em curso · {lg.stem}: {ult[-1].strip()}")
+        ult = [l for l in lg.read_text(errors="replace").splitlines()
+               if l.startswith("[")]
+        if not ult:
+            continue
+        alvo = lg.stem.split("-")[-1].lstrip("a")          # "…-T32-a8" -> "8"
+        vivo = any(f"--na {alvo} " in c for c in treinos)
+        estado = "em curso" if vivo else "PARADO"
+        print(f"\n   treino {estado} · {lg.stem}: {ult[-1].strip()}")
     return 0
 
 
