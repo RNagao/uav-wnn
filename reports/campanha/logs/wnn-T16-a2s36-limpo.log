@@ -105,3 +105,12 @@ wnn-T16 · Na=2 Ns=36 · regime limpo · 37 de 100 runs a rodar (200 ep cada)
 
 -> reports/campanha/wnn-T16-a2s36-limpo.csv
 -> reports/campanha/wnn-T16-a2s36-limpo-episodios.csv
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=36 (d_obs=27 é o mesmo)
+wnn-T16 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   70.60 s · SR 95.5% ·   22.0 s · resta  0.6 h
+  [  2/100] run   1 · CT   69.06 s · SR 96.0% ·   21.6 s · resta  0.6 h
+  [  3/100] run   2 · CT   79.36 s · SR 93.5% ·   21.7 s · resta  0.6 h
+  [  4/100] run   3 · CT   84.56 s · SR 92.5% ·   22.8 s · resta  0.6 h
+  [  5/100] run   4 · CT   74.63 s · SR 94.5% ·   21.3 s · resta  0.6 h
+  [  6/100] run   5 · CT   65.98 s · SR 96.5% ·   22.1 s · resta  0.6 h
+  [  7/100] run   6 · CT   85.47 s · SR 92.0% ·   21.8 s · resta  0.6 h

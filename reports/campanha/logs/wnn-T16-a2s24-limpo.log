@@ -103,3 +103,17 @@ wnn-T16 · Na=2 Ns=24 · regime limpo · 21 de 100 runs a rodar (200 ep cada)
 
 -> reports/campanha/wnn-T16-a2s24-limpo.csv
 -> reports/campanha/wnn-T16-a2s24-limpo-episodios.csv
+wnn-T16 · Na=2 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   92.62 s · SR 89.5% ·   14.5 s · resta  0.4 h
+  [  2/100] run   1 · CT   82.16 s · SR 92.0% ·   14.6 s · resta  0.4 h
+  [  3/100] run   2 · CT   85.26 s · SR 91.0% ·   14.7 s · resta  0.4 h
+  [  4/100] run   3 · CT   88.62 s · SR 90.5% ·   16.2 s · resta  0.4 h
+  [  5/100] run   4 · CT   90.73 s · SR 90.0% ·   16.8 s · resta  0.4 h
+  [  6/100] run   5 · CT   87.92 s · SR 90.5% ·   17.5 s · resta  0.4 h
+  [  7/100] run   6 · CT   93.63 s · SR 89.5% ·   18.1 s · resta  0.4 h
+  [  8/100] run   7 · CT   92.75 s · SR 89.5% ·   18.0 s · resta  0.4 h
+  [  9/100] run   8 · CT   70.32 s · SR 94.5% ·   16.9 s · resta  0.4 h
+  [ 10/100] run   9 · CT   96.25 s · SR 89.0% ·   18.5 s · resta  0.4 h
+  [ 11/100] run  10 · CT   72.03 s · SR 94.0% ·   17.3 s · resta  0.4 h
+  [ 12/100] run  11 · CT  104.30 s · SR 87.0% ·   17.3 s · resta  0.4 h
+  [ 13/100] run  12 · CT   74.31 s · SR 93.5% ·   17.2 s · resta  0.4 h

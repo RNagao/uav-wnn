@@ -150,15 +150,42 @@ def pendentes() -> list[tuple[str, int, int, str]]:
     return out
 
 
-def lancar(alvo: tuple[str, int, int, str]) -> bool:
+FALHAS_ATE_DESISTIR = 2
+"""Quantas vezes tentar a mesma corrida antes de tirá-la da fila.
+
+Sem isto o supervisor entra em laço: a corrida morre na inicialização (sem
+metadado, sem atestado, sem checkpoint), ele vê "0 em voo" e relança a MESMA —
+quatro vezes em 90 segundos, no caso que motivou esta guarda. Duas tentativas
+cobrem falha transitória; a terceira seria teimosia."""
+
+
+def lancar(alvo: tuple[str, int, int, str], falhas: dict) -> bool:
+    """Lança e CONFIRMA que subiu — `bash &` devolve 0 mesmo se o filho morrer.
+
+    A confirmação é olhar o processo depois de um instante: um erro de
+    inicialização mata o Python em menos de um segundo, e sem esta checagem o
+    supervisor contaria como sucesso.
+    """
     rot, na, ns, reg = alvo
     r = subprocess.run(["bash", str(UMA), rot, str(na), str(ns), reg],
                        capture_output=True, text=True, cwd=RAIZ)
-    if r.returncode == 0:
-        diz(f"lançada {rot} a{na}s{ns} {reg}")
-        return True
-    diz(f"falhou lançar {rot} a{na}s{ns} {reg}: {r.stdout.strip()} {r.stderr.strip()}")
-    return False
+    if r.returncode != 0:
+        falhas[alvo] = falhas.get(alvo, 0) + 1
+        diz(f"falhou lançar {rot} a{na}s{ns} {reg}: "
+            f"{r.stdout.strip()} {r.stderr.strip()}")
+        return False
+    time.sleep(8)
+    if alvo not in em_voo():
+        falhas[alvo] = falhas.get(alvo, 0) + 1
+        n = falhas[alvo]
+        log = RAIZ / "reports" / "campanha" / "logs"
+        diz(f"{rot} a{na}s{ns} {reg} MORREU na inicialização "
+            f"(tentativa {n}/{FALHAS_ATE_DESISTIR}) — ver {log}/"
+            + ("desistindo desta corrida" if n >= FALHAS_ATE_DESISTIR else ""))
+        return False
+    diz(f"lançada {rot} a{na}s{ns} {reg}")
+    falhas.pop(alvo, None)
+    return True
 
 
 # --- laço --------------------------------------------------------------------
@@ -190,6 +217,7 @@ def main() -> int:
     visto = J[-1][0] if J else 0
     bons = 0
     alvo = a.alvo
+    falhas: dict = {}          # corrida → tentativas que morreram
     while True:
         vivos = em_voo()
         # 1) o treino ainda existe? se acabou, a restrição some
@@ -224,13 +252,15 @@ def main() -> int:
         if len(vivos) < alvo:
             ocupadas = set(vivos)
             for cand in pendentes():
-                if cand in ocupadas:
+                if cand in ocupadas or falhas.get(cand, 0) >= FALHAS_ATE_DESISTIR:
                     continue
-                if lancar(cand):
+                if lancar(cand, falhas):
                     break
             else:
+                mortas = sum(1 for v in falhas.values() if v >= FALHAS_ATE_DESISTIR)
                 if not vivos:
-                    diz("nada pendente e nada em voo — campanha completa")
+                    diz(f"nada pendente e nada em voo — campanha completa"
+                        + (f" ({mortas} corridas desistidas)" if mortas else ""))
                     return 0
 
         if a.uma_vez:

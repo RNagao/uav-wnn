@@ -187,3 +187,56 @@ não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+não achei o T de models/deploy/T32/a1s12: sem procedencia.json nem config.json
+wnn-T32 · Na=1 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   90.09 s · SR 89.0% ·    5.3 s · resta  0.1 h
+  [  2/100] run   1 · CT   82.66 s · SR 90.5% ·    5.1 s · resta  0.1 h
+  [  3/100] run   2 · CT   99.24 s · SR 87.0% ·    5.2 s · resta  0.1 h
+  [  4/100] run   3 · CT  100.07 s · SR 87.0% ·    5.3 s · resta  0.1 h
+  [  5/100] run   4 · CT   86.25 s · SR 90.0% ·    5.4 s · resta  0.1 h
+  [  6/100] run   5 · CT   83.00 s · SR 90.5% ·    5.7 s · resta  0.1 h
+  [  7/100] run   6 · CT   86.37 s · SR 89.5% ·    5.9 s · resta  0.1 h
+  [  8/100] run   7 · CT  106.45 s · SR 85.5% ·    6.4 s · resta  0.1 h
+  [  9/100] run   8 · CT   92.16 s · SR 88.5% ·    6.2 s · resta  0.1 h
+  [ 10/100] run   9 · CT   85.31 s · SR 90.0% ·    6.3 s · resta  0.1 h
+  [ 11/100] run  10 · CT   97.09 s · SR 87.5% ·    6.3 s · resta  0.1 h
+  [ 12/100] run  11 · CT   86.34 s · SR 89.5% ·    6.7 s · resta  0.1 h
+  [ 13/100] run  12 · CT   91.01 s · SR 89.0% ·    6.5 s · resta  0.1 h
+  [ 14/100] run  13 · CT   83.51 s · SR 90.5% ·    6.6 s · resta  0.1 h
+  [ 15/100] run  14 · CT   70.77 s · SR 93.0% ·    6.0 s · resta  0.1 h
+  [ 16/100] run  15 · CT   85.18 s · SR 90.0% ·    7.1 s · resta  0.1 h
+  [ 17/100] run  16 · CT  100.56 s · SR 87.0% ·    6.7 s · resta  0.1 h
+  [ 18/100] run  17 · CT   94.60 s · SR 88.0% ·    6.5 s · resta  0.1 h
+  [ 19/100] run  18 · CT   94.50 s · SR 88.0% ·    6.7 s · resta  0.1 h
+  [ 20/100] run  19 · CT   84.95 s · SR 90.0% ·    6.8 s · resta  0.1 h
+  [ 21/100] run  20 · CT   91.64 s · SR 88.5% ·    6.9 s · resta  0.1 h
+  [ 22/100] run  21 · CT   91.74 s · SR 88.5% ·    7.1 s · resta  0.1 h
+  [ 23/100] run  22 · CT   85.12 s · SR 90.0% ·    7.2 s · resta  0.1 h
+  [ 24/100] run  23 · CT   81.16 s · SR 91.0% ·    7.8 s · resta  0.1 h
+  [ 25/100] run  24 · CT   84.73 s · SR 90.0% ·    7.8 s · resta  0.1 h
+  [ 26/100] run  25 · CT   85.47 s · SR 90.0% ·    7.5 s · resta  0.1 h
+  [ 27/100] run  26 · CT   97.06 s · SR 87.5% ·    7.8 s · resta  0.1 h
+  [ 28/100] run  27 · CT   95.83 s · SR 87.5% ·    7.7 s · resta  0.1 h
+  [ 29/100] run  28 · CT   85.67 s · SR 90.0% ·    7.5 s · resta  0.1 h
+  [ 30/100] run  29 · CT   98.81 s · SR 87.0% ·    8.1 s · resta  0.1 h
+  [ 31/100] run  30 · CT  110.39 s · SR 84.5% ·    8.3 s · resta  0.1 h
+  [ 32/100] run  31 · CT   85.56 s · SR 90.0% ·    7.9 s · resta  0.1 h
+  [ 33/100] run  32 · CT   91.96 s · SR 88.5% ·    8.1 s · resta  0.1 h
+  [ 34/100] run  33 · CT   78.67 s · SR 91.5% ·    8.9 s · resta  0.1 h
+  [ 35/100] run  34 · CT   83.42 s · SR 90.5% ·    7.9 s · resta  0.1 h
+  [ 36/100] run  35 · CT  101.12 s · SR 86.5% ·    7.9 s · resta  0.1 h
+  [ 37/100] run  36 · CT   76.23 s · SR 92.0% ·    8.2 s · resta  0.1 h
+  [ 38/100] run  37 · CT  101.20 s · SR 86.5% ·    7.9 s · resta  0.1 h
+  [ 39/100] run  38 · CT   73.81 s · SR 92.5% ·    7.9 s · resta  0.1 h
+  [ 40/100] run  39 · CT  103.23 s · SR 86.0% ·    7.8 s · resta  0.1 h
+  [ 41/100] run  40 · CT  103.55 s · SR 86.0% ·    8.4 s · resta  0.1 h
+  [ 42/100] run  41 · CT   96.38 s · SR 87.5% ·    7.9 s · resta  0.1 h
+  [ 43/100] run  42 · CT   91.89 s · SR 88.5% ·    8.0 s · resta  0.1 h
+  [ 44/100] run  43 · CT   82.86 s · SR 90.5% ·    8.0 s · resta  0.1 h

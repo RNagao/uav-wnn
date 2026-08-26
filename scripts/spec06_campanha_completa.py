@@ -128,8 +128,8 @@ def montar_politica(a, cfg):
     # T=32, e assumir um dos dois faria o custo do outro sair errado.
     proc = _json.loads((a.checkpoint / "procedencia.json").read_text()) \
         if (a.checkpoint / "procedencia.json").exists() else {}
-    t_res = int(proc.get("resolucao") or _res_do_config(a.checkpoint))
     d_obs, n_tup, d_saida = cfg.observation_size, ap.ator.tamanho_tupla, 3
+    t_res = int(proc.get("resolucao") or _res_do_config(a.checkpoint, d_obs))
     cm = custo_ntuple_de_rede(ap.ator, variante="hash", limiares_por_dim=t_res,
                               n_dims=d_obs, rotulo=f"{a.rotulo} a{a.na}s{a.ns}")
     op = operacoes_ntuple(n_ram=ap.ator.n_ram, tamanho_tupla=n_tup,
@@ -142,22 +142,28 @@ def montar_politica(a, cfg):
     return pol, cst, {"mult_fp": op.mult_fp}, lambda: _latencia_wnn(pol, cfg)
 
 
-def _res_do_config(ckpt: Path) -> int:
-    """`T` do `config.json` da corrida, quando não há `procedencia.json`.
+def _res_do_config(ckpt: Path, d_obs: int) -> int:
+    """`T` do checkpoint. Do metadado se houver; senão, DERIVADO do próprio `.npz`.
 
-    As corridas de 1 drone (grade) gravam `config.json` dois níveis acima do
-    checkpoint; as multiagente gravam `procedencia.json` ao lado. Ler o errado
-    daria o `T` de outra corrida — daí a busca explícita.
+    O metadado externo é frágil: copiar um checkpoint sem levar o `config.json`
+    junto deixa a corrida sem `T` e ela morre na inicialização — aconteceu com
+    `models/T32/a1s12`, e o supervisor relançou a mesma corrida quatro vezes.
+
+    Mas `T` não precisa de arquivo externo: o `.npz` do ator grava `n_bits`, e
+    `n_bits = d_obs · T` por construção do termômetro. Derivar é mais robusto que
+    procurar, e a divisão exata serve de verificação.
     """
     import json as _json
-    # A ordem cobre os três leiautes: `models/T16/a1s12/` (config ao lado dos
-    # pesos), `runs/.../<hash>/<semente>/checkpoints/melhor` (dois acima) e o
-    # multiagente (`procedencia.json`, tratado antes desta função).
     for cand in (ckpt / "config.json", ckpt.parent.parent / "config.json",
                  ckpt.parent / "config.json"):
         if cand.exists():
             return int(_json.loads(cand.read_text())["config"]["resolucao"])
-    raise SystemExit(f"não achei o T de {ckpt}: sem procedencia.json nem config.json")
+    z = np.load(next(ckpt.glob("*ator.npz")), allow_pickle=False)
+    n_bits = int(_json.loads(str(z["config"]))["n_bits"])
+    if n_bits % d_obs:
+        raise SystemExit(f"{ckpt}: n_bits={n_bits} não é múltiplo de d_obs={d_obs}; "
+                         "não dá para derivar T — restaure o config.json")
+    return n_bits // d_obs
 
 
 def _latencia_torch(politica, obs_dim: int, repeticoes: int = 2000):
