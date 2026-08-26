@@ -152,10 +152,31 @@ Verificado em 5 242 ações contra a implementação original, atravessando 30 3
 slots de preenchimento, em limpo e sob Kalman com σ=10: diferença máxima na ação
 de **0,00e+00**.
 
-Registro tudo porque omitir o wall-clock seria escolher a métrica conveniente — e
-porque ele diz uma coisa verdadeira: **do jeito que está implementada hoje, a WNN
-é mais lenta em x86.** A vantagem de 31–703× é o que uma implementação em C
-entregaria, e o modelo de ciclos é a estimativa dela.
+### E depois da via rápida, o wall-clock virou
+
+O diagnóstico acima apontava o remédio: a decisão da WNN gastava ~30 despachos
+NumPy, e nesse tamanho de vetor o despacho domina a conta. A via rápida funde o
+pipeline — a `Observacao` sai do caminho (o ator só lê `.vetor`), o termômetro,
+o endereçamento e a busca viram uma closure sem materializar os bits, e a
+projeção da ação perde as dataclasses. Bit a bit igual, pinado em
+`tests/test_caminho_rapido.py`. Pareado, no mesmo laço:
+
+| decisão completa | mediana | p99 |
+|---|---|---|
+| **WNN T=16 via rápida** | **33,9 µs** | 78,6 µs |
+| WNN T=32 via rápida | 25,2 µs ¹ | 62,1 µs |
+| WNN T=16 via lenta | 70,7 µs | 153,4 µs |
+| MADDPG (torch) | 76,4 µs | 165,2 µs |
+
+**A WNN passou a ganhar também no relógio de parede: 2,26×.** Nenhuma lib nova —
+a lição é que trocar de arcabouço não era o remédio (o torch perde do NumPy puro
+aqui); reduzir despachos era.
+
+¹ Medido sob contenção (4 treinos na máquina); a inversão T32 < T16 está dentro
+desse ruído e não deve ser lida como sinal.
+
+O modelo de ciclos continua sendo o argumento para o embarcado: 31–703× num
+Cortex-M0 sem FPU é o que uma implementação em C entregaria.
 
 ---
 
@@ -169,8 +190,9 @@ implementou.
 o `T=16` chega a 296 KB contra 287 KB — **empate**. O que era a fraqueza clara do
 método virou paridade.
 
-**O alvo importa.** Em x86 o MADDPG é melhor nos dois eixos práticos — mas por
-1,8×, e a maior parte disso é o nosso decodificador, não o aproximador.
+**O alvo importa — e depois da via rápida, menos ainda.** Em x86 o MADDPG ganha
+só em memória (287 KB × 296 KB, empate prático); em tempo a WNN faz 33,9 µs
+contra 76,4 µs.
 Num Cortex-M0 sem FPU a conta inverte: 13 mil ciclos contra 9,2 milhões, e 296 KB
 contra 287 KB de memória — a WNN passa a ser a única das duas que roda.
 

@@ -538,7 +538,18 @@ class AtorCriticoContinuo:
         self._buffer.clear()
 
     def act(self, obs: Observacao) -> Acao:
-        x = self.codificar(obs.vetor)
+        return self.act_vetor(obs.vetor)
+
+    def act_vetor(self, vetor) -> Acao:
+        """`act` sem exigir a `Observacao` — o ator só lê `obs.vetor`.
+
+        Construir a `Observacao` (máscaras de preenchimento, posições relativas
+        com NaN, dataclass congelada) custava 28 % da decisão medida, e nada dela
+        era lido: essas vistas existem para o guloso e para o harness, não para a
+        rede. Quem tem só o vetor cru — o `callable_refenv` da campanha — entra
+        por aqui.
+        """
+        x = self.codificar(vetor)
         f = self.aproximador.f(x)
         self._concentracoes.append(NormalProjetada.concentracao(f))
 

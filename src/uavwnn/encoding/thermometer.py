@@ -93,6 +93,13 @@ class TermometroGlobal:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
 
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
+
     # -- persistência: os limiares SÃO estado treinado ----------------------
 
     def salvar(self, caminho) -> None:
@@ -148,6 +155,13 @@ class TermometroPorSlot:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
 
     # -- persistência: os limiares SÃO estado treinado ----------------------
 
@@ -213,6 +227,13 @@ class TermometroQuantil:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
 
     # -- persistência: os limiares SÃO estado treinado ----------------------
 

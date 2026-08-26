@@ -534,6 +534,52 @@ class LUTPlana(_RedeNTupla):
                     saida[m] = self.valores[j[ok]].sum(axis=0, dtype=np.float64)
         return saida / self.n_ram if self.convencao == "media" else saida
 
+    def consulta_do_vetor(self, dim_por_bit, limiar_por_bit):
+        """Compila `v -> f(v)`: termômetro, endereçamento e busca numa closure.
+
+        O caminho em três etapas — `codificar` (aloca os `B` bits), `enderecos`
+        (aloca o estendido e a fatia `(1, N, n)`) e `prever` — gasta ~20 despachos
+        NumPy por decisão, e para `M = 1` o despacho domina o trabalho. Aqui o bit
+        nunca é materializado: para cada slot de tupla, junta-se A DIMENSÃO e O
+        LIMIAR que o bit compararia, e o endereço sai de um único
+        `(v[dim] >= lim) · pot`. Três despachos no lugar de doze.
+
+        A SEMÂNTICA É A MESMA POR CONSTRUÇÃO, não por aproximação: o bit
+        `b = d·T + t` do termômetro é `v[d] >= limiares[d, t]`, e é exatamente
+        essa comparação que o gather reproduz — mesmos float64, mesmo `>=`. O
+        sentinela (índice `n_bits`, para tuplas curtas) vira limiar `+inf`, e o
+        peso dele em `_pot_mat` já é zero. Bit a bit igual a
+        `prever(codificar(v))[0]`, pinado em teste.
+
+        `dim_por_bit` e `limiar_por_bit` vêm de fora (do termômetro) porque esta
+        classe não conhece codificação — e é assim que deve ficar.
+        """
+        dim = np.concatenate([np.asarray(dim_por_bit, np.intp),
+                              [0]])[self._tuplas]
+        lim = np.concatenate([np.asarray(limiar_por_bit, float),
+                              [np.inf]])[self._tuplas]
+        pot = self._pot_mat
+        chaves, valores, desloc = self.chaves, self.valores, self._desloc
+        tam, n_saidas = chaves.size, self.n_saidas
+        divisor = self.n_ram if self.convencao == "media" else 1
+        d_obs = int(np.asarray(dim_por_bit).max()) + 1
+
+        def consulta(v):
+            if v.size != d_obs:
+                raise ValueError(f"observação com {v.size} entradas, "
+                                 f"esperado {d_obs}")
+            addr = ((v[dim] >= lim) * pot).sum(axis=1)
+            saida = np.zeros(n_saidas)
+            if tam:
+                g = desloc + addr.astype(np.int32)
+                j = np.minimum(np.searchsorted(chaves, g), tam - 1)
+                ok = chaves[j] == g
+                if ok.any():
+                    saida = valores[j[ok]].sum(axis=0, dtype=np.float64)
+            return saida / divisor
+
+        return consulta
+
     @property
     def memoria(self):
         """Vista somente-leitura, para o harness de custo contar a ocupação.

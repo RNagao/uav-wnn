@@ -53,6 +53,7 @@ from spec02_maddpg_campanha import (  # noqa: E402
 )
 from spec02_maddpg_rollout import trilhas_de_um_episodio  # noqa: E402
 from uavwnn.agents import APROXIMADORES, AtorCriticoContinuo  # noqa: E402
+from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
 from uavwnn.agents.base import Acao, ContextoEpisodio, Observacao  # noqa: E402
 from uavwnn.encoding import TermometroQuantil  # noqa: E402
 from uavwnn.refenv import LAMENZA_003, run_episode  # noqa: E402
@@ -211,14 +212,33 @@ def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0,
         politica_np.reset(ctx, np.random.default_rng(seed))
         acao_de = None
 
+    # VIA RÁPIDA para a LUT plana em avaliação: consulta fundida (termômetro +
+    # endereçamento + busca numa closure) e projeção sem intermediários. Bit a
+    # bit igual à via lenta — pinado em tests/test_caminho_rapido.py — e ~3×
+    # mais barata: a decisão saía a ~30 despachos NumPy, e para vetores deste
+    # tamanho o despacho domina o trabalho. Só existe fora do treino: o treino
+    # precisa do `z` bruto e da trilha que o `act` guarda.
+    consulta = None
+    if (aprox == "ntupla_dissertacao" and acao_de is None
+            and not politica_np.treinando
+            and type(ap.ator).__name__ == "LUTPlana"):
+        consulta = ap.ator.consulta_do_vetor(
+            np.repeat(np.arange(d_obs), termo.n_niveis),
+            termo.limiares.ravel())
+
     def callable_refenv(observacao):
         """Adapta ao protocolo do `refenv`: `obs -> ação em [0,1]²`.
 
         A ponte é `Observacao.decodificar`, a mesma que o harness usa — então a
-        política vê exatamente o que veria lá.
+        política vê exatamente o que veria lá. (A via rápida pula a ponte porque
+        o ator só lê `.vetor`; a igualdade das ações é pinada em teste.)
         """
         if acao_de is not None:
             return acao_de(ap.f(codificar(np.asarray(observacao, float)))).como_array()
+        if consulta is not None:
+            f = consulta(np.asarray(observacao, float).ravel())
+            politica_np._concentracoes.append(NormalProjetada.concentracao(f))
+            return NormalProjetada.media_rapida(f)
         obs = Observacao.decodificar(observacao, ctx)
         return politica_np.act(obs).como_array()
 
