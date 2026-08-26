@@ -218,8 +218,19 @@ def main() -> int:
             return 1
         prim = sorted(x[1] for x in J[:6])
         a.base = prim[len(prim) // 2]
-    # Marca visual de fronteira: quem lê o diário precisa ver onde um supervisor
-    # acaba e outro começa, senão relançamentos legítimos parecem duplicata.
+    # ROTAÇÃO: `_supervisor.log` guarda SÓ a sessão corrente. O diário acumulado
+    # confundia — um supervisor morto e o substituto relançam as mesmas corridas,
+    # e ler as duas sessões juntas parecia duplicata. O histórico não se perde:
+    # vai para `_supervisor.<data>.log`, nomeado pela hora de início da sessão
+    # que está saindo.
+    if DIARIO.exists() and DIARIO.stat().st_size:
+        try:
+            primeira = DIARIO.read_text(errors="replace").splitlines()[0]
+            carimbo = primeira.split()[1].replace(":", "")     # HHMMSS
+            dia = primeira.split()[0].replace("/", "")          # DDMM
+            DIARIO.rename(DIARIO.with_name(f"_supervisor.{dia}-{carimbo}.log"))
+        except (OSError, IndexError):
+            pass                     # arquivo vazio ou ilegível: começa por cima
     diz("─" * 64)
     diz(f"supervisor no ar · base {a.base:.0f} passos/s · alvo {a.alvo} · máx {a.max} "
         f"· recua <{a.base*a.piso:.0f} · sobe >{a.base*a.teto:.0f}")
