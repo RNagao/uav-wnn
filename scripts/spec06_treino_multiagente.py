@@ -129,7 +129,7 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             progresso_cada: int, t_res: int = T_RES,
             retomar: Path | None = None, sem_parada: bool = False,
-            passos_previos: int | None = None) -> dict:
+            passos_previos: int | None = None, val_n: int = 20) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -155,7 +155,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     passos_max = int(cfg_tr.max_episode_length / cfg_tr.algorithm_iteration_interval) + 2
     handlers = list(__import__("logging").getLogger().handlers)
     ctx_av = _ctx(cfg_av)
-    val = carregar_bancos(na, ns).val.sementes[:20]
+    val = carregar_bancos(na, ns).val.sementes[:val_n]
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
     avisou_plato = False
@@ -239,7 +239,18 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             if eh_melhor:
                 melhor = m["cobertura"]; _salvar(melhor_dir)
             print(f"   eval @ {passos:,}: cob {m['cobertura']:.3f} · sr {m['sr']:.3f}"
+                  f" · CT {m['ct_cens']:.1f} s"
                   f"{'  (melhor)' if eh_melhor else ''}", flush=True)
+            # A curva também em JSONL: o log é prosa, e uma corrida de 31 h
+            # precisa ser plotável sem reparsear texto. `ocupadas` entra porque é
+            # o que diz se a LUT ainda está crescendo depois do platô da cobertura.
+            with (saida / "metrics.jsonl").open("a") as fh:
+                fh.write(json.dumps({
+                    "passo": passos, "episodios": ep, "cobertura": m["cobertura"],
+                    "sr": m["sr"], "ct_cens": m["ct_cens"], "n_val": m["n"],
+                    "ocupadas": sum(len(x) for x in ap.ator.memoria),
+                    "parede_s": round(time.perf_counter() - t0, 1),
+                    "melhor": bool(eh_melhor)}) + "\n")
             plato = parada.registrar(m["cobertura"])
             if plato and not sem_parada:
                 print(f"   parada antecipada (platô) em {passos:,} passos", flush=True)
@@ -311,6 +322,12 @@ def main() -> int:
     ap.add_argument("--retomar", type=Path, default=None,
                     help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
+    ap.add_argument("--val-n", type=int, default=20,
+                    help="sementes do banco val por avaliação (máx. 100). Com 20, "
+                         "a SR tem resolução de 5 pp e um único episódio move a "
+                         "curva — pouco para decidir se os passos além do platô "
+                         "da cobertura ainda compram SR. 100 custa 0,65 %% do "
+                         "orçamento de 50 M.")
     ap.add_argument("--passos-previos", type=int, default=None,
                     help="passos já treinados, quando o checkpoint de --retomar "
                          "não tem procedencia.json (ex.: os do grid). --b-max é "
@@ -331,7 +348,7 @@ def main() -> int:
           f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
           flush=True)
     treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
-            a.resolucao, a.retomar, a.sem_parada, a.passos_previos)
+            a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)
     return 0
 
 
