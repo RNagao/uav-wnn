@@ -117,3 +117,27 @@ wnn-T16 · Na=2 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 11/100] run  10 · CT   72.03 s · SR 94.0% ·   17.3 s · resta  0.4 h
   [ 12/100] run  11 · CT  104.30 s · SR 87.0% ·   17.3 s · resta  0.4 h
   [ 13/100] run  12 · CT   74.31 s · SR 93.5% ·   17.2 s · resta  0.4 h
+  [ 14/100] run  13 · CT  100.20 s · SR 88.0% ·   17.6 s · resta  0.4 h
+  [ 15/100] run  14 · CT   95.79 s · SR 89.0% ·   18.4 s · resta  0.4 h
+  [ 16/100] run  15 · CT   93.39 s · SR 89.5% ·   18.1 s · resta  0.4 h
+  [ 17/100] run  16 · CT   93.15 s · SR 89.5% ·   17.0 s · resta  0.4 h
+  [ 18/100] run  17 · CT   83.12 s · SR 91.5% ·   17.9 s · resta  0.4 h
+  [ 19/100] run  18 · CT   79.16 s · SR 92.5% ·   17.5 s · resta  0.4 h
+  [ 20/100] run  19 · CT   90.11 s · SR 90.0% ·   16.9 s · resta  0.4 h
+  [ 21/100] run  20 · CT   79.46 s · SR 92.5% ·   17.1 s · resta  0.4 h
+  [ 22/100] run  21 · CT   84.86 s · SR 91.5% ·   18.5 s · resta  0.4 h
+  [ 23/100] run  22 · CT   85.74 s · SR 91.0% ·   17.9 s · resta  0.4 h
+  [ 24/100] run  23 · CT   86.93 s · SR 90.5% ·   17.8 s · resta  0.4 h
+  [ 25/100] run  24 · CT   99.01 s · SR 88.5% ·   19.2 s · resta  0.4 h
+  [ 26/100] run  25 · CT   82.07 s · SR 92.0% ·   18.9 s · resta  0.4 h
+  [ 27/100] run  26 · CT   79.89 s · SR 92.5% ·   19.7 s · resta  0.4 h
+  [ 28/100] run  27 · CT   83.17 s · SR 91.5% ·   18.9 s · resta  0.3 h
+  [ 29/100] run  28 · CT   78.99 s · SR 92.5% ·   21.0 s · resta  0.3 h
+  [ 30/100] run  29 · CT   77.94 s · SR 93.0% ·   21.2 s · resta  0.3 h
+  [ 31/100] run  30 · CT   97.86 s · SR 88.5% ·   21.6 s · resta  0.3 h
+  [ 32/100] run  31 · CT   89.66 s · SR 90.0% ·   21.3 s · resta  0.3 h
+  [ 33/100] run  32 · CT   94.82 s · SR 89.0% ·   23.4 s · resta  0.3 h
+  [ 34/100] run  33 · CT   90.17 s · SR 90.0% ·   19.3 s · resta  0.3 h
+  [ 35/100] run  34 · CT   79.03 s · SR 92.5% ·   18.8 s · resta  0.3 h
+  [ 36/100] run  35 · CT   83.85 s · SR 91.5% ·   18.5 s · resta  0.3 h
+  [ 37/100] run  36 · CT   75.39 s · SR 93.0% ·   17.7 s · resta  0.3 h

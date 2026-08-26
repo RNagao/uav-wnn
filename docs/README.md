@@ -8,6 +8,7 @@ funcionam*, não *o que foi medido*.
 
 | documento | assunto |
 |---|---|
+| [`simulador-e-cenario.md`](teoria/simulador-e-cenario.md) | o problema: o que o drone vê, o que faz, o que ganha e quando acaba |
 | [`wnn-dissertacao.md`](teoria/wnn-dissertacao.md) | a rede sem peso: endereçamento, as duas redes (ator e crítico), a política, o Algoritmo 4.4, e o custo de uma decisão |
 | [`wnn-anbubus.md`](teoria/wnn-anbubus.md) | a segunda família WNN (`NTNModel` do artigo da Neurocomputing): as três diferenças estruturais e por que o braço PPO falhou |
 | [`maddpg.md`](teoria/maddpg.md) | o baseline do Lamenza: CTDE, o laço de treino do fonte original, e o que exatamente usamos dele |
