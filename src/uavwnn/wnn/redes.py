@@ -444,6 +444,117 @@ class _RedeNTupla:
             m.clear()
 
 
+class LUTPlana(_RedeNTupla):
+    """Ator IMUTÁVEL, para inferência: três arrays contíguos em vez de `N` dicts.
+
+    POR QUE ELA EXISTE — e o número que a motivou
+
+    O T1 modela os bytes de uma implementação em C. A implementação em Python
+    cobra outra coisa, e ninguém tinha medido: um modelo de 2,98 MB modelados
+    ocupava **94,6 MB de RSS**, 31,8×. A causa não é a rede — é granularidade.
+    Uma entrada guarda 24 B e custa 201: o cabeçalho do `ndarray` sozinho são
+    136 B (5,7× o conteúdo), mais 28 do `int` boxed e 37 do slot do dict. São
+    259 mil objetos Python minúsculos, cada um com seu cabeçalho.
+
+    A ESTRUTURA
+
+        chaves   int32   (occ,)     chave GLOBAL = ram·2ⁿ + endereço, ORDENADA
+        valores  float32 (occ, d)
+        desloc   int32   (N,)       ram·2ⁿ, pré-computado
+
+    A chave global é o ponto: em vez de `N` tabelas separadas, **uma** ordenada.
+    Com `N = 72` e `n = 12` a chave máxima é 294 912 — cabe em `int32` com folga,
+    e o construtor recusa se não couber.
+
+    O GANHO, medido no ator de `T=32, Na=2, Ns=24` (129 664 entradas):
+
+        dict[int, ndarray]   25 452 KB   93,0 µs
+        LUTPlana int32/f32    2 026 KB   12,0 µs    12,6× menor · 7,8× mais rápida
+
+    Ganha nos DOIS eixos, e a velocidade é contraintuitiva — busca binária
+    `O(log n)` contra dict `O(1)`. A razão está medida: o dict paga **por RAM**
+    (`N` buscas em Python, cada uma com boxing, hash e desreferência); esta faz
+    UMA chamada compilada sobre memória contígua.
+
+    POR QUE SÓ INFERÊNCIA
+
+    É imutável por construção: as chaves estão ordenadas e a busca binária depende
+    disso, então inserir exigiria reordenar o array inteiro. O treino escreve a
+    cada transição — ~13 milhões de escritas numa corrida de 6,75 M passos, muitas
+    em endereços nunca vistos. `atualizar` e `treinar` levantam aqui, de
+    propósito: é melhor falhar alto que degradar em silêncio.
+    """
+
+    def __init__(self, rede: "RedeGradienteFuncional",
+                 dtype_valor=np.float32) -> None:
+        if not isinstance(rede, RedeGradienteFuncional):
+            raise TypeError(f"esperava RedeGradienteFuncional, veio {type(rede).__name__}")
+        self.n_bits = rede.n_bits
+        self.tamanho_tupla = rede.tamanho_tupla
+        self.n_saidas = rede.n_saidas
+        self.n_ram = rede.n_ram
+        self.convencao = rede.convencao
+        self.c_max = rede.c_max
+        self.mapeamento = rede.mapeamento
+        self._potencias = rede._potencias
+        self._tuplas = rede._tuplas
+        self._pot_mat = rede._pot_mat
+        self._n_passos = 0
+
+        desloc = 1 << self.tamanho_tupla
+        maximo = self.n_ram * desloc
+        if maximo >= 2**31:
+            raise ValueError(
+                f"chave global máxima {maximo:,} não cabe em int32 "
+                f"(n_ram={self.n_ram}, tupla={self.tamanho_tupla})")
+        chaves, valores = [], []
+        for i, m in enumerate(rede.memoria):
+            for k in sorted(m):                       # ORDENADO por RAM, e as
+                chaves.append(i * desloc + k)         # RAMs em ordem crescente
+                valores.append(m[int(k)])             # → o vetor global já sai
+        self.chaves = np.asarray(chaves, np.int32)    #   ordenado, sem sort
+        self.valores = (np.asarray(valores, dtype_valor).reshape(-1, self.n_saidas)
+                        if valores else np.zeros((0, self.n_saidas), dtype_valor))
+        self._desloc = (np.arange(self.n_ram) * desloc).astype(np.int32)
+
+    def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
+        """Eq. (4.12), com busca binária vetorizada. `(M, B) -> (M, d)`.
+
+        Mesma semântica do dict: posição ausente contribui zero e ainda entra no
+        denominador `N`.
+        """
+        end = self.enderecos(bits)
+        saida = np.zeros((end.shape[0], self.n_saidas))
+        if self.chaves.size:
+            for m, linha in enumerate(end):
+                g = self._desloc + linha.astype(np.int32)
+                j = np.minimum(np.searchsorted(self.chaves, g), self.chaves.size - 1)
+                ok = self.chaves[j] == g
+                if ok.any():
+                    saida[m] = self.valores[j[ok]].sum(axis=0, dtype=np.float64)
+        return saida / self.n_ram if self.convencao == "media" else saida
+
+    @property
+    def memoria(self):
+        """Vista somente-leitura, para o harness de custo contar a ocupação.
+
+        Reconstrói dicionários — é caro, e de propósito: quem precisar disto num
+        caminho quente está usando a estrutura errada.
+        """
+        desloc = 1 << self.tamanho_tupla
+        saida = [{} for _ in range(self.n_ram)]
+        for k, v in zip(self.chaves.tolist(), self.valores):
+            saida[k // desloc][k % desloc] = v
+        return saida
+
+    def _imutavel(self, *_a, **_k):
+        raise TypeError(
+            "LUTPlana é imutável — as chaves estão ordenadas e a busca binária "
+            "depende disso. Para treinar, use RedeGradienteFuncional.")
+
+    atualizar = treinar = treinar_componente = salvar = _imutavel
+
+
 class RedeGradienteFuncional(_RedeNTupla):
     """O **ator** — §4.3.1, p.38. "Functional gradient-inspired n-tuple network".
 

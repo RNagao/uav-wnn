@@ -171,7 +171,9 @@ def main() -> int:
         aprox = json.loads(cfgjson.read_text())["config"]["aproximador"]
 
     cfg = LAMENZA_003(1, 12, phase="eval")
-    politica, _ = montar(aprox, cfg, a.checkpoint)
+    # A escada roda 17 células × 500 episódios sobre a MESMA política, sem
+    # nunca escrever nela — o caso exato para a LUT plana.
+    politica, _ = montar(aprox, cfg, a.checkpoint, plana=True)
 
     sigmas = [float(x) for x in a.sigmas.split(",")]
     degraus = [int(x) for x in a.degraus.split(",")]

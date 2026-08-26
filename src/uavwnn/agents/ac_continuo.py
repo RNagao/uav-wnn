@@ -245,22 +245,32 @@ class NTuplaDissertacaoAprox(_PrefixoCheckpoint):
         self.critico.salvar(d / f"{prefixo}-critico.npz")
         (d / "familia.txt").write_text(self.custo()["familia"])
 
-    def carregar(self, diretorio) -> None:
+    def carregar(self, diretorio, plana: bool = False) -> None:
         """Substitui as redes pelas gravadas — inclusive o **mapeamento**.
 
         Reconstruir o mapeamento pela semente daria uma rede cujos endereços não
         correspondem aos valores gravados, e o erro seria silencioso: a política
         prediria zero em quase todo estado e pareceria "não aprendeu".
+
+        `plana=True` converte o ATOR para `LUTPlana` — três arrays contíguos, 12×
+        menos RAM e 8× mais rápido, ao custo de ser IMUTÁVEL. É para inferência.
+        Quem for treinar deixa em `False`, que é o padrão: a bandeira é explícita
+        justamente para que ninguém receba uma rede imutável sem ter pedido.
+
+        O crítico nunca é convertido: quem só infere não precisa dele, e quem
+        precisa dele está treinando.
         """
         from pathlib import Path
 
-        from ..wnn.redes import RedeGradienteFuncional
+        from ..wnn.redes import LUTPlana, RedeGradienteFuncional
         d = Path(diretorio)
         prefixo = self._prefixo_checkpoint()
         # `carregar` devolve a CLASSE GRAVADA, então o crítico volta como
         # `RedeRegressaoEsquecimento` na família da dissertação e como
         # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
         self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
+        if plana:
+            self.ator = LUTPlana(self.ator)
         # O crítico é OPCIONAL: ele só existe para treinar (estima "quão boa é
         # esta situação" e nunca escolhe ação), então um artefato de implantação
         # traz só o ator. Sem esta tolerância, carregar um modelo de deploy morria

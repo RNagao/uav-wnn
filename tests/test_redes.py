@@ -349,3 +349,87 @@ def test_carrega_checkpoint_antigo_com_contador_float(tmp_path):
     antes = int(lida.memoria[0][end][1][0])
     lida.treinar(bits, np.array([2.0]))
     assert int(lida.memoria[0][end][1][0]) == antes + 1
+
+
+def test_lut_plana_e_equivalente_e_recusa_escrita():
+    """A `LUTPlana` é o ator de inferência: mesma predição, memória contígua.
+
+    A equivalência tem de ser EXATA quando os valores ficam em `float64` — a
+    estrutura não introduz erro nenhum por si, só a escolha de precisão. Com
+    `float32` o erro é o arredondamento do tipo, não da busca.
+
+    E ela tem de RECUSAR escrita: as chaves estão ordenadas e a busca binária
+    depende disso, então inserir exigiria reordenar. Degradar em silêncio seria
+    pior que falhar.
+    """
+    import numpy as np
+    import pytest
+
+    from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
+
+    rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=8, n_saidas=3, seed=3)
+    rng = np.random.default_rng(0)
+    for _ in range(40):
+        bits = rng.random((1, 256)) > 0.5
+        rede.atualizar(bits, rng.normal(0, 0.3, 3))
+
+    prova = rng.random((5, 256)) > 0.5
+    esperado = rede.prever(prova)
+
+    exata = LUTPlana(rede, dtype_valor=np.float64)
+    np.testing.assert_allclose(exata.prever(prova), esperado, rtol=0, atol=0)
+
+    f32 = LUTPlana(rede)                      # padrão: float32
+    np.testing.assert_allclose(f32.prever(prova), esperado, rtol=1e-6, atol=0)
+
+    # a estrutura interna: chaves globais, ordenadas
+    assert exata.chaves.dtype == np.int32
+    assert (np.diff(exata.chaves) > 0).all(), "chaves têm de estar ordenadas"
+    assert exata.chaves.size == sum(len(m) for m in rede.memoria)
+
+    for metodo in ("atualizar", "treinar", "salvar"):
+        with pytest.raises(TypeError, match="imutável"):
+            getattr(exata, metodo)(prova, np.zeros(3))
+
+
+def test_lut_plana_recusa_chave_grande_demais():
+    """`n_ram · 2ⁿ` precisa caber em `int32`. Estourar em silêncio daria
+    endereços negativos e uma rede que lê lixo sem levantar nada."""
+    import numpy as np
+    import pytest
+
+    from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
+
+    # n = 28 → 2^28 por RAM; com ~9 RAMs já passa de 2^31
+    rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=28, n_saidas=1)
+    with pytest.raises(ValueError, match="int32"):
+        LUTPlana(rede)
+
+
+def test_montar_com_plana_da_a_mesma_acao(tmp_path):
+    """A bandeira do `montar` não pode mudar o comportamento da política."""
+    import sys
+
+    import numpy as np
+
+    sys.path.insert(0, "scripts")
+    from spec06_campanha_wnn import montar
+
+    from uavwnn.refenv import LAMENZA_003
+
+    cfg = LAMENZA_003(1, 12, phase="eval")
+    ck = Path("models/deploy/T16/a1s12")
+    if not ck.exists():
+        import pytest
+        pytest.skip("modelo de deploy ausente")
+
+    p_dict, ap_d = montar("ntupla_dissertacao", cfg, ck)
+    p_plana, ap_p = montar("ntupla_dissertacao", cfg, ck, plana=True)
+    assert type(ap_p.ator).__name__ == "LUTPlana"
+
+    rng = np.random.default_rng(7)
+    for _ in range(20):
+        obs = rng.random(cfg.observation_size)
+        np.testing.assert_allclose(np.asarray(p_plana(obs), float),
+                                   np.asarray(p_dict(obs), float),
+                                   rtol=1e-6, atol=1e-9)

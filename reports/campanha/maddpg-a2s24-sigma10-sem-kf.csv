@@ -1,0 +1,6 @@
+run,modelo,num_drones,num_sensores,treinado_em_ns,transferencia,regime,episodios,seed_inicial,completion_time_medio,completion_time_std_episodios,taxa_sucesso,coleta_media,separacao_media_m,params_ator,bytes_ator_fp32,mult_fp,latencia_mediana_us,latencia_p99_us,wall_s
+0,maddpg,2,24,24,0,sigma10-sem-kf,200,0,29.505,3.7393,1.0,13.7573,97.861,73474,293896,72960,37.205,82.833,10.33
+1,maddpg,2,24,24,0,sigma10-sem-kf,200,200,29.2325,3.8266,1.0,13.8433,118.087,73474,293896,72960,65.876,112.708,9.98
+2,maddpg,2,24,24,0,sigma10-sem-kf,200,400,29.765,3.6735,1.0,13.9978,113.896,73474,293896,72960,39.441,146.769,10.16
+3,maddpg,2,24,24,0,sigma10-sem-kf,200,600,29.48,3.2573,1.0,13.8387,98.767,73474,293896,72960,66.316,117.778,10.3
+4,maddpg,2,24,24,0,sigma10-sem-kf,200,800,29.9325,3.9509,1.0,14.2008,120.293,73474,293896,72960,38.002,101.753,9.72

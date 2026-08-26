@@ -1,0 +1,7 @@
+  regime FIXO: degrau 1 (ruído bruto, SEM filtro) · σ=10 — todos os 20,000 episódios
+maddpg · Na=2 Ns=24 · regime sigma10-sem-kf · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   29.50 s · SR 100.0% ·   10.3 s · resta  0.3 h
+  [  2/100] run   1 · CT   29.23 s · SR 100.0% ·   10.0 s · resta  0.3 h
+  [  3/100] run   2 · CT   29.77 s · SR 100.0% ·   10.2 s · resta  0.3 h
+  [  4/100] run   3 · CT   29.48 s · SR 100.0% ·   10.3 s · resta  0.3 h
+  [  5/100] run   4 · CT   29.93 s · SR 100.0% ·    9.7 s · resta  0.3 h

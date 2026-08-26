@@ -180,3 +180,30 @@ wnn-T16 · Na=2 Ns=24 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 74/100] run  73 · CT   74.39 s · SR 93.5% ·   17.6 s · resta  0.1 h
   [ 75/100] run  74 · CT  101.87 s · SR 87.5% ·   19.0 s · resta  0.1 h
   [ 76/100] run  75 · CT   73.61 s · SR 93.5% ·   18.0 s · resta  0.1 h
+  [ 77/100] run  76 · CT   72.02 s · SR 94.0% ·   18.6 s · resta  0.1 h
+  [ 78/100] run  77 · CT   86.27 s · SR 91.0% ·   19.3 s · resta  0.1 h
+  [ 79/100] run  78 · CT   90.45 s · SR 90.0% ·   17.4 s · resta  0.1 h
+  [ 80/100] run  79 · CT   84.69 s · SR 91.5% ·   18.8 s · resta  0.1 h
+  [ 81/100] run  80 · CT   89.93 s · SR 90.0% ·   17.6 s · resta  0.1 h
+  [ 82/100] run  81 · CT   99.09 s · SR 88.5% ·   19.3 s · resta  0.1 h
+  [ 83/100] run  82 · CT   88.61 s · SR 90.5% ·   18.1 s · resta  0.1 h
+  [ 84/100] run  83 · CT   81.81 s · SR 92.0% ·   18.3 s · resta  0.1 h
+  [ 85/100] run  84 · CT   98.06 s · SR 88.5% ·   18.3 s · resta  0.1 h
+  [ 86/100] run  85 · CT   89.31 s · SR 90.5% ·   18.0 s · resta  0.1 h
+  [ 87/100] run  86 · CT   81.64 s · SR 92.0% ·   17.6 s · resta  0.1 h
+  [ 88/100] run  87 · CT  101.80 s · SR 87.5% ·   18.2 s · resta  0.1 h
+  [ 89/100] run  88 · CT   73.33 s · SR 94.0% ·   19.2 s · resta  0.1 h
+  [ 90/100] run  89 · CT   90.32 s · SR 90.0% ·   18.8 s · resta  0.1 h
+  [ 91/100] run  90 · CT   96.27 s · SR 88.5% ·   18.6 s · resta  0.0 h
+  [ 92/100] run  91 · CT   70.42 s · SR 94.5% ·   18.5 s · resta  0.0 h
+  [ 93/100] run  92 · CT   84.80 s · SR 91.0% ·   18.7 s · resta  0.0 h
+  [ 94/100] run  93 · CT   88.41 s · SR 90.5% ·   18.6 s · resta  0.0 h
+  [ 95/100] run  94 · CT   94.27 s · SR 89.5% ·   18.4 s · resta  0.0 h
+  [ 96/100] run  95 · CT   80.43 s · SR 92.5% ·   19.6 s · resta  0.0 h
+  [ 97/100] run  96 · CT   89.38 s · SR 90.5% ·   18.6 s · resta  0.0 h
+  [ 98/100] run  97 · CT   84.39 s · SR 91.5% ·   18.5 s · resta  0.0 h
+  [ 99/100] run  98 · CT   71.91 s · SR 94.0% ·   17.7 s · resta  0.0 h
+  [100/100] run  99 · CT   77.88 s · SR 92.5% ·   17.5 s · resta  0.0 h
+
+-> reports/campanha/wnn-T16-a2s24-limpo.csv
+-> reports/campanha/wnn-T16-a2s24-limpo-episodios.csv

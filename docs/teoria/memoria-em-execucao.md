@@ -138,17 +138,55 @@ entrada.
 
 ---
 
-## 7. Recomendação
+## 7. Implementado — `LUTPlana`, só na inferência
 
-Aplicar a LUT plana **só no caminho de inferência**, sem tocar no treino:
+`uavwnn.wnn.LUTPlana`, ligada por bandeira explícita:
 
-* `models/deploy/` já é imutável por construção — nada escreve nele;
-* a campanha carrega esses artefatos e roda milhões de episódios;
-* o ganho é duplo, e a equivalência numérica está medida.
+```python
+ap.carregar(checkpoint, plana=True)          # ac_continuo.py
+montar(aprox, cfg, checkpoint, plana=True)   # spec06_campanha_wnn.py
+```
 
-Não recomendo trocar a estrutura do treino. O `dict` é a escolha certa para
-escrita esparsa e imprevisível, e a memória do treino é artefato de trabalho —
-não é o que a tese reporta.
+Consumidores: `spec06_campanha_completa.py`, `spec08_escada.py` e
+`spec08_gate_rf05.py` — os três só leem a política.
+
+O treino fica **intocado**: `_montar` do `spec06_busca.py` e o do multiagente
+seguem com `RedeGradienteFuncional`. A bandeira é explícita e o padrão é `False`
+justamente para que ninguém receba uma rede imutável sem ter pedido — e
+`atualizar`, `treinar` e `salvar` levantam `TypeError` na `LUTPlana`, em vez de
+degradar em silêncio.
+
+### Medido no modelo real
+
+| modelo | entradas | RSS | `prever` |
+|---|---|---|---|
+| cheio, dict | 129 664 | **94,8 MB** | **124,6 µs** |
+| cheio, plana | 129 664 | **12,1 MB** | **34,4 µs** |
+| podado, dict | 38 900 | — | 98,1 µs |
+| podado, plana | 38 900 | — | 21,8 µs |
+
+**7,8× menos RAM e 3,6× mais rápido** no `prever`.
+
+### O ganho na decisão inteira é menor — e a razão está medida
+
+Uma decisão não é só o `prever`. Perfilando a política completa:
+
+```
+dict :  prever 0,048 s  ·  decodificar 0,040 s  ·  total 0,109 s
+plana:  prever 0,017 s  ·  decodificar 0,038 s  ·  total 0,073 s
+```
+
+O `prever` cai 2,8×, mas o `decodificar` (observação → objeto) custa o mesmo e
+passa a dominar. **Fim a fim: 1,5×.** Reportar só o 3,6× do `prever` seria
+escolher a métrica que convém.
+
+### Verificação
+
+* equivalência **exata** com `float64` (`atol=0`), e o arredondamento do `float32`
+  no padrão;
+* 20 episódios da campanha, mesmas sementes: **zero divergências** contra o CSV
+  já gravado com o `dict`;
+* três testes fixam a equivalência, a recusa de escrita e o estouro de `int32`.
 
 ---
 

@@ -174,7 +174,8 @@ def main() -> int:
     elif a.checkpoint is not None:
         aprox = a.aproximador or json.loads(
             (a.checkpoint.parent.parent / "config.json").read_text())["config"]["aproximador"]  # noqa: E501
-        politica, _ = montar(aprox, cfg, a.checkpoint)
+        # varre `q_w` com 100 episódios por candidato, só lendo a política
+        politica, _ = montar(aprox, cfg, a.checkpoint, plana=True)
         fonte = f"WNN {aprox}"
     else:
         greedy = load_heuristics().create_greedy_heuristics(0, a.ns)

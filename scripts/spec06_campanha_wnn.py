@@ -145,7 +145,8 @@ def _procedencia(checkpoint: Path | None) -> dict:
     return json.loads(arq.read_text()) if arq.exists() else {}
 
 
-def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0):
+def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0,
+           plana: bool = False):
     """Devolve `(callable no protocolo do refenv, aproximador)`.
 
     O codificador vive **fora** do aproximador, como a §4.8 exige: os três recebem
@@ -179,7 +180,12 @@ def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0):
         codificar = lambda v: termo.codificar(np.asarray(v, float)[None, :])[0]  # noqa: E731
 
     if checkpoint is not None:
-        ap.carregar(checkpoint)
+        # `plana` só vale para a família da dissertação; as outras ignoram, e
+        # passar a bandeira adiante sem checar daria TypeError num braço só.
+        if plana and aprox == "ntupla_dissertacao":
+            ap.carregar(checkpoint, plana=True)
+        else:
+            ap.carregar(checkpoint)
 
     if d_saida == 4:
         # CHECKPOINT DO PPO/RLLIB. As 4 saídas são `[μ_θ, μ_s, logσ_θ, logσ_s]` da

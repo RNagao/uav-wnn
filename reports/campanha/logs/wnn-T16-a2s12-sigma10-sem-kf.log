@@ -1,0 +1,25 @@
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=12 (d_obs=27 é o mesmo)
+  regime FIXO: degrau 1 (ruído bruto, SEM filtro) · σ=10 — todos os 20,000 episódios
+wnn-T16 · Na=2 Ns=12 · regime sigma10-sem-kf · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   63.52 s · SR 95.0% ·   12.8 s · resta  0.4 h
+  [  2/100] run   1 · CT   70.54 s · SR 94.0% ·   13.2 s · resta  0.4 h
+  [  3/100] run   2 · CT   56.02 s · SR 97.0% ·   13.1 s · resta  0.4 h
+  [  4/100] run   3 · CT   65.28 s · SR 95.0% ·   14.3 s · resta  0.4 h
+  [  5/100] run   4 · CT   60.42 s · SR 96.0% ·   14.3 s · resta  0.4 h
+  [  6/100] run   5 · CT   54.26 s · SR 97.5% ·   14.4 s · resta  0.4 h
+  [  7/100] run   6 · CT   58.28 s · SR 96.5% ·   15.2 s · resta  0.4 h
+  [  8/100] run   7 · CT   71.84 s · SR 93.5% ·   14.4 s · resta  0.4 h
+  [  9/100] run   8 · CT   61.88 s · SR 96.0% ·   16.2 s · resta  0.4 h
+  [ 10/100] run   9 · CT   51.98 s · SR 97.5% ·   15.6 s · resta  0.4 h
+  [ 11/100] run  10 · CT   71.73 s · SR 93.5% ·   15.7 s · resta  0.4 h
+  [ 12/100] run  11 · CT   65.92 s · SR 94.5% ·   15.2 s · resta  0.4 h
+  [ 13/100] run  12 · CT   66.49 s · SR 95.0% ·   17.0 s · resta  0.4 h
+  [ 14/100] run  13 · CT   51.41 s · SR 98.0% ·   15.7 s · resta  0.4 h
+  [ 15/100] run  14 · CT   62.74 s · SR 95.5% ·   15.6 s · resta  0.4 h
+  [ 16/100] run  15 · CT   62.84 s · SR 95.5% ·   15.9 s · resta  0.3 h
+  [ 17/100] run  16 · CT   53.26 s · SR 98.0% ·   16.0 s · resta  0.3 h
+  [ 18/100] run  17 · CT   58.85 s · SR 96.5% ·   13.6 s · resta  0.3 h
+  [ 19/100] run  18 · CT   64.66 s · SR 95.0% ·   13.3 s · resta  0.3 h
+  [ 20/100] run  19 · CT   57.56 s · SR 96.5% ·   14.4 s · resta  0.3 h
+  [ 21/100] run  20 · CT   58.90 s · SR 96.5% ·   14.7 s · resta  0.3 h
+  [ 22/100] run  21 · CT   58.24 s · SR 96.5% ·   14.9 s · resta  0.3 h

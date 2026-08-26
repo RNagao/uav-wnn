@@ -122,7 +122,10 @@ def montar_politica(a, cfg):
     from spec06_campanha_wnn import montar
     from uavwnn.custo.memoria import custo_ntuple_de_rede
     from uavwnn.custo.operacoes import operacoes_ntuple
-    pol, ap = montar(a.aproximador, cfg, a.checkpoint)
+    # `plana=True`: a campanha só INFERE, e a LUT plana custa 8× menos RAM e
+    # 3,6× menos tempo no `prever`. Com 6 corridas em paralelo, cada uma com um
+    # modelo carregado, a diferença é de 570 MB para 72 MB.
+    pol, ap = montar(a.aproximador, cfg, a.checkpoint, plana=True)
     import json as _json
     # `T` e `n` vêm do checkpoint, não de constante: a campanha compara T=16 com
     # T=32, e assumir um dos dois faria o custo do outro sair errado.
