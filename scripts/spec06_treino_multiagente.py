@@ -128,7 +128,8 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             progresso_cada: int, t_res: int = T_RES,
-            retomar: Path | None = None, sem_parada: bool = False) -> dict:
+            retomar: Path | None = None, sem_parada: bool = False,
+            passos_previos: int | None = None) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -165,7 +166,28 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
         ap.salvar(dest)
         termo.salvar(dest / "termometro.npz")
 
-    passos, ep, ultimo_prog, ultimo_eval, melhor = 0, 0, 0, 0, -1.0
+    passos, ep, melhor = 0, 0, -1.0
+    if retomar is not None:
+        # o `procedencia.json` fica na raiz da corrida, não em `checkpoints/final`
+        base_ret = Path(retomar)
+        proc_ant = next((c for c in (base_ret / "procedencia.json",
+                                     base_ret.parent / "procedencia.json",
+                                     base_ret.parent.parent / "procedencia.json")
+                         if c.exists()), base_ret / "procedencia.json")
+        if proc_ant.exists():
+            d = json.loads(proc_ant.read_text())
+            passos = int(d.get("passos", 0))
+            ep = int(d.get("episodios", 0))
+            melhor = float(d.get("melhor_val_cobertura", -1.0))
+        if passos_previos is not None:
+            passos = passos_previos
+        print(f"retomando de {passos:,} passos, {ep:,} episódios "
+              f"(melhor-val {melhor:.3f}) · alvo {b_max:,}", flush=True)
+        if passos >= b_max:
+            raise SystemExit(
+                f"--b-max {b_max:,} já foi alcançado ({passos:,} passos gravados). "
+                f"É ORÇAMENTO TOTAL, não incremento.")
+    ultimo_prog = ultimo_eval = passos_iniciais = passos
     t0 = time.perf_counter()
     while passos < b_max:
         s = SEED_TREINO_BASE + ep
@@ -206,7 +228,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             pass
         if passos - ultimo_prog >= progresso_cada:
             ultimo_prog = passos
-            taxa = passos / max(1e-9, time.perf_counter() - t0)
+            taxa = (passos - passos_iniciais) / max(1e-9, time.perf_counter() - t0)
             print(f"[{passos/b_max:5.1%}] {passos:,}/{b_max:,} · {ep:,} ep · "
                   f"{taxa:.0f} passos/s · ETA {(b_max-passos)/max(taxa,1)/3600:.1f} h", flush=True)
         # early-stop: avaliação periódica no val + checkpoint de melhor validação
@@ -289,6 +311,10 @@ def main() -> int:
     ap.add_argument("--retomar", type=Path, default=None,
                     help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
+    ap.add_argument("--passos-previos", type=int, default=None,
+                    help="passos já treinados, quando o checkpoint de --retomar "
+                         "não tem procedencia.json (ex.: os do grid). --b-max é "
+                         "ORÇAMENTO TOTAL, então isto desconta do que falta.")
     ap.add_argument("--sem-parada", action="store_true",
                     help="ignora a parada antecipada da §4.4 e gasta --b-max "
                          "inteiro; a avaliação periódica continua rodando")
@@ -305,7 +331,7 @@ def main() -> int:
           f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
           flush=True)
     treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
-            a.resolucao, a.retomar, a.sem_parada)
+            a.resolucao, a.retomar, a.sem_parada, a.passos_previos)
     return 0
 
 
