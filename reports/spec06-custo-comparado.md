@@ -131,6 +131,27 @@ método. Comparando só os núcleos, termômetro + `prever` dá **19,3 µs** con
 **18,2 µs** da matriz em NumPy — empate, com quatro ordens de grandeza menos
 multiplicações.
 
+### Uma otimização feita a partir disto
+
+`np.isclose` era 62 % do `decodificar`, e o trabalho dele ali é reconhecer um
+sentinela `-1.0`. Substituído por tolerância explícita `|v − (−1)| < 1e-12`:
+
+| forma | µs | |
+|---|---|---|
+| `np.isclose` | 38,91 | maquinaria de `rtol·\|b\| + atol` com NaN/inf |
+| `==` | 15,69 | 2,48×, mas exige o sentinela bit-exato |
+| **tolerância** | **16,70** | **2,33×**, e não depende disso |
+
+O `==` é 1,01 µs mais rápido e foi descartado de propósito: ele transformaria uma
+propriedade do AMBIENTE (`fill(-1)` sem aritmética depois) em requisito silencioso
+do nosso código. Se um dia alguém normalizar o vetor inteiro, `-1` decodifica para
+a posição válida `3S` e o slot vazio vira **sensor fantasma** — sem erro, só
+resultado pior.
+
+Verificado em 5 242 ações contra a implementação original, atravessando 30 363
+slots de preenchimento, em limpo e sob Kalman com σ=10: diferença máxima na ação
+de **0,00e+00**.
+
 Registro tudo porque omitir o wall-clock seria escolher a métrica conveniente — e
 porque ele diz uma coisa verdadeira: **do jeito que está implementada hoje, a WNN
 é mais lenta em x86.** A vantagem de 31–703× é o que uma implementação em C

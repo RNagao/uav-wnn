@@ -38,13 +38,18 @@ class Codificador(Protocol):
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]: ...
 
 
+TOL_PADDING = 1e-12
+"""Tolerância para reconhecer o sentinela. Ver `Observacao.decodificar`."""
+
+
 def _valido(coluna: NDArray[np.float32]) -> NDArray[np.bool_]:
     """Máscara dos valores que não são padding.
 
-    `==` e não `np.isclose`, pelo mesmo motivo do `Observacao.decodificar`: o
-    sentinela vem de `fill(-1)` e chega exato. Ver a nota lá.
+    Tolerância explícita em vez de `np.isclose`, pelo motivo detalhado em
+    `Observacao.decodificar`: 7× mais barato, e sem depender de o sentinela
+    chegar bit-exato como `==` dependeria.
     """
-    return coluna != PADDING
+    return np.abs(coluna - PADDING) >= TOL_PADDING
 
 
 def _aplicar(obs: NDArray[np.float32], limiares: NDArray[np.float64]) -> NDArray[np.bool_]:
