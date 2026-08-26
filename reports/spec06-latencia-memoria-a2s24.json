@@ -1,0 +1,35 @@
+[
+  {
+    "modelo": "wnn-T16",
+    "mediana_us": 17.8915,
+    "p99_us": 67.35459000000003,
+    "rss_base_kb": 13612,
+    "rss_arcabouco_kb": 17568,
+    "rss_modelo_kb": 10072,
+    "arrays_vivos_kb": 345.765625,
+    "disco_kb": 276.3544921875,
+    "params": 21472
+  },
+  {
+    "modelo": "wnn-T32",
+    "mediana_us": 20.394,
+    "p99_us": 73.89622000000007,
+    "rss_base_kb": 13544,
+    "rss_arcabouco_kb": 17608,
+    "rss_modelo_kb": 10728,
+    "arrays_vivos_kb": 628.34375,
+    "disco_kb": 499.8955078125,
+    "params": 38900
+  },
+  {
+    "modelo": "maddpg",
+    "mediana_us": 47.912499999999994,
+    "p99_us": 141.05773000000008,
+    "rss_base_kb": 13756,
+    "rss_arcabouco_kb": 493336,
+    "rss_modelo_kb": 3308,
+    "arrays_vivos_kb": 287.0234375,
+    "disco_kb": 1438.13671875,
+    "params": 73478
+  }
+]
