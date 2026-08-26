@@ -19,7 +19,7 @@ G=results/etapa2; NS_TREINO=24
 
 fila() {
   for T in 16 32; do echo "wnn-T$T|1|12|models/T$T/a1s12"; done
-  for NA in 2 4 8; do for NS in 12 24 36; do
+  for NA in 2; do for NS in 12 24 36; do
     echo "maddpg|$NA|$NS|-"
     for T in 16 32; do echo "wnn-T$T|$NA|$NS|models/T$T/a${NA}s${NS_TREINO}"; done
   done; done

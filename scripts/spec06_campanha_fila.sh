@@ -1,9 +1,14 @@
 #!/bin/bash
 # Fila da campanha comparável — MADDPG × WNN T16 × WNN T32.
 #
-# CÉLULAS: Na=1/Ns=12 (só WNN — Lamenza não publica single-drone) e as 9 células
-# multiagente da tab. 7.1 (Na ∈ {2,4,8} × Ns ∈ {12,24,36}), que são exatamente as
-# que o submodule publica checkpoint.
+# CÉLULAS: Na=1/Ns=12 (só WNN — Lamenza não publica single-drone) e Na=2 ×
+# Ns ∈ {12,24,36}.
+#
+# POR QUE SÓ ATÉ 2 DRONES. Na=4 e Na=8 saíram do escopo desta campanha. O que
+# se perde está registrado: o T=32 nunca teve modelo para Na=8 (o treino foi
+# interrompido em 37 %), e as células de Na=8 custavam ~99 min cada — mais que
+# todo o resto somado. O que sobra são as células onde os TRÊS modelos existem
+# e a comparação fecha.
 #
 # TRANSFERÊNCIA: `d_obs` depende só de Na, não de Ns — a mesma rede WNN roda em
 # qualquer Ns. Mas a WNN foi treinada em Ns=24 e o MADDPG tem checkpoint por
@@ -47,7 +52,7 @@ fila() {
     for T in 16 32; do
       echo "wnn|wnn-T$T|1|12|$REG|$(ckpt_wnn $T 1)|$(gate_de wnn-T$T 1 12)|12"
     done
-    for NA in 2 4 8; do
+    for NA in 2; do
       for NS in 12 24 36; do
         echo "maddpg|maddpg|$NA|$NS|$REG|-|$(gate_de maddpg $NA $NS)|$NS"
         for T in 16 32; do
