@@ -172,8 +172,12 @@ projeção da ação perde as dataclasses. Bit a bit igual, pinado em
 a lição é que trocar de arcabouço não era o remédio (o torch perde do NumPy puro
 aqui); reduzir despachos era.
 
-¹ Medido sob contenção (4 treinos na máquina); a inversão T32 < T16 está dentro
-desse ruído e não deve ser lida como sinal.
+¹ A inversão T32 < T16 no laço intercalado NÃO é ruído — é vizinhança de cache,
+e foi isolada trocando a ordem: quem roda logo depois do forward do torch paga os
+caches que as matrizes 256×256 dele despejam (~2× no seguinte). Medido cada um
+SOZINHO em bloco — que é como um modelo roda num drone — a ordem arquitetural
+reaparece: T16 17,7 µs · T32 42,4 µs · MADDPG 98,1 µs (sob a mesma carga de
+fundo). As razões honestas são T16 5,5× e T32 2,3× mais rápidas que o MADDPG.
 
 O modelo de ciclos continua sendo o argumento para o embarcado: 31–703× num
 Cortex-M0 sem FPU é o que uma implementação em C entregaria.
