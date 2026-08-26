@@ -105,3 +105,27 @@ wnn-T32 · Na=2 Ns=36 · regime limpo · 40 de 100 runs a rodar (200 ep cada)
 
 -> reports/campanha/wnn-T32-a2s36-limpo.csv
 -> reports/campanha/wnn-T32-a2s36-limpo-episodios.csv
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=36 (d_obs=27 é o mesmo)
+wnn-T32 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   71.54 s · SR 94.5% ·   23.0 s · resta  0.6 h
+  [  2/100] run   1 · CT   64.91 s · SR 96.0% ·   22.9 s · resta  0.6 h
+  [  3/100] run   2 · CT   71.72 s · SR 94.5% ·   23.2 s · resta  0.6 h
+  [  4/100] run   3 · CT   56.30 s · SR 98.0% ·   23.1 s · resta  0.6 h
+  [  5/100] run   4 · CT   59.24 s · SR 97.0% ·   24.3 s · resta  0.6 h
+  [  6/100] run   5 · CT   78.37 s · SR 93.0% ·   24.3 s · resta  0.6 h
+  [  7/100] run   6 · CT   82.55 s · SR 92.0% ·   23.8 s · resta  0.6 h
+  [  8/100] run   7 · CT   71.84 s · SR 94.5% ·   24.6 s · resta  0.6 h
+  [  9/100] run   8 · CT   59.62 s · SR 97.0% ·   26.4 s · resta  0.6 h
+  [ 10/100] run   9 · CT   58.01 s · SR 97.5% ·   26.6 s · resta  0.6 h
+  [ 11/100] run  10 · CT   63.21 s · SR 96.5% ·   27.1 s · resta  0.6 h
+  [ 12/100] run  11 · CT   74.27 s · SR 94.0% ·   25.9 s · resta  0.6 h
+  [ 13/100] run  12 · CT   69.48 s · SR 95.0% ·   26.0 s · resta  0.6 h
+  [ 14/100] run  13 · CT   61.24 s · SR 97.0% ·   27.0 s · resta  0.6 h
+  [ 15/100] run  14 · CT   69.86 s · SR 95.0% ·   26.6 s · resta  0.6 h
+  [ 16/100] run  15 · CT   60.58 s · SR 97.0% ·   24.9 s · resta  0.6 h
+  [ 17/100] run  16 · CT   59.78 s · SR 97.0% ·   26.8 s · resta  0.6 h
+  [ 18/100] run  17 · CT   57.42 s · SR 97.5% ·   28.4 s · resta  0.6 h
+  [ 19/100] run  18 · CT   75.47 s · SR 93.5% ·   27.6 s · resta  0.6 h
+  [ 20/100] run  19 · CT   58.97 s · SR 97.0% ·   23.7 s · resta  0.6 h
+  [ 21/100] run  20 · CT   65.55 s · SR 96.0% ·   25.2 s · resta  0.6 h
+  [ 22/100] run  21 · CT   60.93 s · SR 97.0% ·   23.8 s · resta  0.5 h

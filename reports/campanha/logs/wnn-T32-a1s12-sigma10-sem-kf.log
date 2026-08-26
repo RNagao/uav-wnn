@@ -117,3 +117,21 @@ não achei o T de models/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/T32/a1s12: sem procedencia.json nem config.json
 não achei o T de models/T32/a1s12: sem procedencia.json nem config.json
+  regime FIXO: degrau 1 (ruído bruto, SEM filtro) · σ=10 — todos os 20,000 episódios
+wnn-T32 · Na=1 Ns=12 · regime sigma10-sem-kf · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   50.55 s · SR 99.0% ·   11.2 s · resta  0.3 h
+  [  2/100] run   1 · CT   57.17 s · SR 97.5% ·   11.1 s · resta  0.3 h
+  [  3/100] run   2 · CT   58.23 s · SR 97.5% ·   11.8 s · resta  0.3 h
+  [  4/100] run   3 · CT   53.91 s · SR 98.5% ·   11.5 s · resta  0.3 h
+  [  5/100] run   4 · CT   63.18 s · SR 96.5% ·   11.7 s · resta  0.3 h
+  [  6/100] run   5 · CT   59.24 s · SR 97.0% ·   11.4 s · resta  0.3 h
+  [  7/100] run   6 · CT   57.77 s · SR 97.5% ·   10.6 s · resta  0.3 h
+  [  8/100] run   7 · CT   50.77 s · SR 99.0% ·    9.4 s · resta  0.3 h
+  [  9/100] run   8 · CT   55.56 s · SR 98.0% ·   10.1 s · resta  0.3 h
+  [ 10/100] run   9 · CT   50.19 s · SR 99.0% ·    9.5 s · resta  0.3 h
+  [ 11/100] run  10 · CT   53.49 s · SR 98.5% ·    9.4 s · resta  0.3 h
+  [ 12/100] run  11 · CT   51.24 s · SR 98.5% ·    9.2 s · resta  0.3 h
+  [ 13/100] run  12 · CT   49.14 s · SR 99.5% ·   10.2 s · resta  0.3 h
+  [ 14/100] run  13 · CT   55.89 s · SR 98.0% ·    9.1 s · resta  0.2 h
+  [ 15/100] run  14 · CT   54.60 s · SR 98.0% ·    9.4 s · resta  0.2 h
+  [ 16/100] run  15 · CT   52.88 s · SR 98.5% ·    9.1 s · resta  0.2 h

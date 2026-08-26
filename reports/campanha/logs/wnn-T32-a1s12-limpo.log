@@ -292,3 +292,20 @@ wnn-T32 · Na=1 Ns=12 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 94/100] run  93 · CT   83.37 s · SR 90.5% ·    8.8 s · resta  0.0 h
   [ 95/100] run  94 · CT   89.72 s · SR 89.0% ·    8.1 s · resta  0.0 h
   [ 96/100] run  95 · CT  114.38 s · SR 84.0% ·    8.5 s · resta  0.0 h
+  [ 97/100] run  96 · CT  103.75 s · SR 86.0% ·    8.3 s · resta  0.0 h
+  [ 98/100] run  97 · CT   76.87 s · SR 92.0% ·    8.2 s · resta  0.0 h
+  [ 99/100] run  98 · CT   92.17 s · SR 88.5% ·    8.4 s · resta  0.0 h
+  [100/100] run  99 · CT  111.06 s · SR 84.5% ·    8.5 s · resta  0.0 h
+
+-> reports/campanha/wnn-T32-a1s12-limpo.csv
+-> reports/campanha/wnn-T32-a1s12-limpo-episodios.csv
+wnn-T32 · Na=1 Ns=12 · regime limpo · 6 de 100 runs a rodar (200 ep cada)
+  [  1/6] run   0 · CT   90.09 s · SR 89.0% ·    8.2 s · resta  0.0 h
+  [  2/6] run   1 · CT   82.66 s · SR 90.5% ·    8.3 s · resta  0.0 h
+  [  3/6] run   2 · CT   99.24 s · SR 87.0% ·    8.4 s · resta  0.0 h
+  [  4/6] run   3 · CT  100.07 s · SR 87.0% ·    8.1 s · resta  0.0 h
+  [  5/6] run   4 · CT   86.25 s · SR 90.0% ·    8.0 s · resta  0.0 h
+  [  6/6] run   5 · CT   83.00 s · SR 90.5% ·    8.9 s · resta  0.0 h
+
+-> reports/campanha/wnn-T32-a1s12-limpo.csv
+-> reports/campanha/wnn-T32-a1s12-limpo-episodios.csv

@@ -12,6 +12,7 @@ funcionam*, não *o que foi medido*.
 | [`wnn-dissertacao.md`](teoria/wnn-dissertacao.md) | a rede sem peso: endereçamento, as duas redes (ator e crítico), a política, o Algoritmo 4.4, e o custo de uma decisão |
 | [`wnn-anbubus.md`](teoria/wnn-anbubus.md) | a segunda família WNN (`NTNModel` do artigo da Neurocomputing): as três diferenças estruturais e por que o braço PPO falhou |
 | [`maddpg.md`](teoria/maddpg.md) | o baseline do Lamenza: CTDE, o laço de treino do fonte original, e o que exatamente usamos dele |
+| [`memoria-em-execucao.md`](teoria/memoria-em-execucao.md) | o que o T1 modela × o que a RAM cobra: 31,8× de diferença, e a LUT plana que fecha |
 | [`filtro-de-kalman.md`](teoria/filtro-de-kalman.md) | o KF do degrau 4: variáveis, equações, implementação linha a linha, e como o `q_w` é descoberto pelo NEES |
 
 ## Mapas do código
