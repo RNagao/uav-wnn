@@ -111,6 +111,24 @@ por entrada, então o **crítico saía ~40 % subestimado** pelo harness. Não
 afetou o T1 publicado (que compara atores), mas qualquer conta de "ator +
 crítico" estava errada.
 
+### Compatibilidade com o que já foi treinado
+
+Testado nas quatro direções que importam:
+
+| | resultado |
+|---|---|
+| carregar checkpoint antigo (contadores `float64`) | **converte para `uint32` no `carregar`** |
+| predição do checkpoint antigo | **idêntica bit a bit** — o contador sempre foi inteiro, e `1 − φ^c` não distingue `5.0` de `5` |
+| continuar treinando num checkpoint antigo | funciona; incremento exato (+3 em 3 chamadas) |
+| salvar → recarregar | tipo preservado, predição idêntica |
+
+**Quebra numa direção, e ela importa:** código **antigo** não lê checkpoint
+**novo**. O `treinar` antigo fazia `c += 1.0` sobre o que leu, e `uint32 += 1.0`
+levanta `UFuncTypeError` no NumPy. Quem estiver com o repositório desatualizado —
+a outra máquina, por exemplo — precisa dar `pull` antes de retomar um treino
+gravado depois desta mudança. Checkpoints antigos continuam abrindo nos dois
+lados.
+
 ### O acumulador `y` — a resposta depende da rede
 
 As duas equações acumulam de formas diferentes, e isso decide o tipo.

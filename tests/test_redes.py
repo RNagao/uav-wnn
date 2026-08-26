@@ -310,3 +310,42 @@ def test_custo_do_critico_conta_o_contador():
     assert kc > ka, "crítico não pode custar o mesmo que o ator"
     occ = sum(len(m) for m in critico.memoria)
     assert kc - ka == occ * 4, "o contador deve pesar 4 bytes (uint32) por entrada"
+
+
+def test_carrega_checkpoint_antigo_com_contador_float(tmp_path):
+    """Checkpoints gravados ANTES da troca para `uint32` têm contadores `float64`.
+
+    Sem conversão no `carregar`, o `treinar` seguinte faria `c += 1` sobre um
+    `float64` e reintroduziria o custo em silêncio — o modelo funcionaria, só
+    gastaria o dobro. Este teste fixa a conversão.
+
+    A predição tem de ser IDÊNTICA bit a bit: o contador sempre foi inteiro, e
+    `1 − φ^c` não distingue `5.0` de `5`.
+    """
+    import numpy as np
+
+    from uavwnn.wnn.redes import RedeRegressaoEsquecimento
+
+    rede = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=1, phi=0.85)
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    for _ in range(7):
+        rede.treinar(bits, np.array([2.0]))
+    esperado = rede.prever(bits)
+
+    # regrava no formato ANTIGO: contadores em float64
+    rede.salvar(tmp_path / "c.npz")
+    d = dict(np.load(tmp_path / "c.npz", allow_pickle=False))
+    d["contadores"] = d["contadores"].astype(np.float64)
+    np.savez_compressed(tmp_path / "antigo.npz", **d)
+
+    lida = RedeRegressaoEsquecimento.carregar(tmp_path / "antigo.npz")
+    _, c = next(iter(lida.memoria[0].values()))
+    assert c.dtype == np.uint32, f"carregar não converteu: {c.dtype}"
+    np.testing.assert_allclose(lida.prever(bits), esperado, rtol=0, atol=0)
+
+    # e continuar treinando no checkpoint antigo tem de funcionar
+    end = int(lida.enderecos(bits)[0][0])
+    antes = int(lida.memoria[0][end][1][0])
+    lida.treinar(bits, np.array([2.0]))
+    assert int(lida.memoria[0][end][1][0]) == antes + 1
