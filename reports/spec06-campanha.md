@@ -176,9 +176,12 @@ Nas células comuns (`Na=2`), ele conclui em **18–36 s** contra **48–134 s**
 WNN. Em SR os três chegam perto sob ruído (99–100 %), mas o tempo separa por
 fator 2–4×.
 
-Duas ressalvas que cortam em direções opostas: o MADDPG treinou com **1 M** de
-passos e as WNN com **6,75 M**; e a comparação é **cross-método** (CTDE contra
-crítico descentralizado on-policy).
+Duas ressalvas. A primeira é do lado do baseline: os tensorboard logs mostram que
+o MADDPG treinou com **50 M** de passos contra os **6,75 M** das WNN — **7,4×
+mais**. E 80 % desse orçamento foi gasto reduzindo o tempo DEPOIS que o SR já
+saturara, o que explica boa parte da vantagem em `CT`. A segunda é que a
+comparação é **cross-método** (CTDE contra crítico descentralizado on-policy).
+Detalhes em [`../docs/teoria/maddpg-treinamento.md`](../docs/teoria/maddpg-treinamento.md).
 
 ### 2. O KF só ajuda quem não trava
 

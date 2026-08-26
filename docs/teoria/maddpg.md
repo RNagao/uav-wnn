@@ -209,7 +209,7 @@ estabilizar antes de guiar o ator.
 
 | parâmetro | valor |
 |---|---|
-| `total_timesteps` | **1 000 000** |
+| `total_timesteps` | **1 000 000** — o *default*, **não** o usado |
 | `actor_learning_rate` | 3e-6 |
 | `critic_learning_rate` | 3e-6 |
 | `buffer_size` | 10⁶ |
@@ -224,6 +224,11 @@ estabilizar antes de guiar o ator.
 
 As larguras **não são palpite nosso** — são os defaults do `main.py`, e são o que
 gerou estes pesos.
+
+> **Cuidado com o `total_timesteps`.** O default de 1 M foi sobrescrito na linha
+> de comando: os tensorboard logs mostram **49 999 999 passos** nas nove células.
+> Em 1 M o SR ainda era **zero**. Ver
+> [`maddpg-treinamento.md`](maddpg-treinamento.md).
 
 ### A exploração
 
@@ -283,11 +288,11 @@ da razão de tamanho, porque não voa.
 | **exploração** | ruído somado **fora** da rede | amostragem **dentro** da política |
 | **dados** | off-policy, replay de 10⁶ | on-policy, buffer de `m = 8` |
 | **alvos** | redes-alvo com `τ = 0,005` | nenhuma |
-| **orçamento** | 1 M de passos | 6,75 M (o nosso) |
+| **orçamento** | **50 M** de passos (medido nos logs) | 6,75 M (o nosso) |
 
-A linha do orçamento merece atenção: as nossas corridas longas usaram **6,75×
-mais passos** que o MADDPG publicado. Quando a WNN perde, não é por falta de
-treino; quando ganha, o crédito é parcialmente do orçamento.
+A linha do orçamento merece atenção, e na direção contrária à que eu supunha: o
+MADDPG usou **7,4× MAIS** passos que as nossas corridas longas (50 M contra
+6,75 M). Quando a WNN perde em tempo, parte da diferença é orçamento.
 
 ---
 
@@ -339,5 +344,6 @@ laço.
 **Não há `Na = 1`.** A célula mais difícil da grade — um drone para todos os
 sensores — não tem baseline. Ali a referência é o guloso (SR 100 %, CT ≈ 34 s).
 
-**O orçamento difere.** 1 M contra 6,75 M. Igualar exigiria retreinar o MADDPG,
-o que sairia do escopo de "não modificar o problema do Lamenza".
+**O orçamento difere, e a favor do baseline.** 50 M contra 6,75 M — 7,4×.
+Igualar exigiria treinar a WNN por 50 M de passos (~52 h por célula à nossa
+vazão), não retreinar o MADDPG. Ver [`maddpg-treinamento.md`](maddpg-treinamento.md).
