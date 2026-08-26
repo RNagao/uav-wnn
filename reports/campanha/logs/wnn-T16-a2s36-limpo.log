@@ -202,3 +202,11 @@ wnn-T16 · Na=2 Ns=36 · regime limpo · 100 de 100 runs a rodar (200 ep cada)
   [ 93/100] run  92 · CT   70.30 s · SR 95.5% ·   23.1 s · resta  0.0 h
   [ 94/100] run  93 · CT   73.73 s · SR 95.0% ·   23.2 s · resta  0.0 h
   [ 95/100] run  94 · CT   76.75 s · SR 94.5% ·   25.4 s · resta  0.0 h
+  [ 96/100] run  95 · CT   65.62 s · SR 96.5% ·   23.7 s · resta  0.0 h
+  [ 97/100] run  96 · CT   75.89 s · SR 94.5% ·   22.4 s · resta  0.0 h
+  [ 98/100] run  97 · CT   69.98 s · SR 95.5% ·   23.5 s · resta  0.0 h
+  [ 99/100] run  98 · CT   71.24 s · SR 95.0% ·   22.8 s · resta  0.0 h
+  [100/100] run  99 · CT   60.50 s · SR 97.5% ·   49.1 s · resta  0.0 h
+
+-> reports/campanha/wnn-T16-a2s36-limpo.csv
+-> reports/campanha/wnn-T16-a2s36-limpo-episodios.csv
