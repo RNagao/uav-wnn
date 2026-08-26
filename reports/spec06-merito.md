@@ -22,8 +22,8 @@ contrário, dependem do cenário — e essas **não** têm par (ver §4).
 
 | modelo | tamanho (ator, fp32) |
 |---|---|
-| **WNN T=32 (1/12), RL real** | **975 KB** (ordenado) — 70 950 entradas · 1 845 KB na variante `hash` |
-| **WNN T=16 (1/12), RL real** | **502 KB** (ordenado) — 36 547 entradas · 942 KB na variante `hash` |
+| **WNN T=32 (1/12), RL real** | **1 073 KB** (ordenado) — 78 132 entradas, checkpoint `final` |
+| **WNN T=16 (1/12), RL real** | **502 KB** (ordenado) — 36 547 entradas, checkpoint `final` |
 | WNN clone sintético (SPEC-03) | 133,9 KB |
 | MADDPG (Na=2/4/8) | 287 / 291 / 299 KB |
 | MLP pareado (1/12, 25-32-32-2) | 7,6 KB |

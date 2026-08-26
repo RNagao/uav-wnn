@@ -1,7 +1,16 @@
 # Modelos treinados (checkpoints `.npz`)
 
 Pesos da rede sem peso da dissertação (`ntupla_dissertacao`) treinada neste
-projeto. Cada pasta é o checkpoint de **melhor validação** (o modelo de deploy)
+projeto. Cada pasta é o checkpoint **`final`** — o estado ao fim do treino.
+
+> **Mudou em 25/08, e a razão importa.** Antes as pastas traziam o `melhor`
+> (melhor validação). Duas medições derrubaram essa escolha: (1) o `melhor`
+> congela cedo, porque o banco de validação satura em 100 % de cobertura e o
+> critério é `>` estrito — o `final` ganha em SR em TODAS as células medidas;
+> (2) as pastas estavam MISTAS — as do `T = 32` vieram com `melhor` e as do
+> `T = 16` com `final`, então a figura T1 comparava redes com orçamentos de
+> treino diferentes (2,5 M contra 6,75 M passos). O `T1` do `T = 32` subiu de
+> 975 KB para 1073 KB ao corrigir isso, e é o número certo.
 de uma célula. `runs/` é gitignored (GBs de artefatos por corrida); estes são os
 modelos versionados de propósito.
 

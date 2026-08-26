@@ -155,3 +155,51 @@ deploy já descarta) e o risco cresce com corridas mais longas — o erro de
 `float32` acumula com o número de atualizações, e 200 mil foi o meu teste, não o
 teto. O crítico poderia ir a `float32` com segurança; fica registrado como opção,
 não aplicado, porque também só afeta artefato de treino.
+
+## 7. Auditoria das contas — atrás do que nos favorece
+
+Depois de achar o crítico subestimado, auditei o resto procurando assimetrias
+que inflassem nosso lado. Duas contas estavam certas; uma estava errada.
+
+### Simétrico (conferido)
+
+**T1 inclui o codificador da WNN.** Os `limiares_codificador` (3,4 KB) e o
+`mapeamento_tuplas` (1,7 KB) entram no persistente. O termômetro é estado
+treinado e viaja com o modelo — omiti-lo inflaria nossa vantagem.
+
+**T3 cobra o amostrador dos dois lados.** As 4 `mult_fp` da WNN são do
+amostrador Box-Muller, não do aproximador (`incluir_amostragem=False` dá zero);
+o MADDPG também paga 4 (72 964 = 72 960 MACs + 4). A alegação "elimina os MACs"
+é sobre o aproximador, e está declarada assim.
+
+**Fora da conta do MADDPG:** os buffers `action_scale`/`action_bias`, 4
+parâmetros = 16 bytes (0,001 % do ator). Constantes do espaço de ação, não
+pesos aprendidos. Registrado por completude.
+
+### ERRADO — e favorecia a WNN
+
+**As pastas de `models/` estavam MISTAS.** As do `T = 32` traziam o checkpoint
+`melhor` e as do `T = 16` o `final`, e o T1 comparava redes com orçamentos de
+treino diferentes:
+
+| checkpoint | passos | ocupadas | T1 |
+|---|---|---|---|
+| T32 `melhor` | ~2,5 M | 70 950 | 975 KB ← era o publicado |
+| **T32 `final`** | 6,75 M | **78 132** | **1 073 KB** |
+| T16 `melhor` | ~2,5 M | 32 005 | 440 KB |
+| **T16 `final`** | 6,75 M | **36 547** | **502 KB** |
+
+A ocupação da WNN **cresce com o treino** — é uma máquina de núcleo, e o suporte
+cresce com a experiência. Reportar o `melhor` (rede menos treinada) dava um
+número 10 % menor que o do modelo que de fato usamos.
+
+Corrigido: `models/` passa a trazer o `final` em todas as células de 1 drone, e
+o T1 do `T = 32` sobe de **975 KB para 1 073 KB** — 3,7× o ator do MADDPG, não
+3,4×.
+
+### Fica em aberto
+
+As células multiagente do `T = 32` (`a2s24`, `a4s24`) vieram da outra máquina só
+com o `melhor`; não há `final` para elas aqui. Os números delas continuam sendo
+do `melhor` e estão marcados como tal. Para fechar, é preciso sincronizar os
+`final` daquela máquina ou reavaliar a partir das corridas.

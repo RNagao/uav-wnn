@@ -1,15 +1,15 @@
 {
   "wnn": {
     "T=32 (1/12)": {
-      "persistente_kb": 974.984375,
+      "persistente_kb": 1073.17578125,
       "variante_principal": "ordenado",
       "persistente_kb_por_variante": {
-        "ordenado": 974.984375,
-        "hash": 1844.74609375,
+        "ordenado": 1073.17578125,
+        "hash": 2106.05859375,
         "denso": 3220.703125
       },
-      "residente_kb": 975.3671875,
-      "entradas_ocupadas": 70950,
+      "residente_kb": 1073.55859375,
+      "entradas_ocupadas": 78132,
       "mult_fp": 4,
       "soma_fp": 203,
       "lookups": 201,
