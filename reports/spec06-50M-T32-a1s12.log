@@ -1,0 +1,7 @@
+SPEC-06 escalada multiagente · config vencedora (passo 0.0008, σ 0.35, T 32, n 12, φ 0.85, m 8)
+
+RETOMANDO de models/T32/a1s12 (ator/crítico/termômetro carregados)
+multiagente · Na=1 Ns=12 · T=32 · N=67 RAMs · B=800 bits · 1 trajetórias compartilhando a rede
+retomando de 6,750,000 passos, 0 episódios (melhor-val -1.000) · alvo 50,000,000
+[14.0%] 7,000,061/50,000,000 · 1,766 ep · 790 passos/s · ETA 15.1 h
+[14.5%] 7,250,170/50,000,000 · 3,537 ep · 769 passos/s · ETA 15.4 h
