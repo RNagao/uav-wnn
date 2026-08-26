@@ -64,10 +64,101 @@ def pareado(a: dict, b: dict, rng) -> dict | None:
     return d
 
 
+MEDIDAS = (("completion_time_medio", "CT", "s"),
+           ("taxa_sucesso", "SR", "%"),
+           ("coleta_media", "coleta", "s"),
+           ("separacao_media_m", "separação", "m"),
+           ("latencia_mediana_us", "latência", "µs"))
+CONSTANTES = (("params_ator", "params"), ("bytes_ator_fp32", "bytes"),
+              ("mult_fp", "mult. fp"))
+
+
+def agregado(modelo: str, na: int, ns: int, regime: str) -> list[dict] | None:
+    f = DIR / f"{modelo}-a{na}s{ns}-{regime}.csv"
+    if not f.exists():
+        return None
+    return list(csv.DictReader(f.open()))
+
+
+def med_dp(linhas: list[dict], col: str) -> tuple[float, float, int]:
+    """Média e desvio SOBRE AS RUNS — não sobre os episódios.
+
+    Cada run é uma réplica da campanha de avaliação (200 episódios), então o
+    desvio entre runs mede quanto o número PUBLICADO variaria numa nova
+    execução. O desvio entre episódios é outra coisa, muito maior, e responde
+    "quanto um episódio varia" — que não é a pergunta.
+    """
+    v = np.array([float(x[col]) for x in linhas if x.get(col) not in (None, "", "nan")],
+                 dtype=float)
+    v = v[~np.isnan(v)]
+    if v.size == 0:
+        return float("nan"), float("nan"), 0
+    return float(v.mean()), float(v.std(ddof=1)) if v.size > 1 else 0.0, int(v.size)
+
+
+def tabela_metricas(md: bool) -> None:
+    p = print
+    p("\n## Métricas por cenário — média ± desvio SOBRE AS RUNS\n" if md
+      else "\n=== MÉTRICAS: média ± desvio sobre as 100 runs ===\n")
+    if md:
+        p("Cada run é uma réplica da campanha de avaliação (200 episódios). O desvio")
+        p("entre runs mede **quanto o número publicado variaria numa nova execução** —")
+        p("não quanto um episódio varia, que é outra coisa e muito maior.\n")
+        p("| Na | Ns | ruído | modelo | CT (s) | SR (%) | coleta (s) | separação (m) |")
+        p("|---|---|---|---|---|---|---|---|")
+    else:
+        p(f"  {'Na':>3}{'Ns':>4} {'ruído':<14} {'modelo':<9}"
+          f"{'CT (s)':>16}{'SR (%)':>16}{'coleta (s)':>16}{'separação (m)':>17}")
+    for na, ns in CELULAS:
+        for reg, rot in REGIMES:
+            for m in MODELOS:
+                L = agregado(m, na, ns, reg)
+                if not L:
+                    continue
+                cel = []
+                for col, _, _ in MEDIDAS[:4]:
+                    mu, dp, _ = med_dp(L, col)
+                    if col == "taxa_sucesso":
+                        mu, dp = mu * 100, dp * 100
+                    cel.append("—" if mu != mu else f"{mu:.2f} ± {dp:.2f}")
+                if md:
+                    p(f"| {na} | {ns} | {rot} | {m} | " + " | ".join(cel) + " |")
+                else:
+                    p(f"  {na:>3}{ns:>4} {rot:<14} {m:<9}"
+                      + "".join(f"{c:>16}" for c in cel[:3]) + f"{cel[3]:>17}")
+
+    p("\n### Custo — constante por modelo e célula\n" if md
+      else "\n  --- custo (constante por modelo/célula) ---\n")
+    if md:
+        p("| Na | Ns | modelo | params do ator | bytes (fp32) | mult. fp | latência mediana (µs) |")
+        p("|---|---|---|---|---|---|---|")
+    else:
+        p(f"  {'Na':>3}{'Ns':>4} {'modelo':<9}{'params':>10}{'bytes':>10}"
+          f"{'mult_fp':>10}{'latência (µs)':>18}")
+    for na, ns in CELULAS:
+        for m in MODELOS:
+            L = agregado(m, na, ns, "limpo")
+            if not L:
+                continue
+            vals = [int(float(L[0][c])) for c, _ in CONSTANTES]
+            lm, ld, _ = med_dp(L, "latencia_mediana_us")
+            if md:
+                p(f"| {na} | {ns} | {m} | {vals[0]:,} | {vals[1]:,} | {vals[2]:,} | "
+                  f"{lm:.1f} ± {ld:.1f} |")
+            else:
+                p(f"  {na:>3}{ns:>4} {m:<9}{vals[0]:>10,}{vals[1]:>10,}{vals[2]:>10,}"
+                  f"{f'{lm:.1f} ± {ld:.1f}':>18}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--md", action="store_true", help="saída em Markdown")
+    ap.add_argument("--metricas", action="store_true",
+                    help="só a tabela de média ± desvio sobre as runs")
     a = ap.parse_args()
+    if a.metricas:
+        tabela_metricas(a.md)
+        return 0
     rng = np.random.default_rng(SEED)
     p = print
 

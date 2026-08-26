@@ -86,6 +86,86 @@ melhora**, que é o achado da SPEC-08.
 | 2 | 36 | wnn-T16 | 94.6% | 99.0% | **+4.4 pp** |
 | 2 | 36 | wnn-T32 | 95.5% | 99.4% | **+3.9 pp** |
 
+## Métricas por cenário — média ± desvio SOBRE AS RUNS
+
+Cada run é uma réplica da campanha de avaliação (200 episódios). O desvio
+entre runs mede **quanto o número publicado variaria numa nova execução** —
+não quanto um episódio varia, que é outra coisa e muito maior.
+
+| Na | Ns | ruído | modelo | CT (s) | SR (%) | coleta (s) | separação (m) |
+|---|---|---|---|---|---|---|---|
+| 1 | 12 | sem ruído | wnn-T16 | 60.39 ± 6.70 | 95.03 ± 1.44 | 34.48 ± 5.35 | — |
+| 1 | 12 | sem ruído | wnn-T32 | 90.42 ± 9.27 | 88.88 ± 2.01 | 48.09 ± 6.13 | — |
+| 1 | 12 | σ=10 · SEM KF | wnn-T16 | 46.35 ± 2.84 | 99.38 ± 0.63 | 21.68 ± 1.64 | — |
+| 1 | 12 | σ=10 · SEM KF | wnn-T32 | 55.51 ± 4.47 | 97.94 ± 0.99 | 23.65 ± 1.87 | — |
+| 1 | 12 | σ=10 · COM KF | wnn-T16 | 45.45 ± 3.83 | 98.49 ± 0.84 | 22.81 ± 2.95 | — |
+| 1 | 12 | σ=10 · COM KF | wnn-T32 | 64.22 ± 7.77 | 94.80 ± 1.69 | 32.22 ± 4.73 | — |
+| 2 | 12 | sem ruído | maddpg | 18.44 ± 0.71 | 99.95 ± 0.15 | 9.79 ± 0.31 | 92.84 ± 13.24 |
+| 2 | 12 | sem ruído | wnn-T16 | 133.68 ± 13.25 | 79.08 ± 2.86 | 77.42 ± 8.28 | 71.41 ± 36.64 |
+| 2 | 12 | sem ruído | wnn-T32 | 98.29 ± 11.33 | 85.92 ± 2.42 | 59.39 ± 7.76 | 57.46 ± 28.16 |
+| 2 | 12 | σ=10 · SEM KF | maddpg | 19.28 ± 0.19 | 100.00 ± 0.00 | 10.36 ± 0.12 | 93.91 ± 14.61 |
+| 2 | 12 | σ=10 · SEM KF | wnn-T16 | 63.38 ± 6.62 | 95.41 ± 1.45 | 33.63 ± 4.34 | 81.46 ± 31.30 |
+| 2 | 12 | σ=10 · SEM KF | wnn-T32 | 48.28 ± 5.75 | 97.40 ± 1.21 | 25.40 ± 3.57 | 59.48 ± 25.44 |
+| 2 | 12 | σ=10 · COM KF | maddpg | 18.62 ± 0.61 | 99.97 ± 0.12 | 9.92 ± 0.16 | 93.52 ± 14.49 |
+| 2 | 12 | σ=10 · COM KF | wnn-T16 | 84.84 ± 9.93 | 89.95 ± 2.13 | 47.16 ± 6.17 | 71.99 ± 33.85 |
+| 2 | 12 | σ=10 · COM KF | wnn-T32 | 75.37 ± 9.74 | 90.94 ± 2.09 | 42.40 ± 5.95 | 57.26 ± 29.06 |
+| 2 | 24 | sem ruído | maddpg | 30.32 ± 2.37 | 99.44 ± 0.50 | 14.36 ± 1.51 | 100.75 ± 15.36 |
+| 2 | 24 | sem ruído | wnn-T16 | 86.82 ± 8.90 | 90.83 ± 1.94 | 32.29 ± 3.49 | 101.79 ± 25.66 |
+| 2 | 24 | sem ruído | wnn-T32 | 69.73 ± 8.11 | 93.82 ± 1.75 | 28.24 ± 3.42 | 81.24 ± 28.51 |
+| 2 | 24 | σ=10 · SEM KF | maddpg | 29.64 ± 0.27 | 100.00 ± 0.00 | 13.94 ± 0.16 | 102.89 ± 14.21 |
+| 2 | 24 | σ=10 · SEM KF | wnn-T16 | 57.05 ± 3.77 | 98.63 ± 0.87 | 21.83 ± 1.33 | 105.52 ± 23.55 |
+| 2 | 24 | σ=10 · SEM KF | wnn-T32 | 51.03 ± 3.31 | 98.99 ± 0.71 | 20.37 ± 1.11 | 79.40 ± 24.61 |
+| 2 | 24 | σ=10 · COM KF | maddpg | 28.90 ± 1.32 | 99.81 ± 0.28 | 13.54 ± 0.84 | 102.24 ± 15.32 |
+| 2 | 24 | σ=10 · COM KF | wnn-T16 | 68.01 ± 7.26 | 95.28 ± 1.59 | 25.78 ± 2.65 | 99.60 ± 27.67 |
+| 2 | 24 | σ=10 · COM KF | wnn-T32 | 64.43 ± 6.91 | 95.17 ± 1.52 | 24.25 ± 2.31 | 77.70 ± 28.20 |
+| 2 | 36 | sem ruído | maddpg | 35.36 ± 2.19 | 99.64 ± 0.46 | 14.85 ± 0.78 | 116.58 ± 19.21 |
+| 2 | 36 | sem ruído | wnn-T16 | 74.53 ± 7.14 | 94.60 ± 1.59 | 23.91 ± 2.10 | 102.29 ± 23.09 |
+| 2 | 36 | sem ruído | wnn-T32 | 67.06 ± 6.27 | 95.50 ± 1.37 | 22.65 ± 1.91 | 84.39 ± 24.24 |
+| 2 | 36 | σ=10 · SEM KF | maddpg | 35.82 ± 0.41 | 100.00 ± 0.05 | 15.49 ± 0.18 | 119.20 ± 15.78 |
+| 2 | 36 | σ=10 · SEM KF | wnn-T16 | 61.07 ± 2.95 | 99.02 ± 0.66 | 21.04 ± 0.68 | 106.84 ± 22.57 |
+| 2 | 36 | σ=10 · SEM KF | wnn-T32 | 55.71 ± 2.60 | 99.38 ± 0.58 | 20.04 ± 0.62 | 86.69 ± 24.84 |
+| 2 | 36 | σ=10 · COM KF | maddpg | 35.18 ± 1.55 | 99.81 ± 0.31 | 14.93 ± 0.56 | 117.50 ± 20.38 |
+| 2 | 36 | σ=10 · COM KF | wnn-T16 | 62.17 ± 4.31 | 97.68 ± 0.96 | 20.75 ± 1.10 | 102.71 ± 24.12 |
+| 2 | 36 | σ=10 · COM KF | wnn-T32 | 58.85 ± 5.34 | 97.52 ± 1.17 | 19.65 ± 1.16 | 84.67 ± 22.44 |
+
+### Custo — constante por modelo e célula
+
+| Na | Ns | modelo | params do ator | bytes (fp32) | mult. fp | latência mediana (µs) |
+|---|---|---|---|---|---|---|
+| 1 | 12 | wnn-T16 | 10,965 | 299,298 | 4 | 102.1 ± 28.9 |
+| 1 | 12 | wnn-T32 | 23,440 | 628,844 | 4 | 104.8 ± 30.0 |
+| 2 | 12 | maddpg | 73,474 | 293,896 | 72,960 | 60.7 ± 12.5 |
+| 2 | 12 | wnn-T16 | 21,472 | 574,072 | 4 | 120.1 ± 35.1 |
+| 2 | 12 | wnn-T32 | 38,900 | 1,039,656 | 4 | 129.7 ± 37.7 |
+| 2 | 24 | maddpg | 73,474 | 293,896 | 72,960 | 54.6 ± 14.5 |
+| 2 | 24 | wnn-T16 | 21,472 | 574,072 | 4 | 129.7 ± 35.9 |
+| 2 | 24 | wnn-T32 | 38,900 | 1,039,656 | 4 | 129.3 ± 37.5 |
+| 2 | 36 | maddpg | 73,474 | 293,896 | 72,960 | 65.3 ± 12.5 |
+| 2 | 36 | wnn-T16 | 21,472 | 574,072 | 4 | 127.6 ± 36.7 |
+| 2 | 36 | wnn-T32 | 38,900 | 1,039,656 | 4 | 136.7 ± 39.4 |
+
+### O que o desvio diz
+
+**A dispersão do MADDPG é uma ordem de grandeza menor.** Em `a2s12` limpo ele dá
+`18,44 ± 0,71 s` contra `133,68 ± 13,25 s` do `wnn-T16` — 3,8 % de coeficiente de
+variação contra 9,9 %. Ele não é só mais rápido; é mais **previsível**.
+
+**O ruído reduz a dispersão das WNN.** No `wnn-T16 a1s12`, o CT vai de
+`60,39 ± 6,70` (limpo) para `46,35 ± 2,84` (σ=10 sem KF) — média e desvio caem
+juntos. Coerente com o dithering: o que gerava a cauda longa eram os episódios
+travados, e o ruído os elimina.
+
+**A separação entre drones tem desvio enorme** (±25 a ±37 m sobre médias de 57 a
+118 m). Ela é medida num único episódio por run — o comentário do
+`spec02_maddpg_campanha.py` já dizia que é "~0,5 % de custo" adicional, e o preço
+dessa economia é justamente esta variância. Não use essa coluna para comparar
+modelos sem aumentar o n.
+
+**A latência não distingue os braços de forma útil.** A WNN mede 102–137 µs contra
+55–65 µs do MADDPG, mas isso é wall-clock de NumPy contra PyTorch — arcabouços
+diferentes. A figura honesta é a contagem de operações: **4 multiplicações contra
+72 960**. O `spec06-merito.md` trata disso.
+
 ---
 
 ## Leitura
