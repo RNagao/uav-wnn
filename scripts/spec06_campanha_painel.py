@@ -162,6 +162,16 @@ def main() -> int:
         print(f"   {_barra(it['runs']/ALVO)} {it['runs']:>3}/{ALVO} "
               f"{rot:<34}{tt} {met} {_hm(eta) if marca != 'x' else '  parada':>8}")
 
+    if feitas:
+        print("   PRONTAS")
+        for it in sorted(itens, key=lambda x: (x["rotulo"], x["na"], x["ns"])):
+            if it["runs"] < ALVO or "PULA" in it["estado"]:
+                continue
+            rot = f"{it['rotulo']} a{it['na']}s{it['ns']} {it['regime']}"
+            tt = "ᵗ" if it["transf"] else " "
+            print(f"   {'':12} {ALVO:>3}/{ALVO} {rot:<34}{tt} "
+                  f"{it['ct']:>7.1f}s {it['sr']:>6.1%}")
+        print()
     if voando:
         print("   EM VOO")
         for it in sorted(voando, key=lambda x: -x["runs"]):
@@ -183,19 +193,28 @@ def main() -> int:
         print(f"\n   {bloqueadas} bloqueadas — sem checkpoint ou sem atestado; "
               "a fila as pula e avisa")
 
-    # "em curso" pela EXISTÊNCIA DO PROCESSO, não pelo log: um treino morto por
-    # fora não deixa marcador nenhum, e o painel o anunciava vivo por horas.
+    # O TREINO só aparece se ESTIVER RODANDO. Antes, todo log histórico virava
+    # uma linha com ETA — quatro treinos encerrados há dias ocupavam 8 das 26
+    # linhas do painel, anunciando "ETA 1.4 h" para processo inexistente. Quem
+    # quiser o histórico usa `spec06_acompanhar.py --multi`.
     treinos = [c for c in _cmdlines()
                if re.search(r"python3?\s+scripts/spec06_treino_multiagente\.py", c)]
+    vivos_t = []
     for lg in LOG_TREINO:
+        alvo = lg.stem.split("-")[-1].lstrip("a")
+        if not any(f"--na {alvo} " in c for c in treinos):
+            continue
         ult = [l for l in lg.read_text(errors="replace").splitlines()
                if l.startswith("[")]
-        if not ult:
-            continue
-        alvo = lg.stem.split("-")[-1].lstrip("a")          # "…-T32-a8" -> "8"
-        vivo = any(f"--na {alvo} " in c for c in treinos)
-        estado = "em curso" if vivo else "PARADO"
-        print(f"\n   treino {estado} · {lg.stem}: {ult[-1].strip()}")
+        if ult:
+            vivos_t.append(f"{lg.stem}: {ult[-1].strip()}")
+    if vivos_t:
+        print("\n   TREINO EM CURSO (disputa CPU com a campanha)")
+        for v in vivos_t:
+            print(f"   {v}")
+    elif LOG_TREINO:
+        print(f"\n   ({len(LOG_TREINO)} treinos encerrados — "
+              f"`spec06_acompanhar.py --multi` para o histórico)")
     return 0
 
 
