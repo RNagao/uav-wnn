@@ -52,7 +52,14 @@ _REG = {"limpo": "limpo", "sigma10-sem-kf": "sem-kf", "sigma10-com-kf": "com-kf"
 
 
 def diz(msg: str) -> None:
-    linha = f"{time.strftime('%d/%m %H:%M:%S')}  {msg}"
+    """Registra com o PID de quem escreveu.
+
+    Sem o PID o diário engana: um supervisor morto e o seu substituto relançam as
+    mesmas corridas, e as duas linhas "lançada X" ficam indistinguíveis de uma
+    duplicação real. Aconteceu — `wnn-T16 a1s12` apareceu lançada às 09:13 e às
+    09:19, e não havia como saber que eram supervisores diferentes.
+    """
+    linha = f"{time.strftime('%d/%m %H:%M:%S')} [{os.getpid()}]  {msg}"
     print(linha, flush=True)
     DIARIO.parent.mkdir(parents=True, exist_ok=True)
     with DIARIO.open("a") as f:
@@ -211,8 +218,24 @@ def main() -> int:
             return 1
         prim = sorted(x[1] for x in J[:6])
         a.base = prim[len(prim) // 2]
+    # Marca visual de fronteira: quem lê o diário precisa ver onde um supervisor
+    # acaba e outro começa, senão relançamentos legítimos parecem duplicata.
+    diz("─" * 64)
     diz(f"supervisor no ar · base {a.base:.0f} passos/s · alvo {a.alvo} · máx {a.max} "
         f"· recua <{a.base*a.piso:.0f} · sobe >{a.base*a.teto:.0f}")
+    # Conta SÓ o python do venv: `uv run python x.py` casa com um padrão frouxo e
+    # infla a contagem. Na primeira versão disto o aviso disse "1 supervisores"
+    # havendo um só — o erro estava em contar wrapper como processo.
+    outros = sum(1 for c in cmdlines()
+                 if re.search(r"\.venv/bin/python3\s+scripts/"
+                              r"spec06_campanha_supervisor\.py", c)) - 1
+    if outros > 0:
+        diz(f"AVISO: {outros} outro(s) supervisor(es) no ar. Dois competindo "
+            "sobrepõem lançamentos — encerre-os antes de seguir.")
+    em = em_voo()
+    if em:
+        diz(f"herdando {len(em)} corridas de um supervisor anterior: "
+            + ", ".join(f"{r} a{n}s{s} {g}" for r, n, s, g in sorted(em)))
 
     visto = J[-1][0] if J else 0
     bons = 0
