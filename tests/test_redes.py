@@ -251,3 +251,62 @@ def test_carregar_remonta_o_enderecamento_vetorizado():
     for r, tupla in enumerate(lida.mapeamento):
         assert list(lida._tuplas[r][:len(tupla)]) == list(tupla), (
             f"_tuplas[{r}] não corresponde a mapeamento[{r}]")
+
+
+def test_contador_e_inteiro_e_sobrevive_ao_ciclo(tmp_path):
+    """O contador é contagem de visitas — inteiro por construção (`c += 1`).
+
+    Guardá-lo em `float64` custava 8 bytes onde 4 bastam, e o crítico guarda DOIS
+    números por entrada: era metade do custo dele. `uint32` e não `uint16` porque
+    o máximo medido num modelo real é 2 353 751 visitas na posição mais quente.
+
+    O ciclo salvar→carregar tem de preservar o tipo: um `.npz` antigo traz
+    `float64`, e recarregá-lo sem converter reintroduziria o custo em silêncio.
+    """
+    import numpy as np
+
+    from uavwnn.wnn.redes import RedeRegressaoEsquecimento
+
+    rede = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=2, phi=0.85)
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    for _ in range(5):
+        rede.treinar(bits, np.array([1.5, -0.5]))
+
+    _, c = next(iter(rede.memoria[0].items()))[1]
+    assert c.dtype == np.uint32, f"contador em {c.dtype}, esperado uint32"
+    assert (c == 5).all()
+
+    antes = rede.prever(bits)
+    rede.salvar(tmp_path / "c.npz")
+    lida = RedeRegressaoEsquecimento.carregar(tmp_path / "c.npz")
+    _, c2 = next(iter(lida.memoria[0].items()))[1]
+    assert c2.dtype == np.uint32, "carregar perdeu o tipo do contador"
+    np.testing.assert_allclose(lida.prever(bits), antes, rtol=0, atol=0)
+
+
+def test_custo_do_critico_conta_o_contador():
+    """`_bytes_luts` contava só `n_saidas` valores por entrada — mas a rede com
+    esquecimento guarda valor E contador, e saía ~40 % subestimada.
+
+    Não afetou o T1 publicado (que compara ATORES), mas qualquer conta de
+    "ator + crítico" pelo harness estava errada.
+    """
+    import numpy as np
+
+    from uavwnn.custo.memoria import custo_ntuple_de_rede
+    from uavwnn.wnn.redes import RedeGradienteFuncional, RedeRegressaoEsquecimento
+
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    ator = RedeGradienteFuncional(n_bits=32, tamanho_tupla=4, n_saidas=1)
+    ator.atualizar(bits, np.array([0.5]))
+    critico = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=1, phi=0.85)
+    critico.treinar(bits, np.array([0.5]))
+
+    ka = custo_ntuple_de_rede(ator, variante="ordenado", rotulo="a").detalhe["luts"]
+    kc = custo_ntuple_de_rede(critico, variante="ordenado", rotulo="c").detalhe["luts"]
+    # mesma ocupação e mesma n_saidas: a diferença é exatamente o contador
+    assert kc > ka, "crítico não pode custar o mesmo que o ator"
+    occ = sum(len(m) for m in critico.memoria)
+    assert kc - ka == occ * 4, "o contador deve pesar 4 bytes (uint32) por entrada"

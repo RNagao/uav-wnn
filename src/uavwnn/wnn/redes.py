@@ -411,7 +411,13 @@ class _RedeNTupla:
                 chave = int(enderecos[i])
                 if contadores is not None:
                     rede.memoria[r][chave] = (valores[i].copy(),
-                                              contadores[i].copy())
+                                              # `rede` e não `cls`: o `carregar`
+                                              # devolve a CLASSE GRAVADA, que pode
+                                              # não ser a que recebeu a chamada.
+                                              contadores[i].astype(
+                                                  getattr(type(rede),
+                                                          "TIPO_CONTADOR",
+                                                          np.uint32)))
                 else:
                     rede.memoria[r][chave] = valores[i].copy()
                 i += 1
@@ -710,15 +716,34 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             {} for _ in range(self.n_ram)
         ]
 
-    def _pesos(self, contador: NDArray[np.float64]) -> NDArray[np.float64]:
+    TIPO_CONTADOR = np.uint32
+    """O contador é uma CONTAGEM DE VISITAS — inteiro por construção (`c += 1`).
+
+    Estava em `float64` por conveniência (mantinha valor e contador no mesmo
+    dtype), gastando 8 bytes onde 4 bastam: metade do custo do crítico, que
+    guarda dois números por entrada.
+
+    `uint32` e não `uint16`: o máximo medido num modelo real é **2 353 751**
+    visitas na posição mais quente (p99 = 33 127), muito acima dos 65 535 do
+    `uint16`. `uint32` cobre 4,29e9 — a ~100 passos/s, mais de um ano de treino
+    contínuo na MESMA posição.
+
+    Nenhuma mudança numérica: `_pesos` promove a float na exponenciação, e
+    `1 − φ^c` com `c` inteiro dá exatamente o mesmo que com `c` float, porque o
+    valor era inteiro nos dois casos.
+    """
+
+    def _pesos(self, contador: NDArray[np.integer]) -> NDArray[np.float64]:
         """Eq. (4.10): o peso acumulado de uma posição, dado seu contador.
 
         Soma dos `c` primeiros termos da série geométrica de razão `φ`. O ramo
         `φ = 1` devolve o próprio contador, recuperando a (3.16).
         """
         if self.phi == 1.0:
-            return contador
-        return (1.0 - self.phi ** contador) / (1.0 - self.phi)
+            # `float64` na saída mesmo com contador inteiro: quem chama divide
+            # por este valor, e devolver inteiro faria a divisão truncar.
+            return np.asarray(contador, dtype=np.float64)
+        return (1.0 - self.phi ** np.asarray(contador, dtype=np.float64)) / (1.0 - self.phi)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
         """Eq. (4.9): `f(x) = Σ_i v[i](x) / Σ_i s[i](x)`. `(M, B) -> (M, d)`.
@@ -785,13 +810,14 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             if item is None:
                 # Posição virgem: v_0 = 0 e c_0 = 0, logo (4.8) dá
                 # v_1 = φ·0 + y = y  e  c_1 = 1.
-                self.memoria[i][chave] = (alvo.astype(np.float64).copy(),
-                                          np.ones(self.n_saidas))
+                self.memoria[i][chave] = (
+                    alvo.astype(np.float64).copy(),
+                    np.ones(self.n_saidas, dtype=self.TIPO_CONTADOR))
             else:
                 v, c = item
                 v *= self.phi          # primeiro o esquecimento...
                 v += alvo              # ...depois a observação nova
-                c += 1.0
+                c += 1                 # inteiro: contagem de visitas
 
     def treinar_componente(self, bits: NDArray[np.bool_], indice: int,
                            alvo: float) -> None:
@@ -820,11 +846,12 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             chave = int(e)
             item = self.memoria[i].get(chave)
             if item is None:
-                v, c = np.zeros(self.n_saidas), np.zeros(self.n_saidas)
+                v = np.zeros(self.n_saidas)
+                c = np.zeros(self.n_saidas, dtype=self.TIPO_CONTADOR)
                 v[indice] = float(alvo)
-                c[indice] = 1.0
+                c[indice] = 1
                 self.memoria[i][chave] = (v, c)
             else:
                 v, c = item
                 v[indice] = self.phi * v[indice] + float(alvo)
-                c[indice] += 1.0
+                c[indice] += 1
