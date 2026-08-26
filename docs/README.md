@@ -13,12 +13,24 @@ funcionam*, não *o que foi medido*.
 | [`maddpg.md`](teoria/maddpg.md) | o baseline do Lamenza: CTDE, o laço de treino do fonte original, e o que exatamente usamos dele |
 | [`filtro-de-kalman.md`](teoria/filtro-de-kalman.md) | o KF do degrau 4: variáveis, equações, implementação linha a linha, e como o `q_w` é descoberto pelo NEES |
 
-## Mapas do código (em `reports/`, por ora)
+## Mapas do código
 
 | documento | assunto |
 |---|---|
-| [`../reports/codebase.md`](../reports/codebase.md) | a base inteira — 42 scripts, 45 módulos, 8 pipelines |
-| [`../reports/pipeline-treinamento.md`](../reports/pipeline-treinamento.md) | o pipeline de treino, do `env.step` até a escrita na LUT |
+| [`codebase.md`](codebase.md) | a base inteira — 42 scripts, 45 módulos, 8 pipelines |
+| [`pipeline-treinamento.md`](pipeline-treinamento.md) | o pipeline de treino, do `env.step` até a escrita na LUT |
+
+## Referência que vive em `reports/`
+
+Estes são **entregáveis da série de specs** — `specs/SPEC-NN-*.md` aponta para
+`reports/specNN-*.md`, e quebrar esse mapeamento custaria mais que a arrumação
+ganharia. Mas leem-se como fundamentação:
+
+| documento | assunto |
+|---|---|
+| [`../reports/spec00-parametros.md`](../reports/spec00-parametros.md) | o ambiente do Lamenza: proveniência, por que não reimplementamos, e o que a versão do simulador implica |
+| [`../reports/spec04-redes-dissertacao.md`](../reports/spec04-redes-dissertacao.md) | as redes e o Algoritmo 4.4 contra a dissertação, com os testes diferenciais |
+| [`../reports/spec02-baseline-maddpg.md`](../reports/spec02-baseline-maddpg.md) | tamanho e latência dos pesos publicados do MADDPG |
 
 ## Convenção
 
