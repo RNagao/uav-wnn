@@ -6,13 +6,13 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 
 | modelo | mediana | p99 |
 | --- | --- | --- |
-| wnn-T16 | 15.7 µs | 33.0 µs |
-| wnn-T32 | 18.3 µs | 40.3 µs |
-| maddpg | 45.6 µs | 88.8 µs |
+| wnn-T16 | 15.8 µs | 35.3 µs |
+| wnn-T32 | 18.6 µs | 38.9 µs |
+| maddpg | 44.0 µs | 79.0 µs |
 
-- wnn-T16 é **2.9×** mais rápida que o MADDPG
+- wnn-T16 é **2.8×** mais rápida que o MADDPG
 
-- wnn-T32 é **2.5×** mais rápida que o MADDPG
+- wnn-T32 é **2.4×** mais rápida que o MADDPG
 
 ## Memória, nas quatro leituras (KB)
 
@@ -33,7 +33,7 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 | --- | --- |
 | wnn-T16 | 17 MB |
 | wnn-T32 | 17 MB |
-| maddpg | 481 MB |
+| maddpg | 479 MB |
 
 ![tempos](spec03-latencia-a2s24.png)
 ![memória](spec03-memoria-a2s24.png)
