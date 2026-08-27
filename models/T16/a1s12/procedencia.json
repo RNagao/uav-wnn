@@ -1,0 +1,45 @@
+{
+  "ator": {
+    "n_saidas": 3
+  },
+  "resolucao": 16,
+  "config": {
+    "na": 1,
+    "ns": 12,
+    "passo": 0.0008,
+    "sigma": 0.35,
+    "T": 16,
+    "n": 12,
+    "phi": 0.85,
+    "m": 8,
+    "gamma": 0.99,
+    "replica": "1b",
+    "parameter_sharing": true,
+    "recompensa_por_na": true,
+    "retomado_de": "models/T16/a1s12",
+    "critico": "descentralizado (Alg. 4.4)"
+  },
+  "passos": 50000000,
+  "episodios": 313210,
+  "melhor_val_cobertura": 0.9916666666666667,
+  "metrica_test": {
+    "sr": 0.93,
+    "ct_cens": 70.495,
+    "cobertura": 0.9575,
+    "n": 100
+  },
+  "fonte": "spec06_treino_multiagente.py",
+  "deploy": {
+    "poda": 0.7,
+    "deploy_kb": 167.119140625,
+    "sr_cheio": 0.97,
+    "sr_podado": 0.97
+  },
+  "metrica_test_final": {
+    "sr": 0.93,
+    "ct_cens": 69.765,
+    "cobertura": 0.9458333333333333,
+    "n": 100
+  },
+  "promovido_de": "runs/spec06-50M/T16-a1s12"
+}
