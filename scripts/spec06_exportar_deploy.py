@@ -229,6 +229,80 @@ def deploy_pos_treino(final: Path, na: int, ns: int, sementes,
     return {**r, **v, "poda": poda}
 
 
+# ---------------------------- promoção dos 50 M -----------------------------
+
+ALVO_PASSOS = 50_000_000
+"""Decisão de projeto (2026-08-26): o checkpoint promovido é o `final` da
+corrida de 50 M — sem seleção pelo melhor ponto da curva de validação, que
+oscila SR 0,90–0,99 num platô desde ~13 M e faria de qualquer escolha um
+sorteio da mesma banda. O `final` existe em todas as corridas e não
+reintroduz seleção sobre validação."""
+
+
+def promover(cel: str) -> None:
+    """Instala o `final` de `runs/spec06-50M/<cel>` em `models/`.
+
+    Na ordem: recusa corrida incompleta (promover parcial por engano foi o que
+    já misturou orçamentos numa comparação); avalia o `final` no `test` e grava
+    `metrica_test_final` — o `metrica_test` do treinador é do MELHOR (fix
+    539b61e), não do artefato promovido; arquiva o 6,75 M em `models/6M75/`;
+    instala cheio + podado com a procedência junto.
+    """
+    import shutil
+
+    t_res = int(cel.split("-")[0][1:])
+    a = cel.split("-")[1]
+    na, ns = int(a[1:a.index("s")]), int(a[a.index("s") + 1:])
+    run = RAIZ / "runs" / "spec06-50M" / cel
+    if not (run / "procedencia.json").exists():
+        raise SystemExit(f"{cel}: sem procedencia.json — a corrida ainda está "
+                         f"em curso (o treinador só o escreve ao terminar)")
+    proc = json.loads((run / "procedencia.json").read_text())
+    if int(proc.get("passos", 0)) < ALVO_PASSOS:
+        raise SystemExit(f"{cel}: só {proc.get('passos', 0):,} passos — "
+                         f"corrida incompleta NÃO é promovida")
+
+    final = run / "checkpoints" / "final"
+    deploy = run / "checkpoints" / "deploy"
+    for d in (final, deploy):
+        if not d.exists():
+            raise SystemExit(f"{cel}: falta {d}")
+
+    for raiz in (RAIZ / "models", RAIZ / "models" / "deploy"):
+        arq = RAIZ / "models" / "6M75" / (raiz / f"T{t_res}" / f"a{na}s{ns}"
+                                          ).relative_to(RAIZ / "models")
+        if arq.exists():
+            raise SystemExit(f"{cel}: {arq.relative_to(RAIZ)} já existe — "
+                             f"promovido antes; não sobrescrevo")
+
+    from spec06_treino_multiagente import _cfgs, _ctx, avaliar_multi, construir
+    from uavwnn.campanha import carregar_bancos
+    print(f"[{cel}] avaliando o final no test (100 sementes)…", flush=True)
+    cfg_tr, cfg_av = _cfgs("1b", na, ns)
+    ap, termo, _ = construir(cfg_tr, na, t_res=t_res, retomar=final)
+    test = carregar_bancos(na, ns).test.sementes[:100]
+    m = avaliar_multi(cfg_av, ap, termo, _ctx(cfg_av), test)
+    proc["metrica_test_final"] = {k: (float(v) if isinstance(v, float) else v)
+                                  for k, v in m.items()}
+    proc["promovido_de"] = str(run.relative_to(RAIZ))
+    print(f"[{cel}] final@test: {proc['metrica_test_final']}", flush=True)
+
+    for raiz, novo in ((RAIZ / "models", final),
+                       (RAIZ / "models" / "deploy", deploy)):
+        atual = raiz / f"T{t_res}" / f"a{na}s{ns}"
+        arquivo = RAIZ / "models" / "6M75" / atual.relative_to(RAIZ / "models")
+        if atual.exists():
+            arquivo.parent.mkdir(parents=True, exist_ok=True)
+            if arquivo.exists():
+                raise SystemExit(f"{cel}: {arquivo} já existe — não sobrescrevo")
+            shutil.move(str(atual), str(arquivo))
+            print(f"[{cel}] arquivado: {atual.relative_to(RAIZ)} -> "
+                  f"{arquivo.relative_to(RAIZ)}", flush=True)
+        shutil.copytree(novo, atual)
+        (atual / "procedencia.json").write_text(json.dumps(proc, indent=2))
+        print(f"[{cel}] instalado: {atual.relative_to(RAIZ)}", flush=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -243,7 +317,14 @@ def main() -> int:
                          "a verificação passa a ser por COMPORTAMENTO (SR no banco "
                          "de teste), não por igualdade de ação.")
     ap.add_argument("--sementes-verif", type=int, default=200)
+    ap.add_argument("--promover", nargs="+", metavar="CEL", default=None,
+                    help="promove corridas de 50 M (ex.: T16-a1s12 T32-a2s24): "
+                         "instala o `final` em models/ e arquiva o 6,75 M")
     a = ap.parse_args()
+    if a.promover:
+        for cel in a.promover:
+            promover(cel)
+        return 0
 
     if a.todos:
         alvos = []
