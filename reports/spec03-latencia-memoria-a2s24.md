@@ -6,20 +6,20 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 
 | modelo | mediana | p99 |
 | --- | --- | --- |
-| wnn-T16 | 15.8 µs | 31.9 µs |
-| wnn-T32 | 18.6 µs | 37.2 µs |
-| maddpg | 45.5 µs | 87.0 µs |
+| wnn-T16 | 15.7 µs | 33.0 µs |
+| wnn-T32 | 18.3 µs | 40.3 µs |
+| maddpg | 45.6 µs | 88.8 µs |
 
 - wnn-T16 é **2.9×** mais rápida que o MADDPG
 
-- wnn-T32 é **2.4×** mais rápida que o MADDPG
+- wnn-T32 é **2.5×** mais rápida que o MADDPG
 
 ## Memória, nas quatro leituras (KB)
 
 | modelo | T1 artefato | residente (RAM) | disco | ator + crítico |
 | --- | --- | --- | --- | --- |
-| wnn-T16 | 310 | 362 | 289 | 1,827 |
-| wnn-T32 | 572 | 670 | 533 | 3,377 |
+| wnn-T16 | 310 | 362 | 289 | 1,385 |
+| wnn-T32 | 572 | 670 | 533 | 2,561 |
 | maddpg † | 287 | 289 | 1,438 | 1,433 |
 
 - **T1 artefato**: chave `uint16` + valores `float32` — a definição da SPEC-03, comparável com as demais tabelas do projeto;
@@ -33,7 +33,7 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 | --- | --- |
 | wnn-T16 | 17 MB |
 | wnn-T32 | 17 MB |
-| maddpg | 479 MB |
+| maddpg | 481 MB |
 
 ![tempos](spec03-latencia-a2s24.png)
 ![memória](spec03-memoria-a2s24.png)

@@ -341,13 +341,25 @@ class _RedeNTupla:
                     contadores.append(v[1])
                 else:
                     valores.append(v)
+        # dtypes ESTREITOS, dimensionados pelo que o conteúdo exige — não pelo
+        # que a aritmética interna usa. O endereço local à RAM tem
+        # `tamanho_tupla` bits (12 -> máx 4095), e gravá-lo em uint64 fazia o
+        # campo pesar 40 % do checkpoint do crítico para carregar zeros. O
+        # `carregar` é agnóstico a dtype (os arrays viram índices/ints), então
+        # arquivos antigos em uint64 continuam legíveis; a igualdade bit a bit
+        # do round-trip é pinada em teste. Os VALORES ficam em float64 de
+        # propósito: são estado de treino, e truncá-los mudaria a retomada.
+        t_end = (np.uint16 if self.tamanho_tupla <= 16
+                 else np.uint32 if self.tamanho_tupla <= 32 else np.uint64)
+        t_map = np.uint16 if self.n_bits < 2**16 else np.int64
         dados = {
             "config": np.array(json.dumps(self._config())),
-            "mapeamento": np.concatenate(self.mapeamento).astype(np.int64),
-            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento], np.int64),
-            "tamanhos_ram": np.array(tamanhos, np.int64),
-            "enderecos": np.array(enderecos, np.uint64) if enderecos
-                         else np.zeros(0, np.uint64),
+            "mapeamento": np.concatenate(self.mapeamento).astype(t_map),
+            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento],
+                                       np.int32),
+            "tamanhos_ram": np.array(tamanhos, np.int32),
+            "enderecos": np.array(enderecos, t_end) if enderecos
+                         else np.zeros(0, t_end),
             "valores": (np.stack(valores) if valores
                         else np.zeros((0, self.n_saidas))),
         }
