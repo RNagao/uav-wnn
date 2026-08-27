@@ -123,8 +123,19 @@ def _filho_wnn(na: int, ns: int, t_res: int) -> dict:
               termo.limiares)
     vivos_kb = sum(a.nbytes for a in arrays) / 1024
 
+    # crítico: não voa (só treina), então a medida é dos arrays GRAVADOS no
+    # checkpoint cheio — endereços, valores e contadores. É a parcela que a
+    # coluna "ator" deixa de fora e que o gráfico ator+crítico devolve.
+    critico_kb = 0.0
+    npz_critico = (RAIZ / "models" / f"T{t_res}" / f"a{na}s{ns}"
+                   / "ntupla_dissertacao-critico.npz")
+    if npz_critico.exists():
+        z = np.load(npz_critico, allow_pickle=True)
+        critico_kb = sum(z[k].nbytes for k in z.files if k != "config") / 1024
+
     med, p99 = _cronometrar(lambda: pol(x))
     return {"modelo": f"wnn-T{t_res}", "mediana_us": med, "p99_us": p99,
+            "critico_kb": critico_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -153,10 +164,16 @@ def _filho_maddpg(na: int, ns: int) -> dict:
     sd = pol.rede.state_dict()
     vivos_kb = sum(v.numel() * v.element_size() for v in sd.values()) / 1024
     params = sum(v.numel() for v in sd.values())
+    # o .cleanrl_model é a tupla (ator, crítico); o crítico são os tensores dele
+    _, critico_sd = torch.load(disp[(na, ns)], map_location="cpu",
+                               weights_only=True)
+    critico_kb = sum(v.numel() * v.element_size()
+                     for v in critico_sd.values()) / 1024
 
     with torch.no_grad():
         med, p99 = _cronometrar(lambda: pol(x))
     return {"modelo": "maddpg", "mediana_us": med, "p99_us": p99,
+            "critico_kb": critico_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -223,7 +240,77 @@ def main() -> int:
     saida = RAIZ / "reports" / f"spec06-latencia-memoria-a{a.na}s{a.ns}.json"
     saida.write_text(json.dumps(linhas, indent=2))
     print(f"\n-> {saida.relative_to(RAIZ)}")
+    for f in _graficos(linhas, a.na, a.ns):
+        print(f"-> {f.relative_to(RAIZ)}")
     return 0
+
+
+CORES = {"wnn-T16": "#2a9d8f", "wnn-T32": "#457b9d", "maddpg": "#e76f51"}
+
+
+def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
+    """Dois PNGs: os tempos medidos, e a memória em duas leituras.
+
+    A memória tem as duas barras DE PROPÓSITO: "ator" é o que voa no drone;
+    "ator + crítico" é o que treina. Publicar só a primeira esconderia que o
+    crítico do MADDPG é 4× o ator dele — e só a segunda cobraria da inferência
+    um custo que ela não paga.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    nomes = [r["modelo"] for r in linhas]
+    cores = [CORES.get(n, "#888") for n in nomes]
+    rot = f"{na} drone{'s' if na > 1 else ''} · {ns} sensores"
+    saidas = []
+
+    # -- tempos: mediana como barra, p99 como haste --
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    med = [r["mediana_us"] for r in linhas]
+    p99 = [r["p99_us"] for r in linhas]
+    barras = ax.bar(nomes, med, color=cores, width=0.55)
+    ax.vlines(range(len(nomes)), med, p99, color="#333", lw=1.5)
+    ax.scatter(range(len(nomes)), p99, color="#333", s=18, zorder=3,
+               label="p99")
+    for b, m in zip(barras, med):
+        ax.annotate(f"{m:.1f} µs", (b.get_x() + b.get_width() / 2, m),
+                    ha="center", va="bottom", fontsize=10, weight="bold")
+    ax.set_ylabel("tempo por decisão (µs)")
+    ax.set_title(f"Tempo de inferência — {rot}\n"
+                 "mesma observação · um processo por modelo · menor mediana "
+                 "de 8×1000", fontsize=10)
+    ax.legend(frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    f = RAIZ / "reports" / f"spec06-latencia-a{na}s{ns}.png"
+    fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
+
+    # -- memória: ator (voa) × ator + crítico (treina) --
+    import numpy as np
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    x = np.arange(len(nomes))
+    ator = [r["arrays_vivos_kb"] for r in linhas]
+    total = [r["arrays_vivos_kb"] + r.get("critico_kb", 0.0) for r in linhas]
+    b1 = ax.bar(x - 0.19, ator, 0.38, color=cores, label="ator (voa)")
+    b2 = ax.bar(x + 0.19, total, 0.38, color=cores, alpha=0.45,
+                hatch="//", label="ator + crítico (treino)")
+    for barras in (b1, b2):
+        for b in barras:
+            ax.annotate(f"{b.get_height():,.0f}",
+                        (b.get_x() + b.get_width() / 2, b.get_height()),
+                        ha="center", va="bottom", fontsize=9)
+    ax.set_xticks(x, nomes)
+    ax.set_ylabel("KB")
+    ax.set_title(f"Memória do modelo — {rot}\n"
+                 "arrays medidos: LUT+termômetro / tensores; crítico não voa",
+                 fontsize=10)
+    ax.legend(frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    f = RAIZ / "reports" / f"spec06-memoria-a{na}s{ns}.png"
+    fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
+    return saidas
 
 
 if __name__ == "__main__":
