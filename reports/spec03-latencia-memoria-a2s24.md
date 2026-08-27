@@ -6,24 +6,24 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 
 | modelo | mediana | p99 |
 | --- | --- | --- |
-| wnn-T16 | 16.9 µs | 81.8 µs |
-| wnn-T32 | 20.0 µs | 59.8 µs |
-| maddpg | 45.4 µs | 107.3 µs |
+| wnn-T16 | 16.0 µs | 40.0 µs |
+| wnn-T32 | 38.5 µs | 73.7 µs |
+| maddpg | 45.1 µs | 101.5 µs |
 
-- wnn-T16 é **2.7×** mais rápida que o MADDPG
+- wnn-T16 é **2.8×** mais rápida que o MADDPG
 
-- wnn-T32 é **2.3×** mais rápida que o MADDPG
+- wnn-T32 é **1.2×** mais rápida que o MADDPG
 
 ## Memória, nas quatro leituras (KB)
 
 | modelo | T1 artefato | residente (RAM) | disco | ator + crítico |
 | --- | --- | --- | --- | --- |
-| wnn-T16 | 296 | 346 | 276 | 2,027 |
-| wnn-T32 | 537 | 628 | 500 | 3,675 |
-| maddpg † | 287 | 287 | 1,438 | 1,433 |
+| wnn-T16 | 310 | 362 | 289 | 1,827 |
+| wnn-T32 | 537 | 630 | 500 | 3,675 |
+| maddpg † | 287 | 289 | 1,438 | 1,433 |
 
 - **T1 artefato**: chave `uint16` + valores `float32` — a definição da SPEC-03, comparável com as demais tabelas do projeto;
-- **residente**: o que a `LUTPlana` ocupa executando — chave global `int32` (não cabe em 16 bits), mapeamento das tuplas e limiares;
+- **residente**: o que ocupa RAM executando — na WNN, a `LUTPlana` (chave global `int32`, mapeamento, limiares) + buffers de trabalho; no MADDPG, pesos + entrada e ativações (2×256) que o forward usa. Sem os buffers do MADDPG a comparação seria assimétrica: o T1 da WNN embute os dela;
 - **disco**: o arquivo como está; † o `.cleanrl_model` traz ator E crítico no mesmo arquivo, a barra dele já é o total;
 - **ator + crítico**: o custo de treino — o crítico não voa.
 

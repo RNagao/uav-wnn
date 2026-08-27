@@ -145,9 +145,16 @@ def _filho_wnn(na: int, ns: int, t_res: int) -> dict:
         n_dims=cfg.observation_size,
         rotulo=f"T{t_res} a{na}s{ns}").persistente / 1024
 
+    # buffers de trabalho por decisão (transientes): a comparação (N,n) do
+    # gather fundido, os N endereços e o acumulador. O T1 da WNN já embute os
+    # seus (buffer_bits/enderecos/acumuladores); esta é a leitura RESIDENTE.
+    trabalho_kb = (lut._tuplas.size * 1        # máscara bool do gather
+                   + lut.n_ram * 8             # endereços uint64
+                   + lut.n_saidas * 8) / 1024  # acumulador float64
     med, p99 = _cronometrar(lambda: pol(x))
     return {"modelo": f"wnn-T{t_res}", "mediana_us": med, "p99_us": p99,
             "critico_kb": critico_kb, "t1_kb": t1_kb,
+            "trabalho_kb": trabalho_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -184,8 +191,16 @@ def _filho_maddpg(na: int, ns: int) -> dict:
 
     with torch.no_grad():
         med, p99 = _cronometrar(lambda: pol(x))
+    # buffers de trabalho: entrada + as DUAS ativações de 256 + saída, float32.
+    # Sem isto o T1 do MADDPG compara pesos-somente contra uma WNN cujo T1
+    # embute os próprios buffers — assimetria a favor do baseline, apontada em
+    # revisão. `custo_mlp` (memoria.py) já definia residente assim.
+    dims = [pol.rede.fc1.in_features, pol.rede.fc1.out_features,
+            pol.rede.fc2.out_features, pol.rede.fc_mu.out_features]
+    trabalho_kb = sum(dims) * 4 / 1024
     return {"modelo": "maddpg", "mediana_us": med, "p99_us": p99,
             "critico_kb": critico_kb, "t1_kb": vivos_kb,
+            "trabalho_kb": trabalho_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -300,14 +315,17 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
     for r in linhas:
         marca = " †" if r["modelo"] == "maddpg" else ""
         L.append(linha([r["modelo"] + marca, f"{r['t1_kb']:,.0f}",
-                        f"{r['arrays_vivos_kb']:,.0f}",
+                        f"{r['arrays_vivos_kb'] + r.get('trabalho_kb', 0):,.0f}",
                         f"{r['disco_kb']:,.0f}",
                         f"{r['arrays_vivos_kb'] + r.get('critico_kb', 0):,.0f}"]))
     L += ["",
           "- **T1 artefato**: chave `uint16` + valores `float32` — a definição "
           "da SPEC-03, comparável com as demais tabelas do projeto;",
-          "- **residente**: o que a `LUTPlana` ocupa executando — chave global "
-          "`int32` (não cabe em 16 bits), mapeamento das tuplas e limiares;",
+          "- **residente**: o que ocupa RAM executando — na WNN, a `LUTPlana` "
+          "(chave global `int32`, mapeamento, limiares) + buffers de trabalho; "
+          "no MADDPG, pesos + entrada e ativações (2×256) que o forward usa. "
+          "Sem os buffers do MADDPG a comparação seria assimétrica: o T1 da "
+          "WNN embute os dela;",
           "- **disco**: o arquivo como está; † o `.cleanrl_model` traz ator E "
           "crítico no mesmo arquivo, a barra dele já é o total;",
           "- **ator + crítico**: o custo de treino — o crítico não voa.",
@@ -378,7 +396,8 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     x = np.arange(len(nomes))
     series = [
         ("T1 artefato (u16+f32)", [r["t1_kb"] for r in linhas], 1.0, None),
-        ("residente (RAM)", [r["arrays_vivos_kb"] for r in linhas], 0.72, None),
+        ("residente (RAM)", [r["arrays_vivos_kb"] + r.get("trabalho_kb", 0.0)
+                             for r in linhas], 0.72, None),
         ("disco", [r["disco_kb"] for r in linhas], 0.45, None),
         ("ator + crítico (treino)",
          [r["arrays_vivos_kb"] + r.get("critico_kb", 0.0) for r in linhas],
