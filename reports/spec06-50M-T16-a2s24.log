@@ -210,3 +210,7 @@ retomando de 6,752,492 passos, 40,521 episódios (melhor-val 1.000) · alvo 50,0
 [98.5%] 49,264,993/50,000,000 · 322,925 ep · 634 passos/s · ETA 0.3 h
 [99.0%] 49,515,062/50,000,000 · 324,598 ep · 634 passos/s · ETA 0.2 h
 [99.5%] 49,765,183/50,000,000 · 326,265 ep · 634 passos/s · ETA 0.1 h
+deploy podado (70%): 289 KB · SR 89.0%→95.0% (val)
+
+Na=2 Ns=24: SR 96% · CT 61.5 s · cobertura 98.5% · melhor-val 100.0% (100 sementes)
+checkpoint (melhor): runs/spec06-50M/T16-a2s24/checkpoints/melhor
