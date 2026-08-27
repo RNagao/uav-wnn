@@ -252,9 +252,79 @@ def main() -> int:
     saida = RAIZ / "reports" / f"spec06-latencia-memoria-a{a.na}s{a.ns}.json"
     saida.write_text(json.dumps(linhas, indent=2))
     print(f"\n-> {saida.relative_to(RAIZ)}")
-    for f in _graficos(linhas, a.na, a.ns):
+    for f in [_markdown(linhas, a.na, a.ns)] + _graficos(linhas, a.na, a.ns):
         print(f"-> {f.relative_to(RAIZ)}")
     return 0
+
+
+def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
+    """O relatório completo, escrito PELA MEDIÇÃO — nada transcrito à mão.
+
+    Números copiados de uma execução para um texto foi como esta sessão publicou
+    um T1 com variante errada e uma latência de laço intercalado: o erro mora na
+    transcrição. Aqui a mesma execução que mediu escreve a tabela.
+    """
+    import datetime
+    import platform
+
+    def linha(cels):
+        return "| " + " | ".join(str(c) for c in cels) + " |"
+
+    L = [f"# Latência e memória — {na}d/{ns}s, medidos",
+         "",
+         f"Gerado por `scripts/spec06_latencia_memoria.py` em "
+         f"{datetime.date.today().isoformat()} · {platform.machine()} · "
+         f"mesma observação para os três · um processo por modelo · "
+         f"menor mediana de {BLOCOS}×{REPS_BLOCO}.",
+         "",
+         "## Tempo de inferência (decisão completa: obs → ação)",
+         "",
+         linha(["modelo", "mediana", "p99"]),
+         linha(["---"] * 3)]
+    for r in linhas:
+        L.append(linha([r["modelo"], f"{r['mediana_us']:.1f} µs",
+                        f"{r['p99_us']:.1f} µs"]))
+    base = next((r for r in linhas if r["modelo"] == "maddpg"), None)
+    if base:
+        for r in linhas:
+            if r["modelo"] != "maddpg":
+                L.append(f"\n- {r['modelo']} é "
+                         f"**{base['mediana_us'] / r['mediana_us']:.1f}×** "
+                         f"mais rápida que o MADDPG")
+
+    L += ["", "## Memória, nas quatro leituras (KB)",
+          "",
+          linha(["modelo", "T1 artefato", "residente (RAM)", "disco",
+                 "ator + crítico"]),
+          linha(["---"] * 5)]
+    for r in linhas:
+        marca = " †" if r["modelo"] == "maddpg" else ""
+        L.append(linha([r["modelo"] + marca, f"{r['t1_kb']:,.0f}",
+                        f"{r['arrays_vivos_kb']:,.0f}",
+                        f"{r['disco_kb']:,.0f}",
+                        f"{r['arrays_vivos_kb'] + r.get('critico_kb', 0):,.0f}"]))
+    L += ["",
+          "- **T1 artefato**: chave `uint16` + valores `float32` — a definição "
+          "da SPEC-03, comparável com as demais tabelas do projeto;",
+          "- **residente**: o que a `LUTPlana` ocupa executando — chave global "
+          "`int32` (não cabe em 16 bits), mapeamento das tuplas e limiares;",
+          "- **disco**: o arquivo como está; † o `.cleanrl_model` traz ator E "
+          "crítico no mesmo arquivo, a barra dele já é o total;",
+          "- **ator + crítico**: o custo de treino — o crítico não voa.",
+          "",
+          "## Arcabouço em RAM (antes de qualquer peso)",
+          "",
+          linha(["modelo", "imports"]),
+          linha(["---"] * 2)]
+    for r in linhas:
+        L.append(linha([r["modelo"], f"{r['rss_arcabouco_kb'] / 1024:,.0f} MB"]))
+    L += ["",
+          f"![tempos](spec06-latencia-a{na}s{ns}.png)",
+          f"![memória](spec06-memoria-a{na}s{ns}.png)", ""]
+
+    f = RAIZ / "reports" / f"spec06-latencia-memoria-a{na}s{ns}.md"
+    f.write_text("\n".join(L))
+    return f
 
 
 CORES = {"wnn-T16": "#2a9d8f", "wnn-T32": "#457b9d", "maddpg": "#e76f51"}
