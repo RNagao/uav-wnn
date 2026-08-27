@@ -104,3 +104,109 @@ wnn-T32 · Na=2 Ns=12 · regime sigma10-com-kf · 100 de 100 runs a rodar (200 e
 
 -> reports/campanha/wnn-T32-a2s12-sigma10-com-kf.csv
 -> reports/campanha/wnn-T32-a2s12-sigma10-com-kf-episodios.csv
+  TRANSFERÊNCIA: rede treinada em Ns=24, avaliada em Ns=12 (d_obs=27 é o mesmo)
+  regime FIXO: degrau 4 (KF + controle) · σ=10 — todos os 20,000 episódios
+wnn-T32 · Na=2 Ns=12 · regime sigma10-com-kf · 100 de 100 runs a rodar (200 ep cada)
+  [  1/100] run   0 · CT   43.61 s · SR 98.0% ·    8.6 s · resta  0.2 h
+  [  2/100] run   1 · CT   54.82 s · SR 95.5% ·    7.9 s · resta  0.2 h
+  [  3/100] run   2 · CT   53.05 s · SR 96.0% ·    8.0 s · resta  0.2 h
+  [  4/100] run   3 · CT   53.04 s · SR 96.0% ·    8.2 s · resta  0.2 h
+  [  5/100] run   4 · CT   49.48 s · SR 97.0% ·    8.6 s · resta  0.2 h
+  [  6/100] run   5 · CT   51.41 s · SR 96.5% ·    9.0 s · resta  0.2 h
+  [  7/100] run   6 · CT   49.38 s · SR 96.5% ·    7.9 s · resta  0.2 h
+  [  8/100] run   7 · CT   62.94 s · SR 94.0% ·    8.5 s · resta  0.2 h
+  [  9/100] run   8 · CT   74.27 s · SR 91.5% ·    8.5 s · resta  0.2 h
+  [ 10/100] run   9 · CT   51.97 s · SR 96.5% ·    8.5 s · resta  0.2 h
+  [ 11/100] run  10 · CT   62.53 s · SR 94.0% ·    8.1 s · resta  0.2 h
+  [ 12/100] run  11 · CT   52.29 s · SR 96.0% ·    7.5 s · resta  0.2 h
+  [ 13/100] run  12 · CT   61.24 s · SR 94.5% ·    8.7 s · resta  0.2 h
+  [ 14/100] run  13 · CT   58.11 s · SR 95.0% ·    7.9 s · resta  0.2 h
+  [ 15/100] run  14 · CT   61.98 s · SR 94.0% ·    8.1 s · resta  0.2 h
+  [ 16/100] run  15 · CT   67.28 s · SR 93.0% ·    8.1 s · resta  0.2 h
+  [ 17/100] run  16 · CT   67.50 s · SR 93.0% ·    8.3 s · resta  0.2 h
+  [ 18/100] run  17 · CT   48.66 s · SR 97.0% ·    7.8 s · resta  0.2 h
+  [ 19/100] run  18 · CT   55.36 s · SR 95.5% ·    8.6 s · resta  0.2 h
+  [ 20/100] run  19 · CT   69.89 s · SR 92.5% ·    8.2 s · resta  0.2 h
+  [ 21/100] run  20 · CT   52.89 s · SR 96.0% ·    7.3 s · resta  0.2 h
+  [ 22/100] run  21 · CT   42.88 s · SR 98.0% ·    8.0 s · resta  0.2 h
+  [ 23/100] run  22 · CT   66.09 s · SR 93.0% ·    8.1 s · resta  0.2 h
+  [ 24/100] run  23 · CT   59.70 s · SR 94.5% ·    7.6 s · resta  0.2 h
+  [ 25/100] run  24 · CT   60.34 s · SR 94.5% ·    8.9 s · resta  0.2 h
+  [ 26/100] run  25 · CT   57.17 s · SR 95.0% ·    8.2 s · resta  0.2 h
+  [ 27/100] run  26 · CT   66.69 s · SR 93.0% ·    8.2 s · resta  0.2 h
+  [ 28/100] run  27 · CT   67.42 s · SR 92.5% ·    9.0 s · resta  0.2 h
+  [ 29/100] run  28 · CT   60.36 s · SR 94.5% ·    8.5 s · resta  0.2 h
+  [ 30/100] run  29 · CT   50.94 s · SR 96.5% ·    8.7 s · resta  0.2 h
+  [ 31/100] run  30 · CT   57.46 s · SR 95.0% ·    8.4 s · resta  0.2 h
+  [ 32/100] run  31 · CT   57.67 s · SR 95.0% ·    8.6 s · resta  0.2 h
+  [ 33/100] run  32 · CT   61.23 s · SR 94.0% ·    8.1 s · resta  0.2 h
+  [ 34/100] run  33 · CT   64.64 s · SR 93.5% ·    8.5 s · resta  0.2 h
+  [ 35/100] run  34 · CT   58.88 s · SR 94.5% ·    8.1 s · resta  0.1 h
+  [ 36/100] run  35 · CT   59.37 s · SR 94.5% ·    8.7 s · resta  0.1 h
+  [ 37/100] run  36 · CT   43.46 s · SR 98.0% ·    8.4 s · resta  0.1 h
+  [ 38/100] run  37 · CT   53.55 s · SR 96.0% ·    9.0 s · resta  0.1 h
+  [ 39/100] run  38 · CT   56.05 s · SR 95.5% ·    8.3 s · resta  0.1 h
+  [ 40/100] run  39 · CT   57.23 s · SR 95.0% ·    8.5 s · resta  0.1 h
+  [ 41/100] run  40 · CT   57.28 s · SR 95.0% ·    8.8 s · resta  0.1 h
+  [ 42/100] run  41 · CT   66.89 s · SR 93.0% ·    8.1 s · resta  0.1 h
+  [ 43/100] run  42 · CT   73.78 s · SR 91.5% ·    8.5 s · resta  0.1 h
+  [ 44/100] run  43 · CT   57.20 s · SR 95.0% ·    8.3 s · resta  0.1 h
+  [ 45/100] run  44 · CT   55.53 s · SR 95.5% ·    8.4 s · resta  0.1 h
+  [ 46/100] run  45 · CT   68.70 s · SR 92.5% ·    8.1 s · resta  0.1 h
+  [ 47/100] run  46 · CT   54.87 s · SR 95.5% ·    8.5 s · resta  0.1 h
+  [ 48/100] run  47 · CT   47.60 s · SR 97.0% ·    8.6 s · resta  0.1 h
+  [ 49/100] run  48 · CT   65.17 s · SR 93.5% ·    8.9 s · resta  0.1 h
+  [ 50/100] run  49 · CT   53.40 s · SR 96.0% ·    8.3 s · resta  0.1 h
+  [ 51/100] run  50 · CT   55.40 s · SR 95.5% ·    8.1 s · resta  0.1 h
+  [ 52/100] run  51 · CT   57.88 s · SR 95.0% ·    8.1 s · resta  0.1 h
+  [ 53/100] run  52 · CT   52.96 s · SR 96.0% ·    8.4 s · resta  0.1 h
+  [ 54/100] run  53 · CT   75.80 s · SR 91.5% ·    9.2 s · resta  0.1 h
+  [ 55/100] run  54 · CT   66.06 s · SR 93.0% ·    8.4 s · resta  0.1 h
+  [ 56/100] run  55 · CT   59.68 s · SR 94.5% ·    8.2 s · resta  0.1 h
+  [ 57/100] run  56 · CT   59.95 s · SR 94.5% ·    8.9 s · resta  0.1 h
+  [ 58/100] run  57 · CT   62.21 s · SR 94.0% ·    8.5 s · resta  0.1 h
+  [ 59/100] run  58 · CT   58.41 s · SR 95.0% ·    8.7 s · resta  0.1 h
+  [ 60/100] run  59 · CT   54.96 s · SR 95.5% ·    8.1 s · resta  0.1 h
+  [ 61/100] run  60 · CT   50.37 s · SR 96.5% ·    8.7 s · resta  0.1 h
+  [ 62/100] run  61 · CT   51.14 s · SR 96.5% ·    8.8 s · resta  0.1 h
+  [ 63/100] run  62 · CT   59.06 s · SR 94.5% ·    7.7 s · resta  0.1 h
+  [ 64/100] run  63 · CT   67.83 s · SR 93.0% ·    8.8 s · resta  0.1 h
+  [ 65/100] run  64 · CT   59.68 s · SR 94.5% ·    8.3 s · resta  0.1 h
+  [ 66/100] run  65 · CT   69.44 s · SR 92.5% ·    8.8 s · resta  0.1 h
+  [ 67/100] run  66 · CT   57.44 s · SR 95.0% ·    8.3 s · resta  0.1 h
+  [ 68/100] run  67 · CT   53.97 s · SR 95.5% ·    8.2 s · resta  0.1 h
+  [ 69/100] run  68 · CT   47.91 s · SR 97.0% ·    8.6 s · resta  0.1 h
+  [ 70/100] run  69 · CT   62.47 s · SR 94.0% ·    8.2 s · resta  0.1 h
+  [ 71/100] run  70 · CT   47.98 s · SR 97.0% ·    8.7 s · resta  0.1 h
+  [ 72/100] run  71 · CT   55.65 s · SR 95.5% ·    9.3 s · resta  0.1 h
+  [ 73/100] run  72 · CT   49.95 s · SR 96.5% ·    8.1 s · resta  0.1 h
+  [ 74/100] run  73 · CT   61.40 s · SR 94.0% ·    8.4 s · resta  0.1 h
+  [ 75/100] run  74 · CT   46.83 s · SR 97.5% ·    8.9 s · resta  0.1 h
+  [ 76/100] run  75 · CT   52.82 s · SR 96.0% ·    8.3 s · resta  0.1 h
+  [ 77/100] run  76 · CT   61.71 s · SR 94.0% ·    8.2 s · resta  0.1 h
+  [ 78/100] run  77 · CT   53.72 s · SR 96.0% ·    8.6 s · resta  0.1 h
+  [ 79/100] run  78 · CT   68.44 s · SR 92.5% ·    8.1 s · resta  0.0 h
+  [ 80/100] run  79 · CT   41.37 s · SR 98.5% ·    8.4 s · resta  0.0 h
+  [ 81/100] run  80 · CT   57.94 s · SR 95.0% ·    8.9 s · resta  0.0 h
+  [ 82/100] run  81 · CT   63.56 s · SR 94.0% ·    8.7 s · resta  0.0 h
+  [ 83/100] run  82 · CT   52.54 s · SR 96.0% ·    8.4 s · resta  0.0 h
+  [ 84/100] run  83 · CT   49.27 s · SR 96.5% ·    8.2 s · resta  0.0 h
+  [ 85/100] run  84 · CT   70.41 s · SR 92.5% ·    8.8 s · resta  0.0 h
+  [ 86/100] run  85 · CT   54.51 s · SR 96.0% ·    8.9 s · resta  0.0 h
+  [ 87/100] run  86 · CT   54.82 s · SR 95.5% ·    8.5 s · resta  0.0 h
+  [ 88/100] run  87 · CT   49.91 s · SR 96.5% ·    8.6 s · resta  0.0 h
+  [ 89/100] run  88 · CT   53.53 s · SR 96.0% ·    8.3 s · resta  0.0 h
+  [ 90/100] run  89 · CT   68.54 s · SR 92.5% ·    8.3 s · resta  0.0 h
+  [ 91/100] run  90 · CT   62.39 s · SR 94.0% ·    8.3 s · resta  0.0 h
+  [ 92/100] run  91 · CT   54.33 s · SR 95.5% ·    8.5 s · resta  0.0 h
+  [ 93/100] run  92 · CT   50.97 s · SR 96.5% ·    8.5 s · resta  0.0 h
+  [ 94/100] run  93 · CT   65.09 s · SR 93.5% ·    8.3 s · resta  0.0 h
+  [ 95/100] run  94 · CT   56.72 s · SR 95.0% ·    8.2 s · resta  0.0 h
+  [ 96/100] run  95 · CT   64.40 s · SR 93.5% ·    8.6 s · resta  0.0 h
+  [ 97/100] run  96 · CT   62.72 s · SR 94.0% ·    8.1 s · resta  0.0 h
+  [ 98/100] run  97 · CT   72.86 s · SR 92.0% ·    8.9 s · resta  0.0 h
+  [ 99/100] run  98 · CT   55.38 s · SR 95.5% ·    7.4 s · resta  0.0 h
+  [100/100] run  99 · CT   56.96 s · SR 95.5% ·    7.9 s · resta  0.0 h
+
+-> reports/campanha/wnn-T32-a2s12-sigma10-com-kf.csv
+-> reports/campanha/wnn-T32-a2s12-sigma10-com-kf-episodios.csv
