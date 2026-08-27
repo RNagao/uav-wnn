@@ -433,3 +433,67 @@ def test_montar_com_plana_da_a_mesma_acao(tmp_path):
         np.testing.assert_allclose(np.asarray(p_plana(obs), float),
                                    np.asarray(p_dict(obs), float),
                                    rtol=1e-6, atol=1e-9)
+
+
+def test_denso_e_esparso_sao_bit_a_bit_identicos(monkeypatch):
+    """O armazenamento denso (n pequeno) replica o esparso operação a operação.
+
+    O denso existe porque o dict custava 218–361 B por entrada para 12–24 B de
+    dado (medido em checkpoint real: 26,4 MB de RAM no crítico para 900 KB de
+    conteúdo). A equivalência não é aproximada: mesmo laço, mesma ordem de
+    acumulação — qualquer refactor que quebre isso muda trajetórias de treino.
+    """
+    import uavwnn.wnn.redes as W
+
+    def gemeas(classe, **kw):
+        densa = classe(**kw)
+        assert densa._densa, "o cenário do teste deveria caber no denso"
+        monkeypatch.setattr(W, "_TETO_DENSO_BYTES", 0)
+        esparsa = classe(**kw)
+        assert not esparsa._densa
+        monkeypatch.undo()
+        return densa, esparsa
+
+    rng = np.random.default_rng(9)
+
+    # ator: atualizar + prever + reiniciar + salvar
+    da, ea = gemeas(W.RedeGradienteFuncional, n_bits=48, tamanho_tupla=12,
+                    n_saidas=3, seed=4)
+    for _ in range(200):
+        bits = rng.random(48) > 0.5
+        passo = rng.normal(0, 0.3, 3)
+        da.atualizar(bits[None, :], passo)
+        ea.atualizar(bits[None, :], passo)
+    sonda = rng.random((40, 48)) > 0.5
+    assert np.array_equal(da.prever(sonda), ea.prever(sonda))
+    assert da.entradas_ocupadas() == ea.entradas_ocupadas()
+    for md, me in zip(da.memoria, ea.memoria):
+        assert set(md) == set(me)
+        for k in md:
+            assert np.array_equal(md[k], me[k])
+
+    # crítico: treinar + treinar_componente + prever
+    dc, ec = gemeas(W.RedeRegressaoEsquecimento, n_bits=48, tamanho_tupla=12,
+                    n_saidas=2, phi=0.85, seed=4)
+    for j in range(200):
+        bits = rng.random(48) > 0.5
+        if j % 3:
+            alvo = rng.normal(0, 2, 2)
+            dc.treinar(bits[None, :], alvo)
+            ec.treinar(bits[None, :], alvo)
+        else:
+            alvo1 = float(rng.normal())
+            dc.treinar_componente(bits[None, :], j % 2, alvo1)
+            ec.treinar_componente(bits[None, :], j % 2, alvo1)
+    sonda = rng.random((40, 48)) > 0.5
+    assert np.array_equal(dc.prever(sonda), ec.prever(sonda))
+    for md, me in zip(dc.memoria, ec.memoria):
+        assert set(md) == set(me)
+        for k in md:
+            assert np.array_equal(md[k][0], me[k][0])
+            assert np.array_equal(md[k][1], me[k][1])
+
+    # reiniciar volta ao estado inicial nos dois modos
+    da.reiniciar(); ea.reiniciar()
+    assert da.entradas_ocupadas() == ea.entradas_ocupadas() == 0
+    assert np.array_equal(da.prever(sonda), ea.prever(sonda))

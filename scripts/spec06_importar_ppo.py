@@ -78,13 +78,17 @@ def _rede_de(peso: np.ndarray, mapeamento: np.ndarray, tupla: int,
             f"2^{tupla} = {esperado}. O mapeamento e os pesos não vêm do mesmo "
             f"modelo")
 
-    rede.memoria = [{} for _ in range(rede.n_ram)]
+    # dicts locais e UMA atribuição no fim: `rede.memoria` agora é propriedade
+    # (armazenamento denso quando cabe), e escrever num dict reconstruído pelo
+    # getter se perderia em silêncio.
+    memo = [{} for _ in range(rede.n_ram)]
     ocupadas = 0
     for r in range(rede.n_ram):
         bloco = peso[r * base:(r + 1) * base]
         for e in np.flatnonzero(np.abs(bloco).sum(axis=1) > 0):
-            rede.memoria[r][int(e)] = bloco[e].astype(np.float64).copy()
+            memo[r][int(e)] = bloco[e].astype(np.float64).copy()
             ocupadas += 1
+    rede.memoria = memo
     return rede, ocupadas
 
 

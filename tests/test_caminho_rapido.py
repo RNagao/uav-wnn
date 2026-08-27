@@ -123,7 +123,7 @@ def test_salvar_estreita_dtypes_e_roundtrip_bit_exato():
     rng = np.random.default_rng(5)
     for _ in range(300):
         bits = rng.random(48) > 0.5
-        rede.atualizar(bits[None, :], rng.normal(0, 1, (1, 3)))
+        rede.atualizar(bits[None, :], rng.normal(0, 1, 3))
     with tempfile.NamedTemporaryFile(suffix=".npz") as f:
         rede.salvar(f.name)
         z = np.load(f.name)
