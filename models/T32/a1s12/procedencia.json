@@ -1,0 +1,46 @@
+{
+  "ator": {
+    "n_saidas": 3
+  },
+  "resolucao": 32,
+  "config": {
+    "na": 1,
+    "ns": 12,
+    "passo": 0.0008,
+    "sigma": 0.35,
+    "T": 32,
+    "n": 12,
+    "phi": 0.85,
+    "m": 8,
+    "gamma": 0.99,
+    "replica": "1b",
+    "parameter_sharing": true,
+    "recompensa_por_na": true,
+    "retomado_de": "models/T32/a1s12",
+    "critico": "descentralizado (Alg. 4.4)"
+  },
+  "passos": 50000000,
+  "episodios": 318668,
+  "melhor_val_cobertura": 1.0,
+  "metrica_test": {
+    "sr": 0.99,
+    "ct_cens": 42.3,
+    "cobertura": 0.9966666666666667,
+    "n": 100
+  },
+  "fonte": "spec06_treino_multiagente.py",
+  "deploy": {
+    "poda": 0.0,
+    "deploy_kb": 1145.2783203125,
+    "sr_cheio": 0.99,
+    "sr_podado": 0.97,
+    "motivo": "poda 70% derrubou SR 99.0%\u219297.0%; deploy sem poda"
+  },
+  "metrica_test_final": {
+    "sr": 0.98,
+    "ct_cens": 48.59,
+    "cobertura": 0.9891666666666667,
+    "n": 100
+  },
+  "promovido_de": "runs/spec06-50M/T32-a1s12"
+}
