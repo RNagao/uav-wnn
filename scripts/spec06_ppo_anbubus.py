@@ -66,6 +66,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -132,10 +133,10 @@ def _analisar_celula(txt: str) -> tuple[int, int]:
 REFERENCIAS = {
     "hopper":  dict(lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
                     minibatch_size=512, tuple_size=8, resolucao=32,
-                    vf_clip_param=3000.0),
+                    vf_clip_param=3000.0, vf_loss_coeff=1.0),
     "reacher": dict(lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
                     minibatch_size=128, tuple_size=10, resolucao=300,
-                    vf_clip_param=10.0),
+                    vf_clip_param=10.0, vf_loss_coeff=1.0),
 }
 
 ANBUBUS = dict(REFERENCIAS["reacher"])
@@ -152,25 +153,34 @@ contrário de `n = 32`, que daria 4,3·10⁹ por RAM."""
 
 TUPLA_ANBUBUS = ANBUBUS["tuple_size"]
 RESOLUCAO_ANBUBUS = ANBUBUS["resolucao"]
-FAIXA_OBS = (-1.0, 1.5)
-"""Faixa REAL da observação, medida — e ela **não** é a declarada pelo ambiente.
+FAIXA_OBS = (-1.5, 1.5)
+"""A faixa das oito configurações publicadas, e ela é em DESVIOS-PADRÃO.
 
-O `GrADySEnvironment` declara `Box(-1.0, 1.0)` e emite valores até **1,50**. Não é
-ruído numérico: a normalização é `(d + S)/(2S)` com `S = 100`, o que dá 1,5 quando
-`d = 200` — isto é, os drones **saem** da caixa de 100 × 100 e a normalização supõe
-que não saem. Medido em 400 passos, `Na ∈ {2, 8}`: faixa `[-1,0000; 1,5000]`.
+Com `observation_filter = "MeanStdFilter"` — invariante nas oito — o codificador não
+vê a observação crua: vê a padronizada. Medido, espiando `encoder.encode` durante um
+`train()`: média +0,144, desvio 1,061, faixa [-4,93; 9,80]. O `±1,5` deles é ±1,5
+desvio, não ±1,5 unidade de observação.
 
-Consequências, e nenhuma delas é opcional:
+A CONSTANTE ANTERIOR ERA (-1,0; 1,5), E O MOTIVO DELA MORREU
 
-1. O `Thermometer(min=-1, max=1)` das configurações do `anbubus` **saturaria** tudo
-   acima de 1,0, perdendo a distinção entre "longe" e "muito longe" exatamente na
-   região em que ela importa para reaproximar o enxame.
-2. O RLlib **valida** o espaço declarado e aborta a coleta. Nós **não corrigimos o
-   ambiente** (é a regra do projeto: clonar o cenário 3 sem modificação), então o
-   que se desliga é a validação — os dados seguem intactos.
-3. O nosso `TermometroQuantil` (E2) se ajusta a um corpus e portanto absorve isto
-   sozinho. O E0 de faixa fixa não absorveria, e é um argumento a mais para o E2
-   que a SPEC-01 não tinha.
+Aquele valor vinha de medir a observação **crua**: o `GrADySEnvironment` declara
+`Box(-1, 1)` e emite até 1,50, porque a normalização é `(d + S)/(2S)` com `S = 100` e
+os drones **saem** da caixa de 100 × 100. Era a faixa certa para entrada crua.
+
+Ao acrescentar o `MeanStdFilter` a entrada passou a ser padronizada, e a constante
+virou uma faixa de observação crua aplicada a desvios-padrão — assimétrica e com o
+dobro da saturação:
+
+    (-1,0; 1,5)  24,1 % dos valores saturam
+    (-1,5; 1,5)  12,4 % dos valores saturam
+
+Os 12,4 % não são defeito: são a escolha deles de cortar em ±1,5 desvio, o que
+concentra a resolução onde estão os dados. Manter a nossa seria divergir do artigo
+sem ganho.
+
+O `_disable_preprocessor_api=True` continua necessário por outro motivo — o ambiente
+emite fora do espaço que **declara**, e o pré-processador do RLlib aborta por isso.
+Desligá-lo é o que evita tocar no ambiente.
 """
 """`tuple_size = 8` e `resolution = 32` são os das configurações deles. O 8 não é
 escolha estética: a alocação é **densa** (`n_nodes · 2^n` posições), então `n = 32`
@@ -380,10 +390,22 @@ def main() -> int:
     ap.add_argument("--resolucao", type=int, default=None,
                     help="publicados: 16, 32, 64, 300")
     ap.add_argument("--minilote", type=int, default=None, help="publicados: 128, 512")
+    ap.add_argument("--vf-loss-coeff", type=float, default=None,
+                    help="peso da perda de valor. É o análogo do eixo de crítico do "
+                         "anbubus sob o Algoritmo 4.4, onde ele é `taxa_crítico/"
+                         "taxa_ator` — nos dois casos o número diz quanto o crítico "
+                         "se move em relação ao ator. Padrão do RLlib: 1,0.")
     ap.add_argument("--vf-clip", type=float, default=None,
                     help="3000 no hopper; 10 é o padrão do RLlib")
     ap.add_argument("--ray-cpus", type=int, default=2,
                     help="CPUs que o ray reserva. A grade roda várias em paralelo.")
+    ap.add_argument("--aval-cada", type=int, default=0,
+                    help="avalia deterministicamente a cada N passos, para acompanhar "
+                         "as figuras de mérito ao vivo. 0 = só no fim. Custa alguns "
+                         "segundos por avaliação e NÃO entra na seleção.")
+    ap.add_argument("--n-aval-parcial", type=int, default=8,
+                    help="episódios nas avaliações intermediárias; menos que no fim, "
+                         "porque servem para acompanhar e não para decidir")
     ap.add_argument("--sementes-aval", default=None,
                     help="arquivo com uma semente por linha (banco val ou test). "
                          "Sem ele, não há avaliação determinística e a grade "
@@ -403,7 +425,8 @@ def main() -> int:
     hp = dict(REFERENCIAS[a.referencia])
     for chave, valor in (("lr", a.lr), ("gamma", a.gamma), ("lambda_", a.lambda_),
                          ("tuple_size", a.tupla), ("resolucao", a.resolucao),
-                         ("minibatch_size", a.minilote), ("vf_clip_param", a.vf_clip)):
+                         ("minibatch_size", a.minilote), ("vf_clip_param", a.vf_clip),
+                         ("vf_loss_coeff", a.vf_loss_coeff)):
         if valor is not None:
             hp[chave] = valor
     algo, kw_env = construir(celula, a.seed, a.lote, hp)
@@ -411,16 +434,55 @@ def main() -> int:
           f"{a.passos} passos")
     print(f"referência `{a.referencia}` -> {hp}")
 
-    hist, vistos = [], 0
+    sementes_val = []
+    if a.sementes_aval:
+        sementes_val = [int(l) for l in Path(a.sementes_aval).read_text().split()
+                        if l.strip()]
+
+    hist, vistos, proximo = [], 0, a.aval_cada
+    t_ini = time.perf_counter()
+    marcos = []          # (passos, parede) para a taxa MARGINAL, não a acumulada
     while vistos < a.passos:
         r = algo.train()
         m = r.get("env_runners", r)
         vistos = r.get("num_env_steps_sampled_lifetime",
-                       r.get("timesteps_total", vistos + ANBUBUS["train_batch_size"]))
+                       r.get("timesteps_total",
+                                     vistos + (a.lote or hp["train_batch_size"])))
         ret = m.get("episode_return_mean", m.get("episode_reward_mean"))
-        hist.append({"passos": int(vistos),
-                     "retorno": None if ret is None else float(ret)})
-        print(f"  {vistos:>8} passos  retorno {ret}")
+        agora = time.perf_counter() - t_ini
+        marcos.append((int(vistos), agora))
+        del marcos[:-8]
+
+        # ETA pela taxa MARGINAL da janela recente. A acumulada mente por baixo
+        # quando a corrida desacelera — na campanha do Alg 4.4 ela marcava 361
+        # passos/s enquanto a real era 147, e eu errei duas ETAs por causa disso.
+        eta = float("nan")
+        if len(marcos) >= 2:
+            dp = marcos[-1][0] - marcos[0][0]
+            dt = marcos[-1][1] - marcos[0][1]
+            if dt > 0 and dp > 0:
+                eta = (a.passos - vistos) / (dp / dt)
+        falta = ("  --" if eta != eta
+                 else f"{int(eta) // 3600:>2}h{int(eta) % 3600 // 60:02d}m")
+        linha = {"passos": int(vistos),
+                 "retorno": None if ret is None else float(ret),
+                 "parede_s": agora}
+
+        # Figuras de mérito ao vivo, DETERMINÍSTICAS. Não entram na seleção — são
+        # para acompanhar; a que decide é a do fim, com o banco inteiro.
+        if a.aval_cada and sementes_val and vistos >= proximo:
+            proximo = vistos + a.aval_cada
+            pa = avaliar_determinista(algo, kw_env,
+                                      sementes_val[:a.n_aval_parcial])
+            linha["parcial"] = pa
+            print(f"  {vistos:>8}/{a.passos} {vistos / a.passos:>4.0%} resta {falta}"
+                  f" · retorno {ret if ret is None else round(ret, 2)}"
+                  f" · cobertura {pa['cobertura']:>6.1%} SR {pa['sr']:>5.1%}"
+                  f" CT {pa['ct_cens']:>5.0f}s", flush=True)
+        else:
+            print(f"  {vistos:>8}/{a.passos} {vistos / a.passos:>4.0%} resta {falta}"
+                  f" · retorno {ret if ret is None else round(ret, 2)}", flush=True)
+        hist.append(linha)
 
     aval = None
     if a.sementes_aval:

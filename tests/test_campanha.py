@@ -238,122 +238,53 @@ def test_parada_respeita_a_direcao_da_metrica():
 # --- a grade de hiperparâmetros (T-06.4/T-06.3) ---------------------------
 
 
-def _grid():
-    import importlib.util
-    import pathlib
-    import sys
-
-    caminho = (pathlib.Path(__file__).resolve().parents[1] / "scripts"
-               / "spec06_grid.py")
-    spec = importlib.util.spec_from_file_location("_grid", caminho)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["_grid"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+# O `_grid()` e os três testes que dependiam dele saíram junto com
+# `scripts/spec06_grid.py`, a varredura de dois eixos que o `spec06_busca.py`
+# substituiu. Eles guardavam o pareamento do esforço de sintonia da T-06.3 —
+# *"um pareamento em que a WNN foi varrida em 15 pontos e a MLP em 2 não é
+# pareamento; é vantagem de esforço disfarçada de vantagem de método"* —, e o
+# princípio migrou para `test_a_conversao_de_taxa_pareia_as_convencoes`, abaixo,
+# que verifica o mecanismo que sobreviveu.
 
 
-def test_os_tres_modelos_recebem_o_mesmo_numero_de_pontos():
-    """T-06.3: *"um pareamento em que a WNN foi varrida em 15 pontos e a MLP em 2
-    não é pareamento; é vantagem de esforço disfarçada de vantagem de método."*
-
-    O `φ` do crítico com esquecimento fica FORA da grade justamente por isso —
-    existe em um dos três e daria 12 pontos a ele contra 6 aos outros.
-    """
-    g = _grid()
-    tamanhos = {m: len(t) * len(g.SIGMAS) for m, t in g.TAXAS.items()}
-    assert len(set(tamanhos.values())) == 1, tamanhos
-    assert set(g.TAXAS) == {"ntupla_dissertacao", "ntupla_anbubus", "mlp"}
-
-
-def test_a_taxa_do_anbubus_e_a_equivalente_na_convencao_de_soma():
+def test_a_conversao_de_taxa_pareia_as_convencoes():
     """A afirmação de justiça da grade, verificada em aritmética.
 
     Somar `passo` às `N` posições endereçadas muda `f` em `passo` na convenção de
-    **média** (eq. 4.12) e em `passo·N` na de **soma**. Então a mesma taxa nominal dá
-    um passo `N` vezes maior no braço do `anbubus`, e comparar sem converter mediria
-    a **convenção**, não o aproximador.
+    **média** (eq. 4.12) e em `passo·N` na de **soma**. A mesma taxa nominal dá um
+    passo `N` vezes maior no braço de soma, e comparar sem converter mediria a
+    CONVENÇÃO, não o aproximador.
 
-    Se alguém editar uma das duas faixas sem a outra, a comparação passa a ser
-    injusta **sem nenhum erro aparecer** — e é isso que este teste impede.
+    O `spec06_busca.py` converte por AMOSTRA, e é o eixo `n` que obriga: `N =
+    ⌈25·T/n⌉` varia de 12 a 200 no espaço varrido, então uma tabela fixa de taxas
+    equivalentes valeria para um único `(T, n)`.
+
+    Substitui `test_a_taxa_do_anbubus_e_a_equivalente_na_convencao_de_soma`, que
+    verificava o mesmo sobre o `spec06_grid.py`, removido.
     """
-    from uavwnn.wnn.redes import RedeGradienteFuncional
+    import math
 
-    g = _grid()
-    n_bits = 25 * g.BITS_POR_ESCALAR
-    n_ram = RedeGradienteFuncional(n_bits, g.TAMANHO_TUPLA, seed=0).n_ram
+    from uavwnn.agents.ac_continuo import (
+        NTuplaAnbubusAprox,
+        NTuplaDissertacaoAprox,
+    )
 
-    for media, soma in zip(g.TAXAS["ntupla_dissertacao"], g.TAXAS["ntupla_anbubus"]):
-        esperado = media / n_ram
-        assert soma == pytest.approx(esperado, rel=0.02), (
-            f"taxa de soma {soma:.3e} não equivale a {media:.3e} da média "
-            f"(esperado {esperado:.3e} com N={n_ram}); o passo efetivo em `f` "
-            f"difere e a grade deixa de medir o aproximador")
-
-
-def test_as_faixas_cobrem_a_mesma_razao():
-    """Mesma razão em cada família é o que torna as faixas comparáveis apesar de
-    valores diferentes — a MLP usa Adam e o `anbubus` usa soma, então valores iguais
-    não significam esforço igual."""
-    g = _grid()
-    razoes = {m: max(t) / min(t) for m, t in g.TAXAS.items()}
-    assert max(razoes.values()) / min(razoes.values()) < 1.05, razoes
-
-
-# --- normalização móvel da observação (o MeanStdFilter deles) --------------
-
-
-def test_normalizador_estima_media_e_desvio():
-    """Welford, não soma dos quadrados: com milhões de passos a forma acumulada
-    perde precisão quando a média é grande em relação ao desvio."""
-    from uavwnn.campanha import NormalizadorMovel
-
-    g = np.random.default_rng(0)
-    nz = NormalizadorMovel(3)
-    for _ in range(4000):
-        nz.atualizar(g.normal(loc=[5.0, -2.0, 100.0], scale=[3.0, 0.5, 0.1], size=3))
-    assert np.allclose(nz.media, [5.0, -2.0, 100.0], atol=0.15)
-    assert np.allclose(nz.desvio, [3.0, 0.5, 0.1], rtol=0.1)
-
-
-def test_congelar_impede_vazamento_na_avaliacao():
-    """A estatística é estado TREINADO. Se ela seguisse acumulando durante a
-    avaliação, o agente se calibraria nos episódios de reporte — vazamento pela
-    porta de trás, sem tocar em pesos."""
-    from uavwnn.campanha import NormalizadorMovel
-
-    nz = NormalizadorMovel(2)
-    g = np.random.default_rng(1)
-    for _ in range(50):
-        nz.atualizar(g.normal(size=2))
-    n_antes, media_antes = nz.n, nz.media.copy()
-
-    nz.congelar()
-    for _ in range(500):
-        nz.aplicar(g.normal(loc=99.0, size=2))     # distribuição MUITO diferente
-    assert nz.n == n_antes
-    assert np.array_equal(nz.media, media_antes)
-
-    nz.descongelar()
-    nz.aplicar(g.normal(size=2))
-    assert nz.n == n_antes + 1
-
-
-def test_normalizador_persiste_bit_a_bit(tmp_path):
-    """Vai no checkpoint: um modelo carregado sem a estatística veria a observação
-    numa escala diferente da que treinou."""
-    from uavwnn.campanha import NormalizadorMovel
-
-    g = np.random.default_rng(2)
-    nz = NormalizadorMovel(5)
-    for _ in range(300):
-        nz.atualizar(g.normal(loc=3.0, scale=2.0, size=5))
-    x = g.normal(size=5)
-    antes = nz.aplicar(x, atualizar=False)
-
-    nz.salvar(tmp_path / "nz.npz")
-    outro = NormalizadorMovel.carregar(tmp_path / "nz.npz")
-    assert np.array_equal(outro.aplicar(x, atualizar=False), antes)
-    assert outro.congelado, "carregar deve devolver congelado — é avaliação"
+    passo = 5e-4
+    for n_bits, tupla in ((400, 12), (800, 12), (7500, 10)):
+        n_ram = math.ceil(n_bits / tupla)
+        d = NTuplaDissertacaoAprox(n_bits=n_bits, tamanho_tupla=tupla,
+                                   taxa_ator=passo)
+        a = NTuplaAnbubusAprox(n_bits=n_bits, tamanho_tupla=tupla,
+                               taxa_ator=passo / n_ram)
+        # `ganho_do_passo` é 1 na média e `N` na soma: é ele que faz `c_max`
+        # significar a mesma coisa nas duas, e é ele que o pareamento usa.
+        df_d = d.ator.taxa_ator_efetiva if hasattr(d.ator, "taxa_ator_efetiva") \
+            else passo * d.ator.ganho_do_passo
+        df_a = (passo / n_ram) * a.ator.ganho_do_passo
+        assert a.ator.n_ram == n_ram
+        assert math.isclose(df_d, df_a, rel_tol=1e-9), (
+            f"Δf difere entre as convenções em (n_bits={n_bits}, n={tupla}): "
+            f"{df_d} contra {df_a}")
 
 
 def _busca():

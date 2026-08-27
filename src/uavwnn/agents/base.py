@@ -47,6 +47,9 @@ PADDING = -1.0
 """Sentinela de slot vazio. Fora da faixa dos válidos, o que torna o bit de
 validade desnecessário (PRD §5.4)."""
 
+TOL_PADDING = 1e-12
+"""Tolerância para reconhecer o sentinela. Ver `Observacao.decodificar`."""
+
 V_MAX = 15.0
 """m/s. `speed: float = action[1] * 15` no `environment.py`."""
 
@@ -125,8 +128,30 @@ class Observacao:
         bruto_s = v[2 * n_a:2 * n_a + 2 * n_s].reshape(n_s, 2)
         S = ctx.scenario_size
 
-        val_a = ~np.isclose(bruto_a, PADDING).all(axis=1) if n_a else np.zeros(0, bool)
-        val_s = ~np.isclose(bruto_s, PADDING).all(axis=1)
+        # Comparação com TOLERÂNCIA EXPLÍCITA, não `np.isclose` nem `==`.
+        #
+        # `np.isclose` custava 10,9 µs sobre um (24,2) contra 1,55 µs desta forma
+        # — 7×, e são duas chamadas por decisão, metade do `decodificar`. O grosso
+        # do custo dele é a maquinaria de `rtol·|b| + atol` com tratamento de
+        # NaN/inf, que aqui não serve para nada.
+        #
+        # A COMPARAÇÃO EXATA (`==`) também funcionaria: medido, o sentinela chega
+        # com desvio 0,00e+00 em 27 496 slots, no limpo, sob ruído σ=10 e sob
+        # Kalman — o `environment.py` escreve por `fill(-1)` e normaliza só a
+        # fatia dos válidos. Mas isso é propriedade do AMBIENTE, não nossa, e
+        # `==` a transforma em requisito silencioso: um dia em que alguém
+        # normalize o vetor inteiro, o slot vazio vira sensor fantasma (−1
+        # decodifica para a posição válida 3S) e a política persegue algo que
+        # não existe, sem erro nenhum.
+        #
+        # 1e-12 fica muito acima do ruído de arredondamento em float64 para
+        # valores de magnitude 1 (eps ≈ 2,2e-16) e muito abaixo da distância de
+        # qualquer válido até −1: o normalizado é (p_k − p_outro + S)/2S, que
+        # exigiria os dois a 3S um do outro para chegar a −1. A margem é ~0,5,
+        # doze ordens de grandeza acima da tolerância.
+        val_a = (np.abs(bruto_a - PADDING) >= TOL_PADDING).any(axis=1) \
+            if n_a else np.zeros(0, bool)
+        val_s = (np.abs(bruto_s - PADDING) >= TOL_PADDING).any(axis=1)
 
         # p_outro − p_k = −(p_k − p_outro) = −(bruto·2S − S) = S − bruto·2S
         rel_a = S - bruto_a * 2 * S

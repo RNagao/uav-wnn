@@ -222,6 +222,18 @@ grandeza.
 Relatórios: [`reports/spec02-baseline-maddpg.md`](reports/spec02-baseline-maddpg.md)
 e [`reports/spec02-baseline-maddpg-rollout.md`](reports/spec02-baseline-maddpg-rollout.md).
 
+## Documentação
+
+`docs/` explica **como as coisas funcionam**; `reports/` guarda **o que foi
+medido**.
+
+| | |
+|---|---|
+| [`docs/teoria/`](docs/teoria/) | fundamentação: as duas WNN, o MADDPG e o filtro de Kalman — equações, variáveis e a linha de código que implementa cada uma |
+| [`docs/codebase.md`](docs/codebase.md) | a base inteira: 42 scripts, 45 módulos, 8 pipelines |
+| [`docs/pipeline-treinamento.md`](docs/pipeline-treinamento.md) | o treino, do `env.step` até a escrita na LUT |
+| [`reports/`](reports/) | um relatório por spec, mais os experimentos transversais |
+
 ## Instalação
 
 Requer [uv](https://docs.astral.sh/uv/). O ambiente vem de um **submodule**:

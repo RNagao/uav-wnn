@@ -38,9 +38,18 @@ class Codificador(Protocol):
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]: ...
 
 
+TOL_PADDING = 1e-12
+"""Tolerância para reconhecer o sentinela. Ver `Observacao.decodificar`."""
+
+
 def _valido(coluna: NDArray[np.float32]) -> NDArray[np.bool_]:
-    """Máscara dos valores que não são padding."""
-    return ~np.isclose(coluna, PADDING)
+    """Máscara dos valores que não são padding.
+
+    Tolerância explícita em vez de `np.isclose`, pelo motivo detalhado em
+    `Observacao.decodificar`: 7× mais barato, e sem depender de o sentinela
+    chegar bit-exato como `==` dependeria.
+    """
+    return np.abs(coluna - PADDING) >= TOL_PADDING
 
 
 def _aplicar(obs: NDArray[np.float32], limiares: NDArray[np.float64]) -> NDArray[np.bool_]:
@@ -83,6 +92,13 @@ class TermometroGlobal:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
 
     # -- persistência: os limiares SÃO estado treinado ----------------------
 
@@ -139,6 +155,13 @@ class TermometroPorSlot:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
 
     # -- persistência: os limiares SÃO estado treinado ----------------------
 
@@ -204,6 +227,13 @@ class TermometroQuantil:
     def codificar(self, obs: NDArray[np.float32]) -> NDArray[np.bool_]:
         assert self._limiares is not None, "chame ajustar() antes"
         return _aplicar(obs, self._limiares)
+
+    @property
+    def limiares(self) -> NDArray[np.float64]:
+        """`(D, T)`, somente leitura — a consulta fundida da `LUTPlana` precisa
+        deles para pular a materialização dos bits."""
+        assert self._limiares is not None, "chame ajustar() antes"
+        return self._limiares
 
     # -- persistência: os limiares SÃO estado treinado ----------------------
 

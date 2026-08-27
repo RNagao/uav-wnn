@@ -66,19 +66,35 @@ def test_treina_na_fase_certa():
     assert _script().ENV_TREINO["end_when_all_collected"] is False
 
 
-def test_faixa_da_observacao_e_a_medida_nao_a_declarada():
-    """O ambiente declara `Box(-1, 1)` e emite até **1,50**. Medido.
+def test_faixa_da_observacao_e_a_do_artigo_em_desvios_padrao():
+    """A faixa é `(-1,5; 1,5)` nas OITO configurações publicadas, e é em σ.
 
-    A normalização é `(d + S)/(2S)` com `S = 100`, o que dá 1,5 quando `d = 200` —
-    os drones **saem** da caixa de 100 × 100 e a normalização supõe que não saem.
+    Com `observation_filter = "MeanStdFilter"` — também invariante nas oito — o
+    codificador não vê a observação crua, vê a padronizada. Medido espiando
+    `encoder.encode` durante um `train()`: média +0,144, desvio 1,061, faixa
+    [-4,93; 9,80]. O ±1,5 é ±1,5 desvio.
 
-    Um termômetro de faixa fixa em `[-1, 1]` saturaria tudo acima de 1,0, perdendo a
-    distinção entre "longe" e "muito longe" justamente onde ela importa para
-    reaproximar o enxame. O `FAIXA_OBS` do script existe por isso.
+    ESTE TESTE JÁ AFIRMOU O CONTRÁRIO, e o motivo de ter mudado importa.
+
+    Ele fixava `lo == -1.0`, vindo de medir a observação **crua**: o
+    `GrADySEnvironment` declara `Box(-1, 1)` e emite até 1,50, porque a normalização
+    é `(d + S)/(2S)` com `S = 100` e os drones **saem** da caixa de 100 × 100. Era a
+    faixa certa para entrada crua, e o teste guardava isso corretamente.
+
+    O `MeanStdFilter` entrou depois, e com ele a entrada passou a ser padronizada — o
+    que transformou aquela constante numa faixa de observação crua aplicada a
+    desvios-padrão. Assimétrica, e com o dobro da saturação:
+
+        (-1,0; 1,5)  24,1 % dos valores saturam
+        (-1,5; 1,5)  12,4 % dos valores saturam
+
+    Os 12,4 % são a escolha deles: cortar em ±1,5 σ concentra a resolução onde estão
+    os dados. Divergir disso seria sintonia nossa disfarçada de reprodução.
     """
     lo, hi = _script().FAIXA_OBS
-    assert lo == -1.0
-    assert hi >= 1.5, f"faixa superior {hi} não cobre o 1,50 medido"
+    assert (lo, hi) == (-1.5, 1.5), (
+        "a faixa tem de ser a das oito configurações publicadas; com MeanStdFilter "
+        "ela é em desvios-padrão, não em unidades de observação")
 
 
 @pytest.mark.parametrize("celula", [(2, 12), (4, 24), (8, 36)])
@@ -93,12 +109,19 @@ def test_hiperparametros_sao_os_do_anbubus(celula):
     # Fixa as DUAS tarefas contínuas, não uma: é a citação completa de
     # `wnn/{hopper,reacher}/thermo/individual_run/experiment.py`, e é o que a grade
     # varre. Pinar só a base deixaria a outra livre para derivar.
+    # `vf_loss_coeff = 1.0` é o PADRÃO do RLlib, não um valor publicado: as oito
+    # configurações não o mencionam, então herdam o padrão. Ele entra aqui como eixo
+    # porque é o análogo da razão `taxa_crítico/taxa_ator` do anbubus sob o Algoritmo
+    # 4.4 — nos dois casos o número diz quanto o crítico se move em relação ao ator —,
+    # e sem ele não há como parear as duas grades nesse eixo.
     assert mod.REFERENCIAS["hopper"] == dict(
         lr=4e-4, gamma=0.98, lambda_=1.0, train_batch_size=1000,
-        minibatch_size=512, tuple_size=8, resolucao=32, vf_clip_param=3000.0)
+        minibatch_size=512, tuple_size=8, resolucao=32, vf_clip_param=3000.0,
+        vf_loss_coeff=1.0)
     assert mod.REFERENCIAS["reacher"] == dict(
         lr=7e-5, gamma=0.99, lambda_=0.9, train_batch_size=1000,
-        minibatch_size=128, tuple_size=10, resolucao=300, vf_clip_param=10.0)
+        minibatch_size=128, tuple_size=10, resolucao=300, vf_clip_param=10.0,
+        vf_loss_coeff=1.0)
 
     # A BASE é o reacher, e a escolha está registrada: é a tarefa contínua com
     # γ = 0,99, o desconto que Lamenza fixa, e a única com λ declarado.

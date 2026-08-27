@@ -236,59 +236,209 @@ na chave, dois níveis que compartilham configuração e orçamento refariam o t
 
 ---
 
-## 8. Onde a varredura está, e o que falta
+## 8. O que esta varredura NÃO fecha
 
-Parcial do `desempate` (121 de 720 corridas):
+A SPEC-06 tem `Na = 1` fechado; o **portão G1 segue não declarado**, e o que falta é
+campanha, não varredura:
 
-| | melhor cobertura | melhor SR | configuração |
-|---|---|---|---|
-| dissertação | **76,2 %** | **64,0 %** | `passo` 8e-4, `σ` 0,35, `T` 32, `n` 12, `φ` 0,85 |
-| anbubus | 27,0 % | 0,0 % | `passo` 3e-3, `σ` 0,35, `T` 32, `n` 12 |
+- **T-06.5**, a escalada `Na = 1 → 2 → 4 → 8` e `Ns ∈ {24, 36}`. É onde o MADDPG
+  entra como baseline, porque os checkpoints publicados começam em 2 agentes.
+- **T-06.6**, a tabela de custo T1/T2/T3, que o PRD §8 diz não poder cair.
+- os critérios 2 a 6 e 8 a 9 do portão.
 
-Das 121 corridas, **4 têm SR > 0 e todas as 4 são da dissertação**. Todos os pontos
-acima de 50 % de cobertura têm `n = 12`; `n = 24` não aparece.
+Três coisas que a varredura deixou medidas e não resolvidas:
 
-Referências para leitura: caminhante aleatório 3,3 % de cobertura; guloso 100 % de SR
-com `CT ≈ 34 s`.
+**Os 720 pontos reportam o estado FINAL, não o de melhor validação.** A correção
+entrou depois deles (`539b61e`), e o viés não é simétrico: quem aborta tem o estado
+final no limite da divergência. Medido num caso, a diferença é de 14 pontos de SR.
+Reavaliar os checkpoints `melhor` ficou barato (0,10 s por load) e é o próximo passo —
+o Δ de +5,0 pp do regime estável é limite inferior.
 
-**O que este documento NÃO conclui.** A grade está em 17 %. O veredito pareado sobre a
-grade completa não está calculado, o portão G1 da SPEC-06 segue **não declarado**, e as
-seis linhas de critério dele continuam abertas.
+**`α` e `σ` seguem confundidos** (`Δf ~ α·δ/σ`). Tolerável para comparar modelos, por
+ser simétrico entre os braços; não tolerável para concluir qual `σ` é melhor.
 
-### Transferência para `Na > 1` e para os cenários com ruído
-
-Pergunta levantada durante a varredura. A T-06.5 já pré-registra a resposta: a
-escalada usa **a configuração vencedora da T-06.4**, sem re-sintonizar por célula.
-
-Isso é o que preserva a comparação. Lamenza usa **um único conjunto** de
-hiperparâmetros em todos os cenários (`3e-6` para ator e crítico, `γ = 0,99`,
-`τ = 0,005`; o `benchmark.py` não sobrescreve). Re-sintonizar por cenário nos daria
-vantagem de esforço que o baseline não teve — é o mesmo princípio do "pareamento do
-orçamento de sintonia" da T-06.4.
-
-Mas a T-06.5 registra **um gatilho de reconfirmação**, e a parcial acima sugere que ele
-vai disparar: a observação cresce com `Na` (25 → 27 → 31 → 39 escalares), logo `B`
-cresce, logo `N = ⌈B/n⌉` cresce. Todos os melhores pontos têm `n = 12`, e em
-`Na = 8` com `T = 32` isso dá `N = 104` contra os 67 de hoje. O gatilho é a
-**utilização de endereços** (T-01.4): se a ocupação por RAM cair muito, é capacidade
-morta e `(n, N)` precisa ser reconfirmado.
-
-Duas coisas transferem melhor do que parecem:
-
-- **o termômetro quantil**, cujos limiares são reajustados por cenário a partir de um
-  corpus colhido naquele cenário — então a mudança de distribuição do ruído de GPS é
-  absorvida por construção;
-- **`γ`**, que é fixado por autoridade e é o único número genuinamente compartilhado
-  com Lamenza.
-
-E uma que não transfere: `3e-6` do Lamenza **não** é comparável ao nosso `passo`. É
-taxa nominal de Adam sobre rede densa 256×256, com replay e redes-alvo; o passo real é
-normalizado pelo momento de segunda ordem. Nosso `passo_efetivo` é o deslocamento
-direto em `f`. Só a nossa é interpretável como "quanto a saída se move".
+**O recorte de `δ` nunca foi testado.** A própria mensagem da assertiva sugere
+*"reduza η ou recorte δ"*, e três das quatro maiores perdas por aborto eram anbubus
+com 42 a 61 % de cobertura — uma morta por estourar `c_max` em 0,00. Sob recorte,
+aquele nível pode ser outra história.
 
 ---
 
-## 9. Configuração provisória, para desenvolvimento em paralelo
+## 9. O MODELO ESCOLHIDO — E A INVERSÃO QUE O ORÇAMENTO PRODUZ
+
+**O finalista da grade é `T = 32`.**
+
+    dissertação · passo 8,0e-4 · σ 0,35 · T = 32 · n = 12 (N = 67) · φ = 0,85 · m = 8
+    1º de 120 pontos · 720 corridas · 200 mil passos · 3 sementes
+    cobertura 50,1 %   SR 21,3 %   0/3 abortos
+    hash de config: `15b49e642647`
+
+É a mesma config eleita sobre a **parcial** do `desempate` e usada em **todos** os
+dados do projeto — custo T1/T2/T3, SPEC-08 (ruído) e escalada multiagente. A grade
+completa **confirmou** a escolha da parcial; não houve troca de vencedor.
+
+`T = 16` com os mesmos demais hiperparâmetros ficou em **3º de 120**, com
+cobertura 46,0 % e **SR 0,7 %**.
+
+### A corrida longa, as duas sementes
+
+| T | semente | cobertura | SR | CT_succ | CT_cens | passos | `melhor` |
+|---|---|---|---|---|---|---|---|
+| 16 | 0 | 98,5 % | 97,0 % | 38,2 s | 52,1 s | 6,75 M | 1,2 MB |
+| 32 | 1 | 97,8 % | 95,0 % | 38,5 s | 61,6 s | 6,75 M | 2,7 MB |
+| 32 | 0 | 95,4 % | 91,0 % | 39,2 s | 80,6 s | 6,75 M | 2,6 MB |
+| 16 | 1 | 92,8 % | 89,0 % | 42,5 s | 92,8 s | 7,25 M | 1,4 MB |
+
+**Média das duas sementes — os dois empatam em SR:**
+
+| T | N | cobertura | SR | spread de SR | `melhor` |
+|---|---|---|---|---|---|
+| **32** | 67 | **96,6 %** | **93,0 %** | **4 pp** | 2,6–2,7 MB |
+| 16 | 34 | 95,6 % | 93,0 % | 8 pp | 1,2–1,4 MB |
+
+> **Correção.** Uma versão anterior desta seção declarava `T = 16` o melhor modelo
+> treinado, com SR 97,0 %. Aquele número é a **melhor semente** do `T = 16`,
+> comparada contra **uma** semente do `T = 32`. Com as duas sementes de cada lado os
+> dois empatam em 93,0 %, e o `T = 16` tem o **dobro do spread**. Os tamanhos citados
+> (2,6 MB / 5,9 MB) também estavam inflados ~2×: contavam `melhor` + `final`; o
+> artefato implantável é só o `melhor`.
+
+### O terceiro ponto: a config que colapsou
+
+`PONTOS_LONGA` tinha **três** configs da dissertação. A segunda —
+`5e-4 · σ 0,20 · T = 32`, 2ª de 120 na grade — **colapsou no orçamento longo**:
+SR de **2–3 %** e `CT_cens` de ~488 s contra um horizonte de 500 s. Ou seja: quase
+nunca completa a coleta. Foi interrompida, e nunca recebeu avaliação no banco de
+teste pela rede viva — os números acima vêm do checkpoint `melhor`.
+
+Uma config **2ª colocada na grade** virando inútil a 6,75 M é o mesmo fenômeno da
+inversão do `T = 16`, no sentido oposto. A grade a 200 mil passos erra nos dois
+sentidos.
+
+### O checkpoint `melhor` está PIOR que a rede final — e por quê
+
+A campanha longa começou às 14:07 de 23/08; a correção `539b61e`, que faz a
+avaliação final ler o checkpoint `melhor`, entrou às 18:32. **Os processos já
+rodavam com o código anterior**, logo a tabela acima mede a **rede viva no fim do
+treino**. Medindo os checkpoints `melhor`, que nunca tinham sido avaliados:
+
+| config | `melhor` gravado em | cobertura | SR |
+|---|---|---|---|
+| T=32 s0 | 2,50 M | 90,8 % | **81,0 %** |
+| T=32 s1 | 2,25 M | 97,3 % | 96,0 % |
+| T=16 s0 | 2,50 M | 95,5 % | 93,0 % |
+| T=16 s1 | 4,25 M | 90,9 % | **82,0 %** |
+| 5e-4/0,20 s0 | 6,75 M | 83,8 % | 2,0 % |
+| 5e-4/0,20 s1 | 4,00 M | 81,2 % | 3,0 % |
+
+Média de 2 sementes: **T=32 → 88,5 %** e **T=16 → 87,5 %**, contra 93,0 % das redes
+finais. Os checkpoints salvos estão **4,5–5,5 pp abaixo** do que a campanha
+realmente produziu.
+
+**A causa é o banco de validação saturado.** São **20 episódios**, e a cobertura
+bate **100 %** já em 2,25–2,5 M. O critério é `if m["cobertura"] > melhor` —
+estritamente maior — então, saturado o banco, **nenhum checkpoint posterior
+substitui o primeiro**. No `T=32` semente 0 a validação atingiu 100 % em **seis**
+avaliações distintas, de 2,5 M a 6,5 M, e o checkpoint ficou congelado na primeira.
+
+Isto **não** contradiz a `539b61e`. São dois regimes opostos: a 200 mil passos a
+rede final está perto da divergência e o `melhor` ganha (foram os 14 pp de SR que
+motivaram a correção); a 6,75 M a validação satura e o `melhor` escolhe a rede
+**menos treinada** entre empates. O defeito real é o critério de seleção — banco de
+validação pequeno demais e desempate pelo primeiro máximo.
+
+**Consequência operacional:** o `checkpoints/melhor` que a SPEC-08 e as figuras de
+custo carregam é o de 2,5 M, não o de 6,75 M. As figuras de **custo** (tamanho,
+tempo de inferência, operações) não mudam — dependem de `N` e `n`, não do conteúdo
+das LUTs. As de **desempenho** sob ruído partem de uma rede 5 pp pior do que a
+disponível.
+
+### O que isso de fato estabelece
+
+**A grade a 200 mil passos não ordena o regime de operação.** 200 mil é 0,4 % do
+orçamento de 10 M — e um ponto que a grade colocou em 3º com **SR 0,7 %** alcança,
+com orçamento longo, o mesmo SR do 1º colocado. A grade serve para **descartar** o
+que aborta ou fica no piso; ela não é evidência confiável de ordenação no topo.
+
+**Há folga de custo não explorada.** Mesmo SR com **metade** do modelo: 34 RAMs
+contra 67, 400 bits de entrada contra 800, 1,2–1,4 MB contra 2,6–2,7 MB. A diferença
+é estrutural (`N = ⌈D·T/n⌉`), não estatística.
+
+**Nada disso troca o modelo dos dados publicados.** Duas sementes não separam 93,0 %
+de 93,0 %, e o `T = 32` chega com o menor spread e com o 1º lugar da grade. O
+`T = 16` fica registrado como **um segundo ponto na fronteira custo×desempenho**,
+existente só em `Na = 1`, e como candidato natural caso a fronteira vire objeto de
+estudo.
+
+**Não há MADDPG para comparar em `Na = 1`.** Os checkpoints publicados de Lamenza
+começam em 2 agentes — registrado em `spec02-baseline-maddpg.md`. A comparação com o
+baseline é da T-06.5, em `Na ≥ 2`; aqui a referência é o guloso: 100 % de SR com
+CT ≈ 34 s. O `CT_succ` de 38,5 s do finalista é 13 % acima dessa heurística que vê o
+mapa inteiro — decidindo por observação local, sem sinalização.
+
+---
+
+## 10. As três campanhas e o que cada uma estabeleceu
+
+| campanha | orçamento | corridas | o que fechou |
+|---|---|---|---|
+| grade `desempate` | 200 mil | 720 | qual **rede** funciona sob o Algoritmo 4.4 |
+| corrida longa | até 10 M | 12 | qual **modelo** resolve a tarefa |
+| grade PPO | 200 mil | 135 | qual **algoritmo** serve a rede do anbubus |
+
+### O veredito entre as redes, sob o Algoritmo 4.4
+
+| regime | Δ (dissertação − anbubus) | IC95 % | pontos |
+|---|---|---|---|
+| todos os 120 | +1,0 pp | [−1,0; +3,1] | 49/120 — inclui zero |
+| **estável** (`passo` ≤ 8e-4) | **+5,0 pp** | **[+2,3; +7,8]** | 43/72 |
+| instável (≥ 1,5e-3) | −4,9 pp | [−7,0; −3,2] | 6/48 |
+
+No regime em que as duas são estáveis a dissertação ganha com IC excluindo zero.
+Sobre a grade toda inclui zero, e o regime instável **não é média comparável**: a
+mortalidade é desigual (187/360 contra 137/360) e as abortadas entram com a cobertura
+do momento da morte.
+
+### O braço PPO, no mesmo orçamento
+
+| | cobertura | SR |
+|---|---|---|
+| PPO não treinado | 10,8 % | 0,0 % |
+| **anbubus sob PPO**, melhor ponto | **44,6 %** | **0,0 %** |
+| anbubus sob Algoritmo 4.4 | 46,6 % | 10,3 % |
+| dissertação sob Algoritmo 4.4 | 50,1 % | 21,3 % |
+
+**A cobertura do PPO chega perto; o SR não sai de zero.** O melhor ponto dele recolhe
+44,6 % dos sensores e **nunca** fecha um episódio; o segundo melhor com SR > 0 faz
+3,3 % de média. Cobertura mede quanto se recolhe, SR mede se se recolhe tudo — e é o
+SR que Lamenza reporta.
+
+Isso responde à pergunta que motivou o braço: **não, o PPO não resolve a
+instabilidade do anbubus por si.** Ele diverge em 22 de 124 corridas com `nan` na
+distribuição de ação, taxa comparável à do Algoritmo 4.4 — o que derruba o argumento
+que eu sustentei por várias mensagens, de que o `clip_param = 0,3` era a válvula que
+faltava.
+
+### Duas assimetrias entre os braços, declaradas
+
+**σ não transfere.** No PPO ela é aprendida (`policy_output_dim = 2 × dim de ação`);
+no Algoritmo 4.4 é fixa e varrida, pelas quatro razões da §4.4. O eixo simplesmente
+não existe no PPO, então o espaço pareado tem 45 pontos contra 120.
+
+**`n = 24` não cabe no modelo publicado.** A alocação do `NTNModel` é DENSA
+(`n_nodes · 2^n`): 2²⁴ endereços por RAM dão 6,7 a 13,4 GB só no ator, numa máquina
+de 11,9 GB — medido, 18 corridas mortas por SIGKILL. Nossa implementação é esparsa e
+varreu `n = 24` sem esforço, medindo que ele colapsa (4,9 % contra 31,7 %). O braço
+PPO não pode nem testar. A perda científica é pequena porque o nível que não cabe já
+era ruim; a de pareamento é real.
+
+E o `_keys` deles exige `n | 25·T`, porque o `conv1d(stride=n)` dá `floor(B/n)` chaves
+enquanto `n_nodes` dá `ceil(B/n)`. Nenhuma combinação de `T ∈ {16, 32}` com
+`n ∈ {12, 24}` roda.
+
+---
+
+## 11. Configuração provisória, para desenvolvimento em paralelo
 
 Escolhida sobre a **parcial** do `desempate` (160 de 720 corridas) para destravar
 trabalho em outra máquina. É provisória: a grade não fechou.
@@ -340,7 +490,7 @@ Agora `scripts/spec06_treinar.py` fixa `PASSO_EFETIVO` e `SIGMA` explicitamente,
 
 ---
 
-## 10. Como reproduzir
+## 12. Como reproduzir
 
 ```bash
 # grade de decisão (2,8 h)

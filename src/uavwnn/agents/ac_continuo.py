@@ -245,23 +245,42 @@ class NTuplaDissertacaoAprox(_PrefixoCheckpoint):
         self.critico.salvar(d / f"{prefixo}-critico.npz")
         (d / "familia.txt").write_text(self.custo()["familia"])
 
-    def carregar(self, diretorio) -> None:
+    def carregar(self, diretorio, plana: bool = False) -> None:
         """Substitui as redes pelas gravadas — inclusive o **mapeamento**.
 
         Reconstruir o mapeamento pela semente daria uma rede cujos endereços não
         correspondem aos valores gravados, e o erro seria silencioso: a política
         prediria zero em quase todo estado e pareceria "não aprendeu".
+
+        `plana=True` converte o ATOR para `LUTPlana` — três arrays contíguos, 12×
+        menos RAM e 8× mais rápido, ao custo de ser IMUTÁVEL. É para inferência.
+        Quem for treinar deixa em `False`, que é o padrão: a bandeira é explícita
+        justamente para que ninguém receba uma rede imutável sem ter pedido.
+
+        O crítico nunca é convertido: quem só infere não precisa dele, e quem
+        precisa dele está treinando.
         """
         from pathlib import Path
 
-        from ..wnn.redes import RedeGradienteFuncional
+        from ..wnn.redes import LUTPlana, RedeGradienteFuncional
         d = Path(diretorio)
         prefixo = self._prefixo_checkpoint()
         # `carregar` devolve a CLASSE GRAVADA, então o crítico volta como
         # `RedeRegressaoEsquecimento` na família da dissertação e como
         # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
         self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
+        if plana:
+            self.ator = LUTPlana(self.ator)
+        # O crítico é OPCIONAL: ele só existe para treinar (estima "quão boa é
+        # esta situação" e nunca escolhe ação), então um artefato de implantação
+        # traz só o ator. Sem esta tolerância, carregar um modelo de deploy morria
+        # com `FileNotFoundError` no crítico — e a mensagem não dizia que o
+        # arquivo era dispensável.
+        critico = d / f"{prefixo}-critico.npz"
+        if critico.exists():
+            self.critico = RedeGradienteFuncional.carregar(critico)
+        else:
+            self._sem_critico = True
 
     def custo(self) -> dict[str, Any]:
         """T1 e T3 pelo harness da SPEC-03, via a porta esparsa de T-05.7.
@@ -431,7 +450,16 @@ class NTuplaAnbubusAprox(_PrefixoCheckpoint):
         # `RedeRegressaoEsquecimento` na família da dissertação e como
         # `RedeGradienteFuncional` na do anbubus, sem ramificação aqui.
         self.ator = RedeGradienteFuncional.carregar(d / f"{prefixo}-ator.npz")
-        self.critico = RedeGradienteFuncional.carregar(d / f"{prefixo}-critico.npz")
+        # O crítico é OPCIONAL: ele só existe para treinar (estima "quão boa é
+        # esta situação" e nunca escolhe ação), então um artefato de implantação
+        # traz só o ator. Sem esta tolerância, carregar um modelo de deploy morria
+        # com `FileNotFoundError` no crítico — e a mensagem não dizia que o
+        # arquivo era dispensável.
+        critico = d / f"{prefixo}-critico.npz"
+        if critico.exists():
+            self.critico = RedeGradienteFuncional.carregar(critico)
+        else:
+            self._sem_critico = True
 
     def custo(self) -> dict[str, Any]:
         from ..custo import custo_ntuple_de_rede, operacoes_ntuple
@@ -510,7 +538,18 @@ class AtorCriticoContinuo:
         self._buffer.clear()
 
     def act(self, obs: Observacao) -> Acao:
-        x = self.codificar(obs.vetor)
+        return self.act_vetor(obs.vetor)
+
+    def act_vetor(self, vetor) -> Acao:
+        """`act` sem exigir a `Observacao` — o ator só lê `obs.vetor`.
+
+        Construir a `Observacao` (máscaras de preenchimento, posições relativas
+        com NaN, dataclass congelada) custava 28 % da decisão medida, e nada dela
+        era lido: essas vistas existem para o guloso e para o harness, não para a
+        rede. Quem tem só o vetor cru — o `callable_refenv` da campanha — entra
+        por aqui.
+        """
+        x = self.codificar(vetor)
         f = self.aproximador.f(x)
         self._concentracoes.append(NormalProjetada.concentracao(f))
 

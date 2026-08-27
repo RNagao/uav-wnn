@@ -212,3 +212,118 @@ def test_as_duas_familias_diferem_onde_deve_e_concordam_onde_deve():
     for c in (nossa.custo(), deles.custo()):
         assert c["mult_fp_aproximador"] == 0
     assert nossa.ator.n_saidas == deles.ator.n_saidas == 3
+
+
+# --- os invariantes de ARQUITETURA do `NTNModel`, lidos do código publicado ------
+#
+# Os testes acima provam equivalência NUMÉRICA — endereçamento, saída, gradiente e
+# termômetro. Estes provam que a ESTRUTURA é a do artigo, que é o que a equivalência
+# numérica não captura: dois modelos podem concordar num vetor e diferir em quantas
+# memórias têm, na dimensão do crítico ou no estado inicial.
+
+
+def test_duas_memorias_separadas_ambas_de_gradiente_funcional():
+    """`policy_mem` e `vf_mem`, as duas `EmbeddingBag`, as duas por gradiente.
+
+    É a diferença que resolve a pendência C2 e o motivo de o `anbubus` ser um braço
+    separado. O PPO deles treina ator e crítico pelo MESMO mecanismo — descida —,
+    enquanto o Algoritmo 4.4 usa gradiente funcional no ator e regressão com
+    esquecimento no crítico, que são modelos diferentes.
+
+    Confundir os dois braços aqui apagaria justamente o que a comparação mede.
+    """
+    ap = NTuplaAnbubusAprox(n_bits=200, tamanho_tupla=8)
+    assert type(ap.ator) is RedeGradienteFuncional
+    assert type(ap.critico) is RedeGradienteFuncional, (
+        "o crítico do anbubus é gradiente funcional, não regressão com esquecimento")
+    assert ap.ator.convencao == ap.critico.convencao == "soma", (
+        "`EmbeddingBag(mode='sum')` é a convenção de soma nas DUAS memórias")
+
+
+def test_critico_tem_uma_saida_como_vf_output_dim():
+    """`self.vf_output_dim = torch.Size([1])` no `NTNModel`.
+
+    Não é detalhe de forma: o crítico estima `V(s)`, um escalar. Se ele tivesse a
+    dimensão do ator, `regredir_critico` treinaria três valores e o `v()` leria só
+    um — erro silencioso, com dois terços da memória do crítico nunca consultados.
+    """
+    ap = NTuplaAnbubusAprox(n_bits=200, tamanho_tupla=8)
+    assert ap.critico.n_saidas == 1
+    assert isinstance(ap.v(np.zeros(200, dtype=np.uint8)), float)
+
+
+@pytest.mark.parametrize("n_bits,tupla", [(200, 8), (800, 12), (7500, 10)])
+def test_n_ram_e_o_teto_de_bits_sobre_tupla(n_bits, tupla):
+    """`n_nodes = ceil(input_dim / tuple_size)` — eq. do `NTNModel`, linha 24.
+
+    `N` é DERIVADO, não escolhido, e é o que faz a taxa deles não ser transferível:
+    somar `passo` às `N` posições muda `f` em `passo·N` na convenção de soma. Um `N`
+    errado aqui propaga silenciosamente para toda conversão de taxa.
+
+    O caso `(7500, 10)` é a configuração `reacher` sobre a nossa observação de 25
+    escalares com `T = 300`: 750 RAMs.
+    """
+    ap = NTuplaAnbubusAprox(n_bits=n_bits, tamanho_tupla=tupla)
+    assert ap.ator.n_ram == -(-n_bits // tupla)
+    assert ap.critico.n_ram == ap.ator.n_ram
+
+
+def test_memorias_comecam_em_zero():
+    """`nn.init.zeros_` nas duas memórias do `NTNModel`.
+
+    A consequência é comportamental, não estética: com tudo em zero a política
+    inicial é `N(0, σ²)` **independentemente da arquitetura**, então duas redes de
+    tamanhos diferentes com a mesma semente produzem as mesmas primeiras ações. Foi
+    o que explicou dois retornos idênticos em corridas de `T = 32` e `T = 300` que
+    eu quase tratei como defeito.
+
+    No nosso caso o zero vem da memória esparsa vazia, não de uma inicialização —
+    o efeito observável é o mesmo, e é ele que o teste fixa.
+    """
+    ap = NTuplaAnbubusAprox(n_bits=200, tamanho_tupla=8)
+    bits = np.zeros(200, dtype=np.uint8)
+    bits[::3] = 1
+    assert np.allclose(ap.f(bits), 0.0)
+    assert ap.v(bits) == 0.0
+
+
+def test_mapeamento_e_permutacao_cada_bit_uma_vez():
+    """`torch.randperm(input_dim)` — cada bit de entrada em exatamente uma tupla.
+
+    Amostrar com reposição daria bits ignorados e bits repetidos, o que muda a
+    capacidade do modelo sem mudar `N`. O teste não compara com o `randperm` deles
+    (isso o `test_enderecamento_identico` já faz forçando o mapa); fixa a
+    PROPRIEDADE, que é o que sobrevive a trocar de gerador.
+    """
+    ap = NTuplaAnbubusAprox(n_bits=800, tamanho_tupla=12)
+    usados = np.concatenate([np.asarray(t) for t in ap.ator.mapeamento])
+    assert len(usados) == len(set(usados.tolist())), "algum bit aparece duas vezes"
+    assert set(usados.tolist()) <= set(range(800))
+    # `ceil` implica sobra: 800/12 dá 66 tuplas cheias e uma de 8.
+    assert sum(len(t) for t in ap.ator.mapeamento) == 800
+
+
+def test_sigma_fixa_e_desvio_DECLARADO_do_artigo():
+    """O artigo aprende `log σ`; nós não. É desvio, e tem de ser visível.
+
+    Sob a `DiagGaussian` do RLlib, `num_outputs = 2 × dim_ação`, e a `policy_mem`
+    emite média E `log σ` — verificado executando: `policy_output_dim = 4` para a
+    ação de 2 componentes. O bloco comentado deles (`chunk(2, dim=1)[1]` em
+    `log(.5)`) confirma o layout.
+
+    Nós usamos `d_saida = 3` com σ FIXA, pelas quatro razões da §4.4, e a terceira
+    é a que importa aqui: uma cabeça `log σ` no Algoritmo 4.4 diverge, porque onde a
+    vantagem é consistentemente positiva `σ → 0` e o fator `σ⁻²` explode. O PPO
+    neutraliza isso com o recorte do objetivo; o Algoritmo 4.4 não tem recorte.
+
+    O teste fixa duas coisas: que o padrão é 3 (o nosso), e que `d_saida` é
+    PARAMETRIZÁVEL para o layout deles — sem isso o braço PPO não teria como usar a
+    mesma classe.
+    """
+    from uavwnn.agents.politica_continua import D_ATOR
+
+    assert NTuplaAnbubusAprox(n_bits=200).d_saida == D_ATOR == 3
+    deles = NTuplaAnbubusAprox(n_bits=200, d_saida=4)
+    assert deles.ator.n_saidas == 4, (
+        "`d_saida` tem de aceitar 2×dim_ação, que é o layout da DiagGaussian")
+    assert deles.critico.n_saidas == 1, "o crítico não acompanha o ator"

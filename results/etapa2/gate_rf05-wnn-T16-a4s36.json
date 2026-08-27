@@ -1,0 +1,403 @@
+{
+  "status": "aprovado",
+  "hash_filtro": "4806d704329965bf622df7df596e3d2f90f8b3461bfdb025fef96e8e2c494e42",
+  "hash_experimento": "b86bbb8a8d6f4169280dd29926e0330925e3fafb482c5d5b0a2573cb4424f78d",
+  "sigma_ancora": 5.0,
+  "dt": 0.5,
+  "episodios": 100,
+  "mobilidade": "WNN ntupla_dissertacao",
+  "degrau2": {
+    "rmse": 7.162127481091247,
+    "n_execucoes": 100,
+    "n_passos": 184
+  },
+  "degrau3": {
+    "grade": "q_a",
+    "melhor": 200.0,
+    "resultado_melhor": {
+      "rmse": 6.11823385749056,
+      "n_execucoes": 100,
+      "n_passos": 172,
+      "nees": {
+        "medio": 1.958930483259312,
+        "faixa": [
+          1.6272798250184628,
+          2.410578955063109
+        ],
+        "fracao_fora": 0.04656976744186046,
+        "veredito": "consistente"
+      },
+      "nis": {
+        "medio": 1.8672641882370682,
+        "faixa": [
+          1.6272798250184628,
+          2.410578955063109
+        ],
+        "fracao_fora": 0.04898809523809524,
+        "veredito": "consistente"
+      }
+    },
+    "tentativas": {
+      "0.5": {
+        "rmse": 11.53100959415337,
+        "n_execucoes": 100,
+        "n_passos": 168,
+        "nees": {
+          "medio": 18.789720203607303,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.5963095238095238,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 8.446811139750501,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.4177439024390244,
+          "veredito": "otimista"
+        }
+      },
+      "2.0": {
+        "rmse": 8.507912950560586,
+        "n_execucoes": 100,
+        "n_passos": 156,
+        "nees": {
+          "medio": 7.6644973732242585,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.38211538461538463,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 5.280066789352752,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.26532894736842105,
+          "veredito": "otimista"
+        }
+      },
+      "5.0": {
+        "rmse": 7.323048550832012,
+        "n_execucoes": 100,
+        "n_passos": 184,
+        "nees": {
+          "medio": 4.800597178587265,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.2311413043478261,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 4.10051508014914,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.18566666666666667,
+          "veredito": "otimista"
+        }
+      },
+      "20.0": {
+        "rmse": 6.2163614468719794,
+        "n_execucoes": 100,
+        "n_passos": 176,
+        "nees": {
+          "medio": 2.7287733927665565,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.08375,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 2.8719044172120625,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.09930232558139535,
+          "veredito": "otimista"
+        }
+      },
+      "50.0": {
+        "rmse": 6.016642058285609,
+        "n_execucoes": 100,
+        "n_passos": 208,
+        "nees": {
+          "medio": 2.2477347288059972,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.054038461538461535,
+          "veredito": "consistente"
+        },
+        "nis": {
+          "medio": 2.4233005205573828,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.07004901960784314,
+          "veredito": "otimista"
+        }
+      },
+      "200.0": {
+        "rmse": 6.11823385749056,
+        "n_execucoes": 100,
+        "n_passos": 172,
+        "nees": {
+          "medio": 1.958930483259312,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04656976744186046,
+          "veredito": "consistente"
+        },
+        "nis": {
+          "medio": 1.8672641882370682,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04898809523809524,
+          "veredito": "consistente"
+        }
+      }
+    }
+  },
+  "degrau4": {
+    "grade": "q_w",
+    "melhor": 4.0,
+    "resultado_melhor": {
+      "rmse": 3.6826969915236263,
+      "n_execucoes": 100,
+      "n_passos": 176,
+      "nees": {
+        "medio": 1.9577796729747305,
+        "faixa": [
+          1.6272798250184628,
+          2.410578955063109
+        ],
+        "fracao_fora": 0.05323863636363636,
+        "veredito": "consistente"
+      },
+      "nis": {
+        "medio": 1.993627396635901,
+        "faixa": [
+          1.6272798250184628,
+          2.410578955063109
+        ],
+        "fracao_fora": 0.05191860465116279,
+        "veredito": "consistente"
+      }
+    },
+    "tentativas": {
+      "0.0": {
+        "rmse": 5.623724137630263,
+        "n_execucoes": 100,
+        "n_passos": 156,
+        "nees": {
+          "medio": 31.527428017244112,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.5101282051282051,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 3.1056890064473874,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.10684210526315789,
+          "veredito": "otimista"
+        }
+      },
+      "0.25": {
+        "rmse": 5.306353933526805,
+        "n_execucoes": 100,
+        "n_passos": 184,
+        "nees": {
+          "medio": 14.065372625902954,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.36994565217391306,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 2.990462484421806,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.091,
+          "veredito": "otimista"
+        }
+      },
+      "1.0": {
+        "rmse": 4.599260592940715,
+        "n_execucoes": 100,
+        "n_passos": 192,
+        "nees": {
+          "medio": 5.742977739108743,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.16005208333333334,
+          "veredito": "otimista"
+        },
+        "nis": {
+          "medio": 2.603303672298679,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.07579787234042554,
+          "veredito": "otimista"
+        }
+      },
+      "4.0": {
+        "rmse": 3.6826969915236263,
+        "n_execucoes": 100,
+        "n_passos": 176,
+        "nees": {
+          "medio": 1.9577796729747305,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.05323863636363636,
+          "veredito": "consistente"
+        },
+        "nis": {
+          "medio": 1.993627396635901,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.05191860465116279,
+          "veredito": "consistente"
+        }
+      },
+      "8.0": {
+        "rmse": 3.8215475811477435,
+        "n_execucoes": 100,
+        "n_passos": 192,
+        "nees": {
+          "medio": 1.648813114119731,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04760416666666667,
+          "veredito": "consistente"
+        },
+        "nis": {
+          "medio": 1.8351425874860858,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04627659574468085,
+          "veredito": "consistente"
+        }
+      },
+      "16.0": {
+        "rmse": 4.116853210525474,
+        "n_execucoes": 100,
+        "n_passos": 200,
+        "nees": {
+          "medio": 1.5114429908159093,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.0431,
+          "veredito": "conservador"
+        },
+        "nis": {
+          "medio": 1.619189147038523,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.0413265306122449,
+          "veredito": "conservador"
+        }
+      },
+      "32.0": {
+        "rmse": 4.548095608607729,
+        "n_execucoes": 100,
+        "n_passos": 208,
+        "nees": {
+          "medio": 1.4878119922921977,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04052884615384615,
+          "veredito": "conservador"
+        },
+        "nis": {
+          "medio": 1.3815364090381153,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04083333333333333,
+          "veredito": "conservador"
+        }
+      },
+      "64.0": {
+        "rmse": 5.1002514076346515,
+        "n_execucoes": 100,
+        "n_passos": 188,
+        "nees": {
+          "medio": 1.5521220988941946,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04074468085106383,
+          "veredito": "conservador"
+        },
+        "nis": {
+          "medio": 1.1003623462974976,
+          "faixa": [
+            1.6272798250184628,
+            2.410578955063109
+          ],
+          "fracao_fora": 0.04532608695652174,
+          "veredito": "conservador"
+        }
+      }
+    }
+  },
+  "rf04": {
+    "verde": true,
+    "resumo": "\u001b[32m\u001b[32m\u001b[1m8 passed\u001b[0m\u001b[32m in 1.03s\u001b[0m\u001b[0m"
+  },
+  "regras": {
+    "degrau4_consistente": true,
+    "degrau3_pode_reprovar": true,
+    "_": "aprovado exige degrau 4 NEES consistente E RF-04 verde"
+  }
+}

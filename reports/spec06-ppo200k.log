@@ -1,0 +1,422 @@
+════ semente 0 ════
+Installed 26 packages in 79ms
+PPO (RLlib) + NTNModel · Na=1 Ns=12 · 200000 passos
+referência `hopper` -> {'lr': 0.0004, 'gamma': 0.99, 'lambda_': 1.0, 'train_batch_size': 1000, 'minibatch_size': 512, 'tuple_size': 8, 'resolucao': 32, 'vf_clip_param': 3000.0}
+      1000/200000   0% resta   -- · retorno -59.1
+      2000/200000   1% resta  0h12m · retorno -62.74
+      3000/200000   2% resta  0h12m · retorno -61.93
+      4000/200000   2% resta  0h12m · retorno -61.45
+      5000/200000   2% resta  0h12m · retorno -62.22
+      6000/200000   3% resta  0h12m · retorno -62.87
+      7000/200000   4% resta  0h12m · retorno -63.46
+      8000/200000   4% resta  0h12m · retorno -63.15
+      9000/200000   4% resta  0h12m · retorno -63.57
+     10000/200000   5% resta  0h12m · retorno -63.24
+     11000/200000   6% resta  0h12m · retorno -63.74
+     12000/200000   6% resta  0h12m · retorno -63.92
+     13000/200000   6% resta  0h12m · retorno -63.24
+     14000/200000   7% resta  0h12m · retorno -64.31
+     15000/200000   8% resta  0h12m · retorno -62.47
+     16000/200000   8% resta  0h12m · retorno -62.85
+     17000/200000   8% resta  0h12m · retorno -62.64
+     18000/200000   9% resta  0h12m · retorno -63.76
+     19000/200000  10% resta  0h11m · retorno -65.48
+     20000/200000  10% resta  0h12m · retorno -64.56 · cobertura  10.4% SR  0.0% CT   500s
+     21000/200000  10% resta  0h13m · retorno -63.95
+     22000/200000  11% resta  0h12m · retorno -63.66
+     23000/200000  12% resta  0h12m · retorno -63.3
+     24000/200000  12% resta  0h12m · retorno -64.4
+     25000/200000  12% resta  0h12m · retorno -63.97
+     26000/200000  13% resta  0h12m · retorno -63.19
+     27000/200000  14% resta  0h11m · retorno -61.65
+     28000/200000  14% resta  0h10m · retorno -60.83
+     29000/200000  14% resta  0h10m · retorno -59.77
+     30000/200000  15% resta  0h10m · retorno -60.79
+     31000/200000  16% resta  0h09m · retorno -62.1
+     32000/200000  16% resta  0h09m · retorno -63.05
+     33000/200000  16% resta  0h09m · retorno -62.4
+     34000/200000  17% resta  0h08m · retorno -62.43
+     35000/200000  18% resta  0h08m · retorno -63.5
+     36000/200000  18% resta  0h08m · retorno -63.87
+     37000/200000  18% resta  0h08m · retorno -64.03
+     38000/200000  19% resta  0h08m · retorno -62.98
+     39000/200000  20% resta  0h08m · retorno -62.93
+     40000/200000  20% resta  0h08m · retorno -63.99 · cobertura  11.5% SR  0.0% CT   500s
+     41000/200000  20% resta  0h09m · retorno -62.86
+     42000/200000  21% resta  0h09m · retorno -63.36
+     43000/200000  22% resta  0h09m · retorno -63.77
+     44000/200000  22% resta  0h09m · retorno -63.93
+     45000/200000  22% resta  0h09m · retorno -64.76
+     46000/200000  23% resta  0h08m · retorno -64.92
+     47000/200000  24% resta  0h08m · retorno -65.59
+     48000/200000  24% resta  0h08m · retorno -66.37
+     49000/200000  24% resta  0h08m · retorno -64.37
+     50000/200000  25% resta  0h08m · retorno -64.45
+     51000/200000  26% resta  0h08m · retorno -66.32
+     52000/200000  26% resta  0h08m · retorno -65.52
+     53000/200000  26% resta  0h08m · retorno -65.42
+     54000/200000  27% resta  0h08m · retorno -64.88
+     55000/200000  28% resta  0h08m · retorno -63.5
+     56000/200000  28% resta  0h08m · retorno -64.09
+     57000/200000  28% resta  0h08m · retorno -64.68
+     58000/200000  29% resta  0h08m · retorno -64.53
+     59000/200000  30% resta  0h08m · retorno -64.55
+     60000/200000  30% resta  0h08m · retorno -63.47 · cobertura   9.4% SR  0.0% CT   500s
+     61000/200000  30% resta  0h08m · retorno -63.6
+     62000/200000  31% resta  0h08m · retorno -63.0
+     63000/200000  32% resta  0h08m · retorno -62.46
+     64000/200000  32% resta  0h08m · retorno -64.33
+     65000/200000  32% resta  0h08m · retorno -63.63
+     66000/200000  33% resta  0h08m · retorno -62.3
+     67000/200000  34% resta  0h08m · retorno -63.05
+     68000/200000  34% resta  0h07m · retorno -62.9
+     69000/200000  34% resta  0h07m · retorno -61.93
+     70000/200000  35% resta  0h07m · retorno -61.28
+     71000/200000  36% resta  0h07m · retorno -62.94
+     72000/200000  36% resta  0h07m · retorno -62.22
+     73000/200000  36% resta  0h06m · retorno -60.9
+     74000/200000  37% resta  0h06m · retorno -62.52
+     75000/200000  38% resta  0h06m · retorno -64.76
+     76000/200000  38% resta  0h06m · retorno -65.08
+     77000/200000  38% resta  0h07m · retorno -64.77
+     78000/200000  39% resta  0h07m · retorno -65.1
+     79000/200000  40% resta  0h07m · retorno -64.65
+     80000/200000  40% resta  0h07m · retorno -64.26 · cobertura  15.6% SR  0.0% CT   500s
+     81000/200000  40% resta  0h07m · retorno -65.07
+     82000/200000  41% resta  0h07m · retorno -64.44
+     83000/200000  42% resta  0h07m · retorno -63.84
+     84000/200000  42% resta  0h06m · retorno -62.69
+     85000/200000  42% resta  0h06m · retorno -61.29
+     86000/200000  43% resta  0h06m · retorno -59.43
+     87000/200000  44% resta  0h06m · retorno -60.46
+     88000/200000  44% resta  0h06m · retorno -60.81
+     89000/200000  44% resta  0h06m · retorno -59.52
+     90000/200000  45% resta  0h06m · retorno -61.69
+     91000/200000  46% resta  0h06m · retorno -61.72
+     92000/200000  46% resta  0h06m · retorno -61.84
+     93000/200000  46% resta  0h06m · retorno -62.79
+     94000/200000  47% resta  0h06m · retorno -64.42
+     95000/200000  48% resta  0h06m · retorno -63.43
+     96000/200000  48% resta  0h06m · retorno -65.31
+     97000/200000  48% resta  0h05m · retorno -65.5
+     98000/200000  49% resta  0h05m · retorno -66.03
+     99000/200000  50% resta  0h05m · retorno -65.16
+    100000/200000  50% resta  0h05m · retorno -63.81 · cobertura   8.3% SR  0.0% CT   500s
+    101000/200000  50% resta  0h06m · retorno -63.36
+    102000/200000  51% resta  0h05m · retorno -62.43
+    103000/200000  52% resta  0h05m · retorno -62.58
+    104000/200000  52% resta  0h05m · retorno -64.13
+    105000/200000  52% resta  0h05m · retorno -63.4
+    106000/200000  53% resta  0h05m · retorno -62.86
+    107000/200000  54% resta  0h05m · retorno -63.61
+    108000/200000  54% resta  0h05m · retorno -62.2
+    109000/200000  55% resta  0h05m · retorno -63.18
+    110000/200000  55% resta  0h04m · retorno -63.35
+    111000/200000  56% resta  0h04m · retorno -63.15
+    112000/200000  56% resta  0h04m · retorno -64.41
+    113000/200000  56% resta  0h04m · retorno -63.02
+    114000/200000  57% resta  0h04m · retorno -62.8
+    115000/200000  57% resta  0h05m · retorno -62.16
+    116000/200000  58% resta  0h05m · retorno -62.35
+    117000/200000  58% resta  0h04m · retorno -62.48
+    118000/200000  59% resta  0h04m · retorno -62.59
+    119000/200000  60% resta  0h04m · retorno -63.03
+    120000/200000  60% resta  0h04m · retorno -62.59 · cobertura   8.3% SR  0.0% CT   500s
+    121000/200000  60% resta  0h04m · retorno -61.39
+    122000/200000  61% resta  0h04m · retorno -61.91
+    123000/200000  62% resta  0h04m · retorno -63.36
+    124000/200000  62% resta  0h04m · retorno -63.57
+    125000/200000  62% resta  0h04m · retorno -63.65
+    126000/200000  63% resta  0h04m · retorno -62.92
+    127000/200000  64% resta  0h04m · retorno -61.52
+    128000/200000  64% resta  0h04m · retorno -61.65
+    129000/200000  64% resta  0h04m · retorno -62.62
+    130000/200000  65% resta  0h04m · retorno -62.6
+    131000/200000  66% resta  0h03m · retorno -63.19
+    132000/200000  66% resta  0h03m · retorno -62.78
+    133000/200000  66% resta  0h03m · retorno -62.41
+    134000/200000  67% resta  0h03m · retorno -64.19
+    135000/200000  68% resta  0h03m · retorno -63.92
+    136000/200000  68% resta  0h03m · retorno -65.19
+    137000/200000  68% resta  0h03m · retorno -65.16
+    138000/200000  69% resta  0h03m · retorno -64.65
+    139000/200000  70% resta  0h03m · retorno -64.31
+    140000/200000  70% resta  0h03m · retorno -63.41 · cobertura  22.9% SR  0.0% CT   500s
+    141000/200000  70% resta  0h03m · retorno -63.96
+    142000/200000  71% resta  0h03m · retorno -64.26
+    143000/200000  72% resta  0h03m · retorno -63.29
+    144000/200000  72% resta  0h03m · retorno -62.61
+    145000/200000  72% resta  0h02m · retorno -62.53
+    146000/200000  73% resta  0h02m · retorno -62.48
+    147000/200000  74% resta  0h02m · retorno -64.27
+    148000/200000  74% resta  0h02m · retorno -64.15
+    149000/200000  74% resta  0h02m · retorno -64.47
+    150000/200000  75% resta  0h02m · retorno -62.54
+    151000/200000  76% resta  0h02m · retorno -63.11
+    152000/200000  76% resta  0h02m · retorno -63.09
+    153000/200000  76% resta  0h02m · retorno -63.64
+    154000/200000  77% resta  0h02m · retorno -64.03
+    155000/200000  78% resta  0h02m · retorno -63.46
+    156000/200000  78% resta  0h02m · retorno -62.74
+    157000/200000  78% resta  0h02m · retorno -62.72
+    158000/200000  79% resta  0h02m · retorno -61.4
+    159000/200000  80% resta  0h02m · retorno -63.14
+    160000/200000  80% resta  0h02m · retorno -62.48 · cobertura  16.7% SR  0.0% CT   500s
+    161000/200000  80% resta  0h02m · retorno -63.08
+    162000/200000  81% resta  0h02m · retorno -62.5
+    163000/200000  82% resta  0h02m · retorno -61.21
+    164000/200000  82% resta  0h01m · retorno -61.72
+    165000/200000  82% resta  0h01m · retorno -61.14
+    166000/200000  83% resta  0h01m · retorno -60.48
+    167000/200000  84% resta  0h01m · retorno -60.29
+    168000/200000  84% resta  0h01m · retorno -60.68
+    169000/200000  84% resta  0h01m · retorno -62.31
+    170000/200000  85% resta  0h01m · retorno -62.72
+    171000/200000  86% resta  0h01m · retorno -61.84
+    172000/200000  86% resta  0h01m · retorno -62.28
+    173000/200000  86% resta  0h01m · retorno -61.66
+    174000/200000  87% resta  0h01m · retorno -62.3
+    175000/200000  88% resta  0h01m · retorno -63.66
+    176000/200000  88% resta  0h01m · retorno -62.28
+    177000/200000  88% resta  0h01m · retorno -62.14
+    178000/200000  89% resta  0h01m · retorno -61.72
+    179000/200000  90% resta  0h01m · retorno -61.61
+    180000/200000  90% resta  0h01m · retorno -63.17 · cobertura   9.4% SR  0.0% CT   500s
+    181000/200000  90% resta  0h01m · retorno -62.09
+    182000/200000  91% resta  0h01m · retorno -62.82
+    183000/200000  92% resta  0h01m · retorno -62.88
+    184000/200000  92% resta  0h00m · retorno -62.97
+    185000/200000  92% resta  0h00m · retorno -63.04
+    186000/200000  93% resta  0h00m · retorno -63.82
+    187000/200000  94% resta  0h00m · retorno -63.43
+    188000/200000  94% resta  0h00m · retorno -63.68
+    189000/200000  94% resta  0h00m · retorno -62.27
+    190000/200000  95% resta  0h00m · retorno -63.19
+    191000/200000  96% resta  0h00m · retorno -63.85
+    192000/200000  96% resta  0h00m · retorno -64.23
+    193000/200000  96% resta  0h00m · retorno -63.21
+    194000/200000  97% resta  0h00m · retorno -61.81
+    195000/200000  98% resta  0h00m · retorno -62.34
+    196000/200000  98% resta  0h00m · retorno -62.25
+    197000/200000  98% resta  0h00m · retorno -62.71
+    198000/200000  99% resta  0h00m · retorno -63.95
+    199000/200000 100% resta  0h00m · retorno -63.66
+    200000/200000 100% resta  0h00m · retorno -63.22 · cobertura  14.6% SR  0.0% CT   500s
+  avaliação determinística (20 episódios): cobertura 12.5% SR 0.0% CT_cens 500s
+
+tabela crua: reports/ckpt/ppo200k-s0.npz
+  ocupadas/alocadas no ator: 11580/25600  (100 RAMs, 800 bits)
+  converta com: uv run python scripts/spec06_importar_ppo.py reports/ckpt/ppo200k-s0.npz <destino>
+
+artefato: reports/spec06-ppo200k-s0.json
+════ semente 1 ════
+Installed 26 packages in 75ms
+PPO (RLlib) + NTNModel · Na=1 Ns=12 · 200000 passos
+referência `hopper` -> {'lr': 0.0004, 'gamma': 0.99, 'lambda_': 1.0, 'train_batch_size': 1000, 'minibatch_size': 512, 'tuple_size': 8, 'resolucao': 32, 'vf_clip_param': 3000.0}
+      1000/200000   0% resta   -- · retorno -63.36
+      2000/200000   1% resta  0h10m · retorno -61.96
+      3000/200000   2% resta  0h10m · retorno -62.12
+      4000/200000   2% resta  0h10m · retorno -60.58
+      5000/200000   2% resta  0h10m · retorno -59.87
+      6000/200000   3% resta  0h10m · retorno -61.68
+      7000/200000   4% resta  0h10m · retorno -61.62
+      8000/200000   4% resta  0h10m · retorno -61.2
+      9000/200000   4% resta  0h10m · retorno -60.93
+     10000/200000   5% resta  0h11m · retorno -61.68
+     11000/200000   6% resta  0h10m · retorno -61.21
+     12000/200000   6% resta  0h10m · retorno -61.96
+     13000/200000   6% resta  0h10m · retorno -62.17
+     14000/200000   7% resta  0h10m · retorno -63.52
+     15000/200000   8% resta  0h09m · retorno -63.35
+     16000/200000   8% resta  0h09m · retorno -63.58
+     17000/200000   8% resta  0h09m · retorno -64.25
+     18000/200000   9% resta  0h09m · retorno -64.7
+     19000/200000  10% resta  0h09m · retorno -65.24
+     20000/200000  10% resta  0h09m · retorno -64.9 · cobertura  14.6% SR  0.0% CT   500s
+     21000/200000  10% resta  0h10m · retorno -66.63
+     22000/200000  11% resta  0h10m · retorno -66.65
+     23000/200000  12% resta  0h10m · retorno -66.71
+     24000/200000  12% resta  0h10m · retorno -65.87
+     25000/200000  12% resta  0h10m · retorno -64.64
+     26000/200000  13% resta  0h10m · retorno -63.91
+     27000/200000  14% resta  0h09m · retorno -64.09
+     28000/200000  14% resta  0h09m · retorno -63.01
+     29000/200000  14% resta  0h09m · retorno -62.31
+     30000/200000  15% resta  0h09m · retorno -61.01
+     31000/200000  16% resta  0h09m · retorno -59.88
+     32000/200000  16% resta  0h09m · retorno -60.22
+     33000/200000  16% resta  0h09m · retorno -59.67
+     34000/200000  17% resta  0h09m · retorno -60.96
+     35000/200000  18% resta  0h08m · retorno -62.66
+     36000/200000  18% resta  0h08m · retorno -62.35
+     37000/200000  18% resta  0h08m · retorno -62.52
+     38000/200000  19% resta  0h08m · retorno -61.73
+     39000/200000  20% resta  0h08m · retorno -61.77
+     40000/200000  20% resta  0h08m · retorno -61.5 · cobertura  11.5% SR  0.0% CT   500s
+     41000/200000  20% resta  0h08m · retorno -60.72
+     42000/200000  21% resta  0h08m · retorno -60.25
+     43000/200000  22% resta  0h08m · retorno -58.02
+     44000/200000  22% resta  0h09m · retorno -57.58
+     45000/200000  22% resta  0h09m · retorno -57.36
+     46000/200000  23% resta  0h09m · retorno -58.07
+     47000/200000  24% resta  0h09m · retorno -58.5
+     48000/200000  24% resta  0h08m · retorno -59.03
+     49000/200000  24% resta  0h08m · retorno -60.19
+     50000/200000  25% resta  0h08m · retorno -60.18
+     51000/200000  26% resta  0h07m · retorno -60.2
+     52000/200000  26% resta  0h07m · retorno -60.03
+     53000/200000  26% resta  0h07m · retorno -62.58
+     54000/200000  27% resta  0h07m · retorno -62.56
+     55000/200000  28% resta  0h07m · retorno -61.8
+     56000/200000  28% resta  0h07m · retorno -63.69
+     57000/200000  28% resta  0h07m · retorno -65.05
+     58000/200000  29% resta  0h07m · retorno -64.11
+     59000/200000  30% resta  0h07m · retorno -65.33
+     60000/200000  30% resta  0h07m · retorno -67.02 · cobertura  15.6% SR  0.0% CT   500s
+     61000/200000  30% resta  0h07m · retorno -67.93
+     62000/200000  31% resta  0h07m · retorno -65.59
+     63000/200000  32% resta  0h07m · retorno -65.84
+     64000/200000  32% resta  0h07m · retorno -66.55
+     65000/200000  32% resta  0h07m · retorno -64.08
+     66000/200000  33% resta  0h07m · retorno -64.59
+     67000/200000  34% resta  0h07m · retorno -65.64
+     68000/200000  34% resta  0h07m · retorno -65.08
+     69000/200000  34% resta  0h07m · retorno -64.89
+     70000/200000  35% resta  0h07m · retorno -64.33
+     71000/200000  36% resta  0h07m · retorno -66.38
+     72000/200000  36% resta  0h07m · retorno -65.96
+     73000/200000  36% resta  0h07m · retorno -65.62
+     74000/200000  37% resta  0h07m · retorno -66.53
+     75000/200000  38% resta  0h06m · retorno -65.76
+     76000/200000  38% resta  0h06m · retorno -64.78
+     77000/200000  38% resta  0h06m · retorno -65.43
+     78000/200000  39% resta  0h06m · retorno -64.84
+     79000/200000  40% resta  0h06m · retorno -63.77
+     80000/200000  40% resta  0h06m · retorno -63.11 · cobertura  12.5% SR  0.0% CT   500s
+     81000/200000  40% resta  0h06m · retorno -61.11
+     82000/200000  41% resta  0h06m · retorno -62.18
+     83000/200000  42% resta  0h06m · retorno -62.0
+     84000/200000  42% resta  0h06m · retorno -62.84
+     85000/200000  42% resta  0h06m · retorno -62.82
+     86000/200000  43% resta  0h06m · retorno -61.5
+     87000/200000  44% resta  0h06m · retorno -62.4
+     88000/200000  44% resta  0h05m · retorno -63.4
+     89000/200000  44% resta  0h05m · retorno -64.44
+     90000/200000  45% resta  0h05m · retorno -65.28
+     91000/200000  46% resta  0h05m · retorno -65.42
+     92000/200000  46% resta  0h05m · retorno -65.29
+     93000/200000  46% resta  0h05m · retorno -65.15
+     94000/200000  47% resta  0h05m · retorno -63.62
+     95000/200000  48% resta  0h05m · retorno -65.38
+     96000/200000  48% resta  0h05m · retorno -65.61
+     97000/200000  48% resta  0h05m · retorno -63.64
+     98000/200000  49% resta  0h04m · retorno -63.7
+     99000/200000  50% resta  0h04m · retorno -64.87
+    100000/200000  50% resta  0h04m · retorno -65.28 · cobertura  12.5% SR  0.0% CT   500s
+    101000/200000  50% resta  0h05m · retorno -64.29
+    102000/200000  51% resta  0h05m · retorno -63.81
+    103000/200000  52% resta  0h05m · retorno -64.49
+    104000/200000  52% resta  0h05m · retorno -63.71
+    105000/200000  52% resta  0h05m · retorno -62.91
+    106000/200000  53% resta  0h05m · retorno -64.41
+    107000/200000  54% resta  0h04m · retorno -65.06
+    108000/200000  54% resta  0h04m · retorno -63.89
+    109000/200000  55% resta  0h04m · retorno -63.47
+    110000/200000  55% resta  0h04m · retorno -62.34
+    111000/200000  56% resta  0h04m · retorno -62.89
+    112000/200000  56% resta  0h04m · retorno -63.88
+    113000/200000  56% resta  0h04m · retorno -63.21
+    114000/200000  57% resta  0h04m · retorno -63.23
+    115000/200000  57% resta  0h04m · retorno -62.38
+    116000/200000  58% resta  0h04m · retorno -62.27
+    117000/200000  58% resta  0h04m · retorno -61.99
+    118000/200000  59% resta  0h04m · retorno -62.54
+    119000/200000  60% resta  0h03m · retorno -62.9
+    120000/200000  60% resta  0h04m · retorno -63.48 · cobertura  15.6% SR  0.0% CT   500s
+    121000/200000  60% resta  0h04m · retorno -63.36
+    122000/200000  61% resta  0h04m · retorno -61.66
+    123000/200000  62% resta  0h04m · retorno -62.04
+    124000/200000  62% resta  0h04m · retorno -61.81
+    125000/200000  62% resta  0h04m · retorno -60.95
+    126000/200000  63% resta  0h04m · retorno -60.48
+    127000/200000  64% resta  0h04m · retorno -59.8
+    128000/200000  64% resta  0h03m · retorno -59.37
+    129000/200000  64% resta  0h03m · retorno -58.42
+    130000/200000  65% resta  0h03m · retorno -57.76
+    131000/200000  66% resta  0h03m · retorno -58.76
+    132000/200000  66% resta  0h03m · retorno -59.42
+    133000/200000  66% resta  0h03m · retorno -59.02
+    134000/200000  67% resta  0h03m · retorno -59.91
+    135000/200000  68% resta  0h03m · retorno -60.38
+    136000/200000  68% resta  0h03m · retorno -60.0
+    137000/200000  68% resta  0h02m · retorno -60.36
+    138000/200000  69% resta  0h02m · retorno -60.43
+    139000/200000  70% resta  0h02m · retorno -61.0
+    140000/200000  70% resta  0h02m · retorno -61.32 · cobertura  12.5% SR  0.0% CT   500s
+    141000/200000  70% resta  0h02m · retorno -60.53
+    142000/200000  71% resta  0h02m · retorno -59.67
+    143000/200000  72% resta  0h02m · retorno -59.16
+    144000/200000  72% resta  0h02m · retorno -58.68
+    145000/200000  72% resta  0h02m · retorno -59.14
+    146000/200000  73% resta  0h02m · retorno -59.8
+    147000/200000  74% resta  0h02m · retorno -61.51
+    148000/200000  74% resta  0h02m · retorno -60.06
+    149000/200000  74% resta  0h02m · retorno -59.35
+    150000/200000  75% resta  0h02m · retorno -59.38
+    151000/200000  76% resta  0h02m · retorno -60.2
+    152000/200000  76% resta  0h02m · retorno -60.51
+    153000/200000  76% resta  0h02m · retorno -61.42
+    154000/200000  77% resta  0h02m · retorno -63.23
+    155000/200000  78% resta  0h02m · retorno -62.43
+    156000/200000  78% resta  0h02m · retorno -61.03
+    157000/200000  78% resta  0h02m · retorno -61.42
+    158000/200000  79% resta  0h02m · retorno -61.72
+    159000/200000  80% resta  0h02m · retorno -61.26
+    160000/200000  80% resta  0h01m · retorno -61.12 · cobertura  17.7% SR  0.0% CT   500s
+    161000/200000  80% resta  0h02m · retorno -61.03
+    162000/200000  81% resta  0h02m · retorno -59.91
+    163000/200000  82% resta  0h01m · retorno -60.15
+    164000/200000  82% resta  0h01m · retorno -59.16
+    165000/200000  82% resta  0h01m · retorno -59.51
+    166000/200000  83% resta  0h01m · retorno -59.77
+    167000/200000  84% resta  0h01m · retorno -60.53
+    168000/200000  84% resta  0h01m · retorno -62.11
+    169000/200000  84% resta  0h01m · retorno -61.4
+    170000/200000  85% resta  0h01m · retorno -61.87
+    171000/200000  86% resta  0h01m · retorno -61.38
+    172000/200000  86% resta  0h01m · retorno -60.3
+    173000/200000  86% resta  0h01m · retorno -60.74
+    174000/200000  87% resta  0h01m · retorno -60.04
+    175000/200000  88% resta  0h01m · retorno -58.68
+    176000/200000  88% resta  0h01m · retorno -58.38
+    177000/200000  88% resta  0h01m · retorno -58.24
+    178000/200000  89% resta  0h01m · retorno -58.27
+    179000/200000  90% resta  0h01m · retorno -58.88
+    180000/200000  90% resta  0h01m · retorno -59.28 · cobertura  13.5% SR  0.0% CT   500s
+    181000/200000  90% resta  0h01m · retorno -59.89
+    182000/200000  91% resta  0h00m · retorno -59.84
+    183000/200000  92% resta  0h00m · retorno -60.91
+    184000/200000  92% resta  0h00m · retorno -60.8
+    185000/200000  92% resta  0h00m · retorno -61.2
+    186000/200000  93% resta  0h00m · retorno -61.93
+    187000/200000  94% resta  0h00m · retorno -61.16
+    188000/200000  94% resta  0h00m · retorno -60.74
+    189000/200000  94% resta  0h00m · retorno -60.6
+    190000/200000  95% resta  0h00m · retorno -60.73
+    191000/200000  96% resta  0h00m · retorno -61.91
+    192000/200000  96% resta  0h00m · retorno -61.63
+    193000/200000  96% resta  0h00m · retorno -61.3
+    194000/200000  97% resta  0h00m · retorno -61.84
+    195000/200000  98% resta  0h00m · retorno -61.07
+    196000/200000  98% resta  0h00m · retorno -60.8
+    197000/200000  98% resta  0h00m · retorno -59.58
+    198000/200000  99% resta  0h00m · retorno -60.24
+    199000/200000 100% resta  0h00m · retorno -60.07
+    200000/200000 100% resta  0h00m · retorno -60.26 · cobertura  16.7% SR  0.0% CT   500s
+  avaliação determinística (20 episódios): cobertura 16.2% SR 0.0% CT_cens 500s
+
+tabela crua: reports/ckpt/ppo200k-s1.npz
+  ocupadas/alocadas no ator: 11113/25600  (100 RAMs, 800 bits)
+  converta com: uv run python scripts/spec06_importar_ppo.py reports/ckpt/ppo200k-s1.npz <destino>
+
+artefato: reports/spec06-ppo200k-s1.json

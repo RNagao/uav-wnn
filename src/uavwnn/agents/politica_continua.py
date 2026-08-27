@@ -71,6 +71,9 @@ from numpy.typing import NDArray
 
 from .base import Acao, V_MAX
 
+TAU = 2 * np.pi
+"""O mesmo `2·np.pi` do `Acao.de_rumo` — a igualdade bit a bit depende disso."""
+
 D_ATOR = 3
 """`(u₁, u₂, μ_s)`. Vale para os dois aproximadores."""
 
@@ -137,6 +140,32 @@ class NormalProjetada:
     def media(self, f: NDArray[np.float64]) -> Acao:
         """Ação determinística: a média, sem ruído. **É o modo de avaliação.**"""
         return self.para_acao(f)
+
+    @staticmethod
+    def media_rapida(f) -> NDArray[np.float64]:
+        """`media(f).como_array()` sem os intermediários — só para avaliação.
+
+        `para_acao` gasta `asarray`+`ravel`+`arctan2`+`clip` e duas dataclasses
+        com validação para produzir dois floats; era 21 % da decisão. Aqui é a
+        MESMA sequência de operações IEEE — incluindo o ida-e-volta
+        `s·V_MAX/V_MAX` do `de_rumo`, que NÃO é identidade em ponto flutuante e
+        por isso é reproduzido, não simplificado. Bit a bit igual, pinado em
+        teste contra `media().como_array()`.
+
+        `np.arctan2` e não `math.atan2` de propósito: as duas libm divergem em
+        1–2 ulp em ~7 % dos ângulos (medido em 300 mil sorteios), e a igualdade
+        exata vale mais que o ~1 µs do despacho. Já o `%` do Python é idêntico ao
+        `np.mod` — zero divergências no mesmo sorteio.
+
+        A validação da `Acao` não se perde por acaso: `%` e o recorte garantem
+        os intervalos por construção, que é o que a validação conferiria.
+        """
+        theta = float(np.arctan2(f[1], f[0])) % TAU
+        s = f[2]
+        s = 0.0 if s < 0.0 else (1.0 if s > 1.0 else s)
+        sn = (s * V_MAX) / V_MAX
+        sn = 0.0 if sn < 0.0 else (1.0 if sn > 1.0 else sn)
+        return np.array([theta / TAU, sn])
 
     def amostrar(
         self, f: NDArray[np.float64], rng: np.random.Generator

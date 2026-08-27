@@ -38,11 +38,16 @@ TEAL, AMBAR, CINZA, VERM = "#1C7293", "#F2A93B", "#808A96", "#B0637C"
 
 # WNN treinados (SPEC-06), célula 1/12: T=32, n=12, N=67, D=25, d_saida=3.
 WNN = {
-    "dissertação": "runs/spec06-longo/spec06-busca-1b/15b49e642647/0",
-    "anbubus (abort)": "runs/spec06-longo/spec06-busca-1b/6356fa883ca1/0",
+    # `models/` e não `runs/`: `runs/` é gitignored e some entre máquinas — o
+    # script silenciosamente pulava a WNN e a tabela saía SÓ com MADDPG, sem
+    # avisar. Os checkpoints versionados são a fonte estável.
+    "T=32 (1/12)": "models/T32/a1s12",
+    "T=16 (1/12)": "models/T16/a1s12",
 }
-FAMILIA = {"dissertação": "ntupla_dissertacao", "anbubus (abort)": "ntupla_anbubus"}
-T, N_TUPLA, N_RAM, D_OBS, D_SAIDA = 32, 12, 67, 25, 3
+FAMILIA = {k: "ntupla_dissertacao" for k in WNN}
+RESOLUCAO = {"T=32 (1/12)": 32, "T=16 (1/12)": 16}
+N_TUPLA, D_OBS, D_SAIDA = 12, 25, 3
+T, N_RAM = 32, 67          # da célula de referência, para o T2 (ciclos)
 # Ator MADDPG (256×256), obs por célula (D depende de Na).
 MADDPG_D = {2: 27, 4: 31, 8: 39}
 
@@ -59,16 +64,34 @@ def coletar() -> dict:
     m: dict = {"wnn": {}, "maddpg": {}, "mlp_pareada": {}}
 
     for nome, run in WNN.items():
-        ck = Path(run) / "checkpoints" / "melhor"
+        ck = Path(run)
         if not ck.exists():
+            print(f"  aviso: {ck} ausente — {nome} fica FORA da tabela", flush=True)
             continue
         _, ap = montar(FAMILIA[nome], cfg, ck)
-        cm = custo_ntuple_de_rede(ap.ator, variante="hash",
-                                  limiares_por_dim=T, n_dims=D_OBS, rotulo=nome)
-        op = operacoes_ntuple(n_ram=N_RAM, tamanho_tupla=N_TUPLA, n_cabecas=D_SAIDA,
-                              n_dims=D_OBS, n_niveis=T)
+        # As TRÊS variantes, e a `ordenado` como principal.
+        #
+        # O `hash` era o número publicado, e ele paga arredondamento de capacidade
+        # para potência de 2 com fator de carga 0,75: 1 059 entradas ocupadas viram
+        # 2 048 posições alocadas. Isso inflava o T1 em 1,85× — e o T1 é justamente
+        # a figura em que a WNN PERDE, então inflá-lo é errar contra nós mesmos.
+        #
+        # A `ordenado` (chaves ordenadas + busca binária) gasta exatamente
+        # `ocupadas × (chave + valores)`, sem folga. O preço é busca O(log n) em vez
+        # de O(1) — ~11 comparações por RAM aqui — e por isso as três ficam
+        # gravadas: quem defender latência tem de citar o `hash`.
+        t_res = RESOLUCAO[nome]
+        var = {v: custo_ntuple_de_rede(ap.ator, variante=v, limiares_por_dim=t_res,
+                                       n_dims=D_OBS, rotulo=nome)
+               for v in ("ordenado", "hash", "denso")}
+        cm = var["ordenado"]
+        op = operacoes_ntuple(n_ram=ap.ator.n_ram, tamanho_tupla=N_TUPLA,
+                              n_cabecas=D_SAIDA, n_dims=D_OBS, n_niveis=t_res)
         m["wnn"][nome] = {
             "persistente_kb": cm.persistente / 1024,
+            "variante_principal": "ordenado",
+            "persistente_kb_por_variante": {v: c.persistente / 1024
+                                            for v, c in var.items()},
             "residente_kb": cm.residente / 1024,
             "entradas_ocupadas": int(ap.ator.entradas_ocupadas()),
             "mult_fp": op.mult_fp, "soma_fp": op.soma_fp,
@@ -115,15 +138,20 @@ def tabela(m: dict) -> None:
           f"{m['mlp_pareada']['persistente_kb']:>9.1f} KB")
     for na, mm in m["maddpg"].items():
         print(f"{'MADDPG '+na:>22} {mm['mult_fp']:>14,} {mm['persistente_kb']:>9.1f} KB")
-    d = m["wnn"].get("dissertação")
+    d = m["wnn"].get("T=32 (1/12)")
     if d:
         maddpg4 = m["maddpg"]["Na=4"]
         print(f"\nLeitura: a WNN elimina os MACs — {d['mult_fp']} mult. fp contra "
               f"{maddpg4['mult_fp']:,} do MADDPG ({d['mult_fp']/maddpg4['mult_fp']:.4%}).")
+        pv = d["persistente_kb_por_variante"]
         print(f"Paga em memória: {d['persistente_kb']:.0f} KB (LUTs, "
-              f"{d['entradas_ocupadas']:,} entradas) contra {maddpg4['persistente_kb']:.0f} KB "
-              f"do ator MADDPG ({d['persistente_kb']/maddpg4['persistente_kb']:.1f}×). "
+              f"{d['entradas_ocupadas']:,} entradas, variante ordenado) contra "
+              f"{maddpg4['persistente_kb']:.0f} KB do ator MADDPG "
+              f"({d['persistente_kb']/maddpg4['persistente_kb']:.1f}×). "
               f"Trade-off memória↔computação.")
+        print(f"  por variante de armazenamento: "
+              + " · ".join(f"{v} {kb:.0f} KB" for v, kb in pv.items())
+              + "  (a `hash` compra O(1) pagando arredondamento de capacidade)")
     print("\nT2 — ciclos por decisão (independente de hardware, RNF-12):")
     for hw, c in m["t2_ciclos"].items():
         print(f"  {hw:>26}: WNN {c['wnn']:>8,}  MADDPG {c['maddpg']:>10,}  "
@@ -136,13 +164,13 @@ def tabela(m: dict) -> None:
 def figuras(m: dict) -> None:
     plt = _plt()
     DIR.mkdir(parents=True, exist_ok=True)
-    diss = m["wnn"].get("dissertação")
+    diss = m["wnn"].get("T=32 (1/12)")
 
     # 1. T3 — multiplicações fp (MACs) por decisão, log
     fig, ax = plt.subplots(figsize=(8, 5))
     rot, val, cor = [], [], []
     if diss:
-        rot.append("WNN\ndissertação"); val.append(max(diss["mult_fp"], 0.5)); cor.append(AMBAR)
+        rot.append("WNN\nT=32"); val.append(max(diss["mult_fp"], 0.5)); cor.append(AMBAR)
     rot.append("MLP pareada\n(1/12)"); val.append(m["mlp_pareada"]["mult_fp"]); cor.append(CINZA)
     for na, mm in m["maddpg"].items():
         rot.append(f"MADDPG\n{na}"); val.append(mm["mult_fp"]); cor.append(TEAL)
@@ -161,14 +189,15 @@ def figuras(m: dict) -> None:
         rot.append(f"MADDPG\n{na}"); val.append(mm["persistente_kb"]); cor.append(TEAL)
     ax.bar(rot, val, color=cor)
     ax.set_yscale("log"); ax.set_ylabel("memória persistente (KB, log)")
-    ax.set_title("T1 — a WNN paga em memória (LUTs treinadas > pesos densos)")
+    ax.set_title("T1 — a WNN paga em memória (LUTs treinadas > pesos densos)\n"
+                 "WNN na variante `ordenado`; a `hash` custa 1,85× mais")
     fig.tight_layout(); fig.savefig(DIR / "t1_memoria.png", dpi=110); plt.close(fig)
 
     # 3. trade-off: memória × computação (o mapa de mérito)
     fig, ax = plt.subplots(figsize=(8, 5.5))
     if diss:
         ax.scatter(diss["mult_fp"] + 0.5, diss["persistente_kb"], s=140, color=AMBAR,
-                   zorder=3, label="WNN dissertação (1/12)")
+                   zorder=3, label="WNN T=32 (1/12)")
     ax.scatter(m["mlp_pareada"]["mult_fp"], m["mlp_pareada"]["persistente_kb"],
                s=120, color=CINZA, marker="s", zorder=3, label="MLP pareada (1/12)")
     for na, mm in m["maddpg"].items():

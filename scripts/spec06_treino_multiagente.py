@@ -46,24 +46,40 @@ from uavwnn.refenv import make_env, prune_logging_handlers  # noqa: E402
 # Config vencedora (T-06.4), fixa em todas as células — o análogo do conjunto
 # único de hiperparâmetros do Lamenza.
 PASSO, SIGMA, T_RES, N_TUPLA, PHI, M, GAMMA, D_SAIDA = 8e-4, 0.35, 32, 12, 0.85, 8, 0.99, 3
+"""`T_RES` é o **padrão**, não uma constante: a campanha de 1 drone produziu dois
+modelos que empatam em SR e diferem só em `T` — `T = 32` (67 RAMs) e `T = 16`
+(34 RAMs, metade da memória, indistinguível sob ruído nas 16 células da escada
+L→R). A escalada tem de rodar os dois, senão a fronteira custo×desempenho existe
+em `Na = 1` e desaparece no multiagente. Use `--resolucao`; todo o resto é fixo,
+como o conjunto único de hiperparâmetros do Lamenza exige."""
 SEED_TREINO_BASE = 2_000_000
 
 
-def construir(cfg, na: int, retomar: Path | None = None):
+def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None):
     """Rede compartilhada + `na` trajetórias de AC (uma por drone).
 
     Se ``retomar`` for um dir de checkpoint, carrega ator/crítico/termômetro dali
     (em vez de sortear rede nova e reajustar o termômetro) e **continua** o treino
     de onde parou — usado para retomar um parcial em outra máquina.
+
+    Ao retomar, `T` vem do **termômetro gravado**, não do argumento: os limiares
+    são estado treinado, e montar a rede com um `T` diferente do que gerou os
+    endereços daria uma rede que lê as LUTs nos lugares errados — o mesmo defeito
+    que o `carregar` do `RedeGradienteFuncional` corrige para o mapeamento.
     """
+    d_obs = cfg.observation_size
     if retomar is not None:
         termo = TermometroQuantil.carregar(Path(retomar) / "termometro.npz")
+        gravado = termo.n_bits // d_obs
+        if gravado != t_res:
+            print(f"  T do checkpoint = {gravado} (o --resolucao {t_res} foi "
+                  f"ignorado: os limiares são estado treinado)", flush=True)
+        t_res = gravado
     else:
-        termo = TermometroQuantil(T_RES).ajustar(corpus_de_observacoes(cfg))
-    d_obs = cfg.observation_size
+        termo = TermometroQuantil(t_res).ajustar(corpus_de_observacoes(cfg))
     ap = APROXIMADORES["ntupla_dissertacao"](
         n_bits=termo.n_bits, tamanho_tupla=N_TUPLA, phi=PHI, taxa_ator=PASSO,
-        seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=T_RES)
+        seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=t_res)
     if retomar is not None:
         rp = Path(retomar)
         ap.ator = type(ap.ator).carregar(next(rp.glob("*ator.npz")))
@@ -111,32 +127,69 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 
 
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
-            progresso_cada: int, retomar: Path | None = None) -> dict:
+            progresso_cada: int, t_res: int = T_RES,
+            retomar: Path | None = None, sem_parada: bool = False,
+            passos_previos: int | None = None, val_n: int = 20) -> dict:
+    """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
+
+    A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
+    passos no `a2s24`, contra os 6,75 M em que a paciência de 8 finalmente
+    disparou). Com `sem_parada` a curva de avaliação continua sendo gravada até o
+    fim, que é o que permite responder se os passos além do platô da cobertura
+    ainda compram `SR` — a métrica que não satura.
+    """
     cfg_tr, cfg_av = _cfgs(replica, na, ns)
     ctx = _ctx(cfg_tr)
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
-    ap, termo, acs = construir(cfg_tr, na, retomar)
+    ap, termo, acs = construir(cfg_tr, na, t_res, retomar)
+    t_res = termo.n_bits // cfg_tr.observation_size     # o efetivo, após retomar
     if retomar is not None:
-        print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)")
-    print(f"multiagente · Na={na} Ns={ns} · N={ap.ator.n_ram} RAMs · "
-          f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede")
+        print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)",
+              flush=True)
+    print(f"multiagente · Na={na} Ns={ns} · T={t_res} · N={ap.ator.n_ram} RAMs · "
+          f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede",
+          flush=True)
 
     passos_max = int(cfg_tr.max_episode_length / cfg_tr.algorithm_iteration_interval) + 2
     handlers = list(__import__("logging").getLogger().handlers)
     ctx_av = _ctx(cfg_av)
-    val = carregar_bancos(na, ns).val.sementes[:20]
+    val = carregar_bancos(na, ns).val.sementes[:val_n]
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
+    avisou_plato = False
+    saida.mkdir(parents=True, exist_ok=True)
     melhor_dir = saida / "checkpoints" / "melhor"
+    ultimo_dir = saida / "checkpoints" / "ultimo"
 
     def _salvar(dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
         ap.salvar(dest)
         termo.salvar(dest / "termometro.npz")
 
-    passos, ep, ultimo_prog, ultimo_eval, melhor = 0, 0, 0, 0, -1.0
+    passos, ep, melhor = 0, 0, -1.0
+    if retomar is not None:
+        # o `procedencia.json` fica na raiz da corrida, não em `checkpoints/final`
+        base_ret = Path(retomar)
+        proc_ant = next((c for c in (base_ret / "procedencia.json",
+                                     base_ret.parent / "procedencia.json",
+                                     base_ret.parent.parent / "procedencia.json")
+                         if c.exists()), base_ret / "procedencia.json")
+        if proc_ant.exists():
+            d = json.loads(proc_ant.read_text())
+            passos = int(d.get("passos", 0))
+            ep = int(d.get("episodios", 0))
+            melhor = float(d.get("melhor_val_cobertura", -1.0))
+        if passos_previos is not None:
+            passos = passos_previos
+        print(f"retomando de {passos:,} passos, {ep:,} episódios "
+              f"(melhor-val {melhor:.3f}) · alvo {b_max:,}", flush=True)
+        if passos >= b_max:
+            raise SystemExit(
+                f"--b-max {b_max:,} já foi alcançado ({passos:,} passos gravados). "
+                f"É ORÇAMENTO TOTAL, não incremento.")
+    ultimo_prog = ultimo_eval = passos_iniciais = passos
     t0 = time.perf_counter()
     while passos < b_max:
         s = SEED_TREINO_BASE + ep
@@ -177,7 +230,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             pass
         if passos - ultimo_prog >= progresso_cada:
             ultimo_prog = passos
-            taxa = passos / max(1e-9, time.perf_counter() - t0)
+            taxa = (passos - passos_iniciais) / max(1e-9, time.perf_counter() - t0)
             print(f"[{passos/b_max:5.1%}] {passos:,}/{b_max:,} · {ep:,} ep · "
                   f"{taxa:.0f} passos/s · ETA {(b_max-passos)/max(taxa,1)/3600:.1f} h", flush=True)
         # early-stop: avaliação periódica no val + checkpoint de melhor validação
@@ -188,10 +241,32 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             if eh_melhor:
                 melhor = m["cobertura"]; _salvar(melhor_dir)
             print(f"   eval @ {passos:,}: cob {m['cobertura']:.3f} · sr {m['sr']:.3f}"
+                  f" · CT {m['ct_cens']:.1f} s"
                   f"{'  (melhor)' if eh_melhor else ''}", flush=True)
-            if parada.registrar(m["cobertura"]):
+            # A curva também em JSONL: o log é prosa, e uma corrida de 31 h
+            # precisa ser plotável sem reparsear texto. `ocupadas` entra porque é
+            # o que diz se a LUT ainda está crescendo depois do platô da cobertura.
+            _salvar(ultimo_dir)
+            (ultimo_dir / "procedencia.json").write_text(json.dumps({
+                "passos": passos, "episodios": ep,
+                "melhor_val_cobertura": melhor,
+                "config": {"na": na, "ns": ns, "T": t_res},
+                "parcial": True, "fonte": "spec06_treino_multiagente.py"}, indent=2))
+            with (saida / "metrics.jsonl").open("a") as fh:
+                fh.write(json.dumps({
+                    "passo": passos, "episodios": ep, "cobertura": m["cobertura"],
+                    "sr": m["sr"], "ct_cens": m["ct_cens"], "n_val": m["n"],
+                    "ocupadas": sum(len(x) for x in ap.ator.memoria),
+                    "parede_s": round(time.perf_counter() - t0, 1),
+                    "melhor": bool(eh_melhor)}) + "\n")
+            plato = parada.registrar(m["cobertura"])
+            if plato and not sem_parada:
                 print(f"   parada antecipada (platô) em {passos:,} passos", flush=True)
                 break
+            if plato and not avisou_plato:
+                avisou_plato = True
+                print(f"   platô da cobertura em {passos:,} passos "
+                      f"(--sem-parada: seguindo até {b_max:,})", flush=True)
 
     # final: salva o estado final e avalia o MELHOR checkpoint (fix 539b61e)
     _salvar(saida / "checkpoints" / "final")
@@ -203,15 +278,34 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     bancos = carregar_bancos(na, ns)
     n_test = min(100, len(bancos.test.sementes))
     metr = avaliar_multi(cfg_av, ap, termo_m, ctx_av, bancos.test.sementes[:n_test])
-    proc = {"ator": {"n_saidas": D_SAIDA}, "resolucao": T_RES,
+    proc = {"ator": {"n_saidas": D_SAIDA}, "resolucao": t_res,
             "config": {"na": na, "ns": ns, "passo": PASSO, "sigma": SIGMA,
-                       "T": T_RES, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
+                       "T": t_res, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
                        "replica": replica, "parameter_sharing": True,
                        "recompensa_por_na": True,
                        "retomado_de": str(retomar) if retomar else None,
                        "critico": "descentralizado (Alg. 4.4)"},
             "passos": passos, "episodios": ep, "melhor_val_cobertura": melhor,
             "metrica_test": metr, "fonte": "spec06_treino_multiagente.py"}
+    # Poda pós-treino PADRÃO: `checkpoints/deploy` podado e verificado no VAL.
+    # Nunca falha o treino — um erro aqui perde o artefato de deploy, não a
+    # corrida — e nunca toca `final`/`melhor`.
+    try:
+        from spec06_exportar_deploy import deploy_pos_treino
+        dep = deploy_pos_treino(saida / "checkpoints" / "final", na, ns,
+                                sementes=bancos.val.sementes[:100])
+        proc["deploy"] = {k: dep[k] for k in
+                          ("poda", "deploy_kb", "sr_cheio", "sr_podado")
+                          if k in dep} | ({"motivo": dep["motivo"]}
+                                          if "motivo" in dep else {})
+        print(f"deploy podado ({dep.get('poda', 0):.0%}): "
+              f"{dep['deploy_kb']:.0f} KB · SR {dep['sr_cheio']:.1%}"
+              f"→{dep['sr_podado']:.1%} (val)"
+              + (f" · {dep['motivo']}" if "motivo" in dep else ""), flush=True)
+    except Exception as e:                                    # noqa: BLE001
+        proc["deploy"] = {"erro": str(e)}
+        print(f"aviso: deploy pós-treino falhou ({e}); final/melhor intactos",
+              flush=True)
     saida.mkdir(parents=True, exist_ok=True)
     (saida / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
     (melhor_dir / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
@@ -230,17 +324,39 @@ def main() -> int:
     ap.add_argument("--replica", default="1b")
     ap.add_argument("--saida", type=Path, default=None)
     ap.add_argument("--progresso-cada", type=int, default=50_000)
+    ap.add_argument("--resolucao", type=int, default=T_RES,
+                    help=f"T do termômetro; {T_RES} (padrão) ou 16 (econômico). "
+                         "Ignorado com --retomar: T vem do checkpoint.")
     ap.add_argument("--retomar", type=Path, default=None,
-                    help="dir de checkpoint (ex.: models/em-treino/...a8s24) para "
+                    help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
+    ap.add_argument("--val-n", type=int, default=20,
+                    help="sementes do banco val por avaliação (máx. 100). Com 20, "
+                         "a SR tem resolução de 5 pp e um único episódio move a "
+                         "curva — pouco para decidir se os passos além do platô "
+                         "da cobertura ainda compram SR. 100 custa 0,65 %% do "
+                         "orçamento de 50 M.")
+    ap.add_argument("--passos-previos", type=int, default=None,
+                    help="passos já treinados, quando o checkpoint de --retomar "
+                         "não tem procedencia.json (ex.: os do grid). --b-max é "
+                         "ORÇAMENTO TOTAL, então isto desconta do que falta.")
+    ap.add_argument("--sem-parada", action="store_true",
+                    help="ignora a parada antecipada da §4.4 e gasta --b-max "
+                         "inteiro; a avaliação periódica continua rodando")
     ap.add_argument("--smoke", action="store_true", help="b-max=5000, avaliação curta")
     a = ap.parse_args()
     if a.smoke:
         a.b_max = min(a.b_max, 5000); a.progresso_cada = 1000
-    saida = a.saida or Path(f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}")
+    # O sufixo só aparece fora do padrão: as células de `T = 32` já publicadas
+    # mantêm o caminho que `modelo-e-hiperparametros.md` registra.
+    sufixo = "" if a.resolucao == T_RES else f"-T{a.resolucao}"
+    saida = a.saida or Path(
+        f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}{sufixo}")
     print(f"SPEC-06 escalada multiagente · config vencedora "
-          f"(passo {PASSO}, σ {SIGMA}, T {T_RES}, n {N_TUPLA}, φ {PHI}, m {M})\n")
-    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada, a.retomar)
+          f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
+          flush=True)
+    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
+            a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)
     return 0
 
 

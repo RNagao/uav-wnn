@@ -1,0 +1,33 @@
+escada L→R · ntupla_dissertacao · degraus [0, 1, 2, 3, 4] · σ [1.0, 3.0, 5.0, 10.0] · 500 episódios (1 semente de treino)
+B1 OK — gate aprovado (q_a=200.0, q_w=4.0)
+
+degrau 0 (teto): CT 52.4 s · SR 97%
+σ=1 degrau 1: CT 43.4 s · SR 99%
+σ=1 degrau 2: CT 46.0 s · SR 98%
+σ=1 degrau 3: CT 44.4 s · SR 99% · NEES 1.99
+σ=1 degrau 4: CT 44.2 s · SR 99% · NEES 1.97
+   4≡0: não (δ=0.91, meia-largura=6.13, NÃO informativa)
+   4 supera: nenhum
+
+σ=3 degrau 1: CT 42.3 s · SR 99%
+σ=3 degrau 2: CT 43.1 s · SR 99%
+σ=3 degrau 3: CT 38.2 s · SR 100% · NEES 1.94
+σ=3 degrau 4: CT 40.0 s · SR 100% · NEES 1.92
+   4≡0: não (δ=1.02, meia-largura=5.95, NÃO informativa)
+   4 supera: nenhum
+
+σ=5 degrau 1: CT 41.2 s · SR 100%
+σ=5 degrau 2: CT 41.5 s · SR 99%
+σ=5 degrau 3: CT 39.9 s · SR 100% · NEES 1.90
+σ=5 degrau 4: CT 41.0 s · SR 99% · NEES 2.03
+   4≡0: não (δ=1.12, meia-largura=6.06, NÃO informativa)
+   4 supera: nenhum
+
+σ=10 degrau 1: CT 48.0 s · SR 99%
+σ=10 degrau 2: CT 42.1 s · SR 100%
+σ=10 degrau 3: CT 47.7 s · SR 99% · NEES 1.84
+σ=10 degrau 4: CT 43.3 s · SR 99% · NEES 2.15
+   4≡0: não (δ=0.45, meia-largura=6.18, NÃO informativa)
+   4 supera: nenhum
+
+artefato: results/etapa2/escada_lr-T16final.json

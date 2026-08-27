@@ -1,0 +1,16 @@
+grade PPO · rede do anbubus com o algoritmo dela · Na=1 Ns=12
+12 pontos × 2 sementes = 24 corridas · 1,000,000 passos
+eixos: lr(7e-05, 0.0004, 0.003) × T(32, 300) × vf_clip(10.0, 3000.0)
+fixos: {'referencia': 'reacher', 'tupla': 10, 'gamma': 0.99} · λ=0,9 · minilote 128 · lote 1000 · MeanStdFilter
+4 simultâneas × 2 CPUs cada
+
+  [  1/24] lr7e-05-T32-vf10-s0          FALHOU código -9 · 285.5 min
+  [  2/24] lr7e-05-T32-vf10-s1          FALHOU código -9 · 285.5 min
+  [  3/24] lr7e-05-T32-vf3000-s0        FALHOU código -9 · 285.5 min
+  [  4/24] lr7e-05-T32-vf3000-s1        FALHOU código -9 · 285.5 min
+grade PPO · rede do anbubus com o algoritmo dela · Na=1 Ns=12
+12 pontos × 2 sementes = 24 corridas · 1,000,000 passos
+eixos: lr(7e-05, 0.0004, 0.003) × T(32, 300) × vf_clip(10.0, 3000.0)
+fixos: {'referencia': 'reacher', 'tupla': 10, 'gamma': 0.99} · λ=0,9 · minilote 128 · lote 1000 · MeanStdFilter
+4 simultâneas × 3 CPUs cada
+

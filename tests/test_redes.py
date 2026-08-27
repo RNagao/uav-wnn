@@ -251,3 +251,185 @@ def test_carregar_remonta_o_enderecamento_vetorizado():
     for r, tupla in enumerate(lida.mapeamento):
         assert list(lida._tuplas[r][:len(tupla)]) == list(tupla), (
             f"_tuplas[{r}] não corresponde a mapeamento[{r}]")
+
+
+def test_contador_e_inteiro_e_sobrevive_ao_ciclo(tmp_path):
+    """O contador é contagem de visitas — inteiro por construção (`c += 1`).
+
+    Guardá-lo em `float64` custava 8 bytes onde 4 bastam, e o crítico guarda DOIS
+    números por entrada: era metade do custo dele. `uint32` e não `uint16` porque
+    o máximo medido num modelo real é 2 353 751 visitas na posição mais quente.
+
+    O ciclo salvar→carregar tem de preservar o tipo: um `.npz` antigo traz
+    `float64`, e recarregá-lo sem converter reintroduziria o custo em silêncio.
+    """
+    import numpy as np
+
+    from uavwnn.wnn.redes import RedeRegressaoEsquecimento
+
+    rede = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=2, phi=0.85)
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    for _ in range(5):
+        rede.treinar(bits, np.array([1.5, -0.5]))
+
+    _, c = next(iter(rede.memoria[0].items()))[1]
+    assert c.dtype == np.uint32, f"contador em {c.dtype}, esperado uint32"
+    assert (c == 5).all()
+
+    antes = rede.prever(bits)
+    rede.salvar(tmp_path / "c.npz")
+    lida = RedeRegressaoEsquecimento.carregar(tmp_path / "c.npz")
+    _, c2 = next(iter(lida.memoria[0].items()))[1]
+    assert c2.dtype == np.uint32, "carregar perdeu o tipo do contador"
+    np.testing.assert_allclose(lida.prever(bits), antes, rtol=0, atol=0)
+
+
+def test_custo_do_critico_conta_o_contador():
+    """`_bytes_luts` contava só `n_saidas` valores por entrada — mas a rede com
+    esquecimento guarda valor E contador, e saía ~40 % subestimada.
+
+    Não afetou o T1 publicado (que compara ATORES), mas qualquer conta de
+    "ator + crítico" pelo harness estava errada.
+    """
+    import numpy as np
+
+    from uavwnn.custo.memoria import custo_ntuple_de_rede
+    from uavwnn.wnn.redes import RedeGradienteFuncional, RedeRegressaoEsquecimento
+
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    ator = RedeGradienteFuncional(n_bits=32, tamanho_tupla=4, n_saidas=1)
+    ator.atualizar(bits, np.array([0.5]))
+    critico = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=1, phi=0.85)
+    critico.treinar(bits, np.array([0.5]))
+
+    ka = custo_ntuple_de_rede(ator, variante="ordenado", rotulo="a").detalhe["luts"]
+    kc = custo_ntuple_de_rede(critico, variante="ordenado", rotulo="c").detalhe["luts"]
+    # mesma ocupação e mesma n_saidas: a diferença é exatamente o contador
+    assert kc > ka, "crítico não pode custar o mesmo que o ator"
+    occ = sum(len(m) for m in critico.memoria)
+    assert kc - ka == occ * 4, "o contador deve pesar 4 bytes (uint32) por entrada"
+
+
+def test_carrega_checkpoint_antigo_com_contador_float(tmp_path):
+    """Checkpoints gravados ANTES da troca para `uint32` têm contadores `float64`.
+
+    Sem conversão no `carregar`, o `treinar` seguinte faria `c += 1` sobre um
+    `float64` e reintroduziria o custo em silêncio — o modelo funcionaria, só
+    gastaria o dobro. Este teste fixa a conversão.
+
+    A predição tem de ser IDÊNTICA bit a bit: o contador sempre foi inteiro, e
+    `1 − φ^c` não distingue `5.0` de `5`.
+    """
+    import numpy as np
+
+    from uavwnn.wnn.redes import RedeRegressaoEsquecimento
+
+    rede = RedeRegressaoEsquecimento(n_bits=32, tamanho_tupla=4, n_saidas=1, phi=0.85)
+    bits = np.zeros((1, 32), bool)
+    bits[0, ::3] = True
+    for _ in range(7):
+        rede.treinar(bits, np.array([2.0]))
+    esperado = rede.prever(bits)
+
+    # regrava no formato ANTIGO: contadores em float64
+    rede.salvar(tmp_path / "c.npz")
+    d = dict(np.load(tmp_path / "c.npz", allow_pickle=False))
+    d["contadores"] = d["contadores"].astype(np.float64)
+    np.savez_compressed(tmp_path / "antigo.npz", **d)
+
+    lida = RedeRegressaoEsquecimento.carregar(tmp_path / "antigo.npz")
+    _, c = next(iter(lida.memoria[0].values()))
+    assert c.dtype == np.uint32, f"carregar não converteu: {c.dtype}"
+    np.testing.assert_allclose(lida.prever(bits), esperado, rtol=0, atol=0)
+
+    # e continuar treinando no checkpoint antigo tem de funcionar
+    end = int(lida.enderecos(bits)[0][0])
+    antes = int(lida.memoria[0][end][1][0])
+    lida.treinar(bits, np.array([2.0]))
+    assert int(lida.memoria[0][end][1][0]) == antes + 1
+
+
+def test_lut_plana_e_equivalente_e_recusa_escrita():
+    """A `LUTPlana` é o ator de inferência: mesma predição, memória contígua.
+
+    A equivalência tem de ser EXATA quando os valores ficam em `float64` — a
+    estrutura não introduz erro nenhum por si, só a escolha de precisão. Com
+    `float32` o erro é o arredondamento do tipo, não da busca.
+
+    E ela tem de RECUSAR escrita: as chaves estão ordenadas e a busca binária
+    depende disso, então inserir exigiria reordenar. Degradar em silêncio seria
+    pior que falhar.
+    """
+    import numpy as np
+    import pytest
+
+    from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
+
+    rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=8, n_saidas=3, seed=3)
+    rng = np.random.default_rng(0)
+    for _ in range(40):
+        bits = rng.random((1, 256)) > 0.5
+        rede.atualizar(bits, rng.normal(0, 0.3, 3))
+
+    prova = rng.random((5, 256)) > 0.5
+    esperado = rede.prever(prova)
+
+    exata = LUTPlana(rede, dtype_valor=np.float64)
+    np.testing.assert_allclose(exata.prever(prova), esperado, rtol=0, atol=0)
+
+    f32 = LUTPlana(rede)                      # padrão: float32
+    np.testing.assert_allclose(f32.prever(prova), esperado, rtol=1e-6, atol=0)
+
+    # a estrutura interna: chaves globais, ordenadas
+    assert exata.chaves.dtype == np.int32
+    assert (np.diff(exata.chaves) > 0).all(), "chaves têm de estar ordenadas"
+    assert exata.chaves.size == sum(len(m) for m in rede.memoria)
+
+    for metodo in ("atualizar", "treinar", "salvar"):
+        with pytest.raises(TypeError, match="imutável"):
+            getattr(exata, metodo)(prova, np.zeros(3))
+
+
+def test_lut_plana_recusa_chave_grande_demais():
+    """`n_ram · 2ⁿ` precisa caber em `int32`. Estourar em silêncio daria
+    endereços negativos e uma rede que lê lixo sem levantar nada."""
+    import numpy as np
+    import pytest
+
+    from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
+
+    # n = 28 → 2^28 por RAM; com ~9 RAMs já passa de 2^31
+    rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=28, n_saidas=1)
+    with pytest.raises(ValueError, match="int32"):
+        LUTPlana(rede)
+
+
+def test_montar_com_plana_da_a_mesma_acao(tmp_path):
+    """A bandeira do `montar` não pode mudar o comportamento da política."""
+    import sys
+
+    import numpy as np
+
+    sys.path.insert(0, "scripts")
+    from spec06_campanha_wnn import montar
+
+    from uavwnn.refenv import LAMENZA_003
+
+    cfg = LAMENZA_003(1, 12, phase="eval")
+    ck = Path("models/deploy/T16/a1s12")
+    if not ck.exists():
+        import pytest
+        pytest.skip("modelo de deploy ausente")
+
+    p_dict, ap_d = montar("ntupla_dissertacao", cfg, ck)
+    p_plana, ap_p = montar("ntupla_dissertacao", cfg, ck, plana=True)
+    assert type(ap_p.ator).__name__ == "LUTPlana"
+
+    rng = np.random.default_rng(7)
+    for _ in range(20):
+        obs = rng.random(cfg.observation_size)
+        np.testing.assert_allclose(np.asarray(p_plana(obs), float),
+                                   np.asarray(p_dict(obs), float),
+                                   rtol=1e-6, atol=1e-9)

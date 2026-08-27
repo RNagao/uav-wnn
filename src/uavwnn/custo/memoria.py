@@ -75,21 +75,32 @@ def _bytes_luts(
     bytes_valor: int,
     variante: Variante,
     alpha: float = 0.75,
+    bytes_contador: int = 0,
 ) -> int:
-    """Footprint das LUTs sob cada estratégia de armazenamento."""
+    """Footprint das LUTs sob cada estratégia de armazenamento.
+
+    `bytes_contador` cobre a rede de regressão com esquecimento (§4.2.1), que
+    guarda **valor E contador** por componente — o ator (§4.3.1) guarda só o
+    valor ("the memory positions do not need to store access counters").
+
+    Sem este termo o crítico saía ~40 % subestimado. Não afetou o T1 publicado,
+    que compara ATORES, mas qualquer conta de "ator + crítico" pelo harness
+    estava errada.
+    """
     b_chave = 2 if tamanho_tupla <= 16 else 4
     occ = int(occ_por_ram.sum())
+    b_entrada = n_cabecas * (bytes_valor + bytes_contador)
 
     if variante == "denso":
         # V-c: previsibilidade máxima, memória máxima. É a mitigação do RNF-10
         # (cauda do hash) e o limite superior.
-        return n_cabecas * n_ram * (1 << tamanho_tupla) * bytes_valor
+        return n_ram * (1 << tamanho_tupla) * b_entrada
 
     if variante == "ordenado":
         # V-b: chaves ordenadas + busca binária. Sem folga de carga; O(log occ)
         # com cauda determinística.
         b_offset = 4
-        return occ * (b_chave + n_cabecas * bytes_valor) + n_ram * b_offset
+        return occ * (b_chave + b_entrada) + n_ram * b_offset
 
     # V-a: hash aberto por RAM. Paga fator de carga E arredondamento para
     # potência de 2 — é a variante que a conta ilustrativa da spec usava.
@@ -98,7 +109,7 @@ def _bytes_luts(
         if oc == 0:
             continue
         cap = 1 << math.ceil(math.log2(max(1, oc / alpha)))
-        total += cap * (b_chave + n_cabecas * bytes_valor)  # tabela
+        total += cap * (b_chave + b_entrada)                 # tabela
         total += math.ceil(cap / 8)                          # bitmap de ocupação
     total += n_ram * 4                                       # cabeçalhos
     return total
@@ -227,8 +238,11 @@ def custo_ntuple_de_rede(
     só se lê a ocupação da estrutura esparsa.
     """
     occ = ocupacao_esparsa(rede.memoria, rede.n_ram)
+    # O contador é `uint32` (4 B) e existe só na rede com esquecimento; a
+    # presença é detectada pelo atributo `phi`, que só ela tem.
+    b_cont = 4 if hasattr(rede, "phi") else 0
     luts = _bytes_luts(occ, rede.n_ram, rede.tamanho_tupla, rede.n_saidas,
-                       bytes_valor, variante)
+                       bytes_valor, variante, bytes_contador=b_cont)
 
     b_idx = _bytes_indice(rede.n_bits)
     mapeamento = rede.n_ram * rede.tamanho_tupla * b_idx

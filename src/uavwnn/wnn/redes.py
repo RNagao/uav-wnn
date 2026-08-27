@@ -411,7 +411,13 @@ class _RedeNTupla:
                 chave = int(enderecos[i])
                 if contadores is not None:
                     rede.memoria[r][chave] = (valores[i].copy(),
-                                              contadores[i].copy())
+                                              # `rede` e não `cls`: o `carregar`
+                                              # devolve a CLASSE GRAVADA, que pode
+                                              # não ser a que recebeu a chamada.
+                                              contadores[i].astype(
+                                                  getattr(type(rede),
+                                                          "TIPO_CONTADOR",
+                                                          np.uint32)))
                 else:
                     rede.memoria[r][chave] = valores[i].copy()
                 i += 1
@@ -436,6 +442,163 @@ class _RedeNTupla:
         """
         for m in self.memoria:
             m.clear()
+
+
+class LUTPlana(_RedeNTupla):
+    """Ator IMUTÁVEL, para inferência: três arrays contíguos em vez de `N` dicts.
+
+    POR QUE ELA EXISTE — e o número que a motivou
+
+    O T1 modela os bytes de uma implementação em C. A implementação em Python
+    cobra outra coisa, e ninguém tinha medido: um modelo de 2,98 MB modelados
+    ocupava **94,6 MB de RSS**, 31,8×. A causa não é a rede — é granularidade.
+    Uma entrada guarda 24 B e custa 201: o cabeçalho do `ndarray` sozinho são
+    136 B (5,7× o conteúdo), mais 28 do `int` boxed e 37 do slot do dict. São
+    259 mil objetos Python minúsculos, cada um com seu cabeçalho.
+
+    A ESTRUTURA
+
+        chaves   int32   (occ,)     chave GLOBAL = ram·2ⁿ + endereço, ORDENADA
+        valores  float32 (occ, d)
+        desloc   int32   (N,)       ram·2ⁿ, pré-computado
+
+    A chave global é o ponto: em vez de `N` tabelas separadas, **uma** ordenada.
+    Com `N = 72` e `n = 12` a chave máxima é 294 912 — cabe em `int32` com folga,
+    e o construtor recusa se não couber.
+
+    O GANHO, medido no ator de `T=32, Na=2, Ns=24` (129 664 entradas):
+
+        dict[int, ndarray]   25 452 KB   93,0 µs
+        LUTPlana int32/f32    2 026 KB   12,0 µs    12,6× menor · 7,8× mais rápida
+
+    Ganha nos DOIS eixos, e a velocidade é contraintuitiva — busca binária
+    `O(log n)` contra dict `O(1)`. A razão está medida: o dict paga **por RAM**
+    (`N` buscas em Python, cada uma com boxing, hash e desreferência); esta faz
+    UMA chamada compilada sobre memória contígua.
+
+    POR QUE SÓ INFERÊNCIA
+
+    É imutável por construção: as chaves estão ordenadas e a busca binária depende
+    disso, então inserir exigiria reordenar o array inteiro. O treino escreve a
+    cada transição — ~13 milhões de escritas numa corrida de 6,75 M passos, muitas
+    em endereços nunca vistos. `atualizar` e `treinar` levantam aqui, de
+    propósito: é melhor falhar alto que degradar em silêncio.
+    """
+
+    def __init__(self, rede: "RedeGradienteFuncional",
+                 dtype_valor=np.float32) -> None:
+        if not isinstance(rede, RedeGradienteFuncional):
+            raise TypeError(f"esperava RedeGradienteFuncional, veio {type(rede).__name__}")
+        self.n_bits = rede.n_bits
+        self.tamanho_tupla = rede.tamanho_tupla
+        self.n_saidas = rede.n_saidas
+        self.n_ram = rede.n_ram
+        self.convencao = rede.convencao
+        self.c_max = rede.c_max
+        self.mapeamento = rede.mapeamento
+        self._potencias = rede._potencias
+        self._tuplas = rede._tuplas
+        self._pot_mat = rede._pot_mat
+        self._n_passos = 0
+
+        desloc = 1 << self.tamanho_tupla
+        maximo = self.n_ram * desloc
+        if maximo >= 2**31:
+            raise ValueError(
+                f"chave global máxima {maximo:,} não cabe em int32 "
+                f"(n_ram={self.n_ram}, tupla={self.tamanho_tupla})")
+        chaves, valores = [], []
+        for i, m in enumerate(rede.memoria):
+            for k in sorted(m):                       # ORDENADO por RAM, e as
+                chaves.append(i * desloc + k)         # RAMs em ordem crescente
+                valores.append(m[int(k)])             # → o vetor global já sai
+        self.chaves = np.asarray(chaves, np.int32)    #   ordenado, sem sort
+        self.valores = (np.asarray(valores, dtype_valor).reshape(-1, self.n_saidas)
+                        if valores else np.zeros((0, self.n_saidas), dtype_valor))
+        self._desloc = (np.arange(self.n_ram) * desloc).astype(np.int32)
+
+    def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
+        """Eq. (4.12), com busca binária vetorizada. `(M, B) -> (M, d)`.
+
+        Mesma semântica do dict: posição ausente contribui zero e ainda entra no
+        denominador `N`.
+        """
+        end = self.enderecos(bits)
+        saida = np.zeros((end.shape[0], self.n_saidas))
+        if self.chaves.size:
+            for m, linha in enumerate(end):
+                g = self._desloc + linha.astype(np.int32)
+                j = np.minimum(np.searchsorted(self.chaves, g), self.chaves.size - 1)
+                ok = self.chaves[j] == g
+                if ok.any():
+                    saida[m] = self.valores[j[ok]].sum(axis=0, dtype=np.float64)
+        return saida / self.n_ram if self.convencao == "media" else saida
+
+    def consulta_do_vetor(self, dim_por_bit, limiar_por_bit):
+        """Compila `v -> f(v)`: termômetro, endereçamento e busca numa closure.
+
+        O caminho em três etapas — `codificar` (aloca os `B` bits), `enderecos`
+        (aloca o estendido e a fatia `(1, N, n)`) e `prever` — gasta ~20 despachos
+        NumPy por decisão, e para `M = 1` o despacho domina o trabalho. Aqui o bit
+        nunca é materializado: para cada slot de tupla, junta-se A DIMENSÃO e O
+        LIMIAR que o bit compararia, e o endereço sai de um único
+        `(v[dim] >= lim) · pot`. Três despachos no lugar de doze.
+
+        A SEMÂNTICA É A MESMA POR CONSTRUÇÃO, não por aproximação: o bit
+        `b = d·T + t` do termômetro é `v[d] >= limiares[d, t]`, e é exatamente
+        essa comparação que o gather reproduz — mesmos float64, mesmo `>=`. O
+        sentinela (índice `n_bits`, para tuplas curtas) vira limiar `+inf`, e o
+        peso dele em `_pot_mat` já é zero. Bit a bit igual a
+        `prever(codificar(v))[0]`, pinado em teste.
+
+        `dim_por_bit` e `limiar_por_bit` vêm de fora (do termômetro) porque esta
+        classe não conhece codificação — e é assim que deve ficar.
+        """
+        dim = np.concatenate([np.asarray(dim_por_bit, np.intp),
+                              [0]])[self._tuplas]
+        lim = np.concatenate([np.asarray(limiar_por_bit, float),
+                              [np.inf]])[self._tuplas]
+        pot = self._pot_mat
+        chaves, valores, desloc = self.chaves, self.valores, self._desloc
+        tam, n_saidas = chaves.size, self.n_saidas
+        divisor = self.n_ram if self.convencao == "media" else 1
+        d_obs = int(np.asarray(dim_por_bit).max()) + 1
+
+        def consulta(v):
+            if v.size != d_obs:
+                raise ValueError(f"observação com {v.size} entradas, "
+                                 f"esperado {d_obs}")
+            addr = ((v[dim] >= lim) * pot).sum(axis=1)
+            saida = np.zeros(n_saidas)
+            if tam:
+                g = desloc + addr.astype(np.int32)
+                j = np.minimum(np.searchsorted(chaves, g), tam - 1)
+                ok = chaves[j] == g
+                if ok.any():
+                    saida = valores[j[ok]].sum(axis=0, dtype=np.float64)
+            return saida / divisor
+
+        return consulta
+
+    @property
+    def memoria(self):
+        """Vista somente-leitura, para o harness de custo contar a ocupação.
+
+        Reconstrói dicionários — é caro, e de propósito: quem precisar disto num
+        caminho quente está usando a estrutura errada.
+        """
+        desloc = 1 << self.tamanho_tupla
+        saida = [{} for _ in range(self.n_ram)]
+        for k, v in zip(self.chaves.tolist(), self.valores):
+            saida[k // desloc][k % desloc] = v
+        return saida
+
+    def _imutavel(self, *_a, **_k):
+        raise TypeError(
+            "LUTPlana é imutável — as chaves estão ordenadas e a busca binária "
+            "depende disso. Para treinar, use RedeGradienteFuncional.")
+
+    atualizar = treinar = treinar_componente = salvar = _imutavel
 
 
 class RedeGradienteFuncional(_RedeNTupla):
@@ -710,15 +873,34 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             {} for _ in range(self.n_ram)
         ]
 
-    def _pesos(self, contador: NDArray[np.float64]) -> NDArray[np.float64]:
+    TIPO_CONTADOR = np.uint32
+    """O contador é uma CONTAGEM DE VISITAS — inteiro por construção (`c += 1`).
+
+    Estava em `float64` por conveniência (mantinha valor e contador no mesmo
+    dtype), gastando 8 bytes onde 4 bastam: metade do custo do crítico, que
+    guarda dois números por entrada.
+
+    `uint32` e não `uint16`: o máximo medido num modelo real é **2 353 751**
+    visitas na posição mais quente (p99 = 33 127), muito acima dos 65 535 do
+    `uint16`. `uint32` cobre 4,29e9 — a ~100 passos/s, mais de um ano de treino
+    contínuo na MESMA posição.
+
+    Nenhuma mudança numérica: `_pesos` promove a float na exponenciação, e
+    `1 − φ^c` com `c` inteiro dá exatamente o mesmo que com `c` float, porque o
+    valor era inteiro nos dois casos.
+    """
+
+    def _pesos(self, contador: NDArray[np.integer]) -> NDArray[np.float64]:
         """Eq. (4.10): o peso acumulado de uma posição, dado seu contador.
 
         Soma dos `c` primeiros termos da série geométrica de razão `φ`. O ramo
         `φ = 1` devolve o próprio contador, recuperando a (3.16).
         """
         if self.phi == 1.0:
-            return contador
-        return (1.0 - self.phi ** contador) / (1.0 - self.phi)
+            # `float64` na saída mesmo com contador inteiro: quem chama divide
+            # por este valor, e devolver inteiro faria a divisão truncar.
+            return np.asarray(contador, dtype=np.float64)
+        return (1.0 - self.phi ** np.asarray(contador, dtype=np.float64)) / (1.0 - self.phi)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
         """Eq. (4.9): `f(x) = Σ_i v[i](x) / Σ_i s[i](x)`. `(M, B) -> (M, d)`.
@@ -728,17 +910,41 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         — situação comum no início do treino e, com tuplas grandes, também para
         entradas novas (§3.2.4, p.27: "the model is unable to generalize").
         """
+        # COLETA e depois SOMA, em vez de acumular por RAM — e o ganho foi medido.
+        #
+        # A versão anterior fazia, por posição encontrada, dois `+=` de array e uma
+        # exponenciação escalar `phi ** contador`. O custo cresce com a TAXA DE
+        # ACERTO, que cresce com a ocupação — e é isso que fazia o treino desacelerar
+        # ao longo da corrida sem que contenção, GC ou localidade explicassem:
+        #
+        #     ocupadas       acertos/prever   ms/prever
+        #            0            0/67           0,020
+        #       20 000            4/67           0,072
+        #      120 000           29/67           0,313
+        #      200 000           51/67           0,480   (24× o vazio)
+        #
+        # O `prever` do ator foi vetorizado na T-06.0; este ficou com o laço, e o
+        # perfil o mostrou consumindo 33 % do laço de treino, com `_pesos` chamado
+        # 381 960 vezes em 3 000 passos.
+        #
+        # A ORDEM DA SOMA MUDA, e isso é decisão consciente: `np.sum` usa soma por
+        # pares e o acumulador dava soma sequencial, então os últimos bits diferem.
+        # Os testes diferenciais contra o Ramnet.jl passam com a tolerância que já
+        # tinham; exigir bit a bit aqui seria fixar uma ordem de acumulação que a
+        # eq. (4.9) não prescreve — ela é uma soma sobre `i`, sem ordem.
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
         for m, linha in enumerate(end):
-            num = np.zeros(self.n_saidas)
-            den = np.zeros(self.n_saidas)
+            vals, cnts = [], []
             for i, e in enumerate(linha):
                 item = self.memoria[i].get(int(e))
                 if item is not None:
-                    v, c = item
-                    num += v
-                    den += self._pesos(c)
+                    vals.append(item[0])
+                    cnts.append(item[1])
+            if not vals:
+                continue                      # eq. (4.9): `Σ s = 0 → 0`, explícito
+            num = np.sum(vals, axis=0)
+            den = np.sum(self._pesos(np.asarray(cnts)), axis=0)
             saida[m] = np.divide(num, den, out=np.zeros_like(num), where=den != 0)
         return saida
 
@@ -761,13 +967,14 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             if item is None:
                 # Posição virgem: v_0 = 0 e c_0 = 0, logo (4.8) dá
                 # v_1 = φ·0 + y = y  e  c_1 = 1.
-                self.memoria[i][chave] = (alvo.astype(np.float64).copy(),
-                                          np.ones(self.n_saidas))
+                self.memoria[i][chave] = (
+                    alvo.astype(np.float64).copy(),
+                    np.ones(self.n_saidas, dtype=self.TIPO_CONTADOR))
             else:
                 v, c = item
                 v *= self.phi          # primeiro o esquecimento...
                 v += alvo              # ...depois a observação nova
-                c += 1.0
+                c += 1                 # inteiro: contagem de visitas
 
     def treinar_componente(self, bits: NDArray[np.bool_], indice: int,
                            alvo: float) -> None:
@@ -796,11 +1003,12 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
             chave = int(e)
             item = self.memoria[i].get(chave)
             if item is None:
-                v, c = np.zeros(self.n_saidas), np.zeros(self.n_saidas)
+                v = np.zeros(self.n_saidas)
+                c = np.zeros(self.n_saidas, dtype=self.TIPO_CONTADOR)
                 v[indice] = float(alvo)
-                c[indice] = 1.0
+                c[indice] = 1
                 self.memoria[i][chave] = (v, c)
             else:
                 v, c = item
                 v[indice] = self.phi * v[indice] + float(alvo)
-                c[indice] += 1.0
+                c[indice] += 1
