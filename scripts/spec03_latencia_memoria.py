@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Latência de inferência e gasto de memória das três redes — MEDIDOS, não modelados.
 
-Complementa o `spec06_custo_comparado.py`, que reporta o custo MODELADO (T1 pela
+Complementa o `spec03_custo_comparado.py`, que reporta o custo MODELADO (T1 pela
 contabilidade de bytes, T2 por ciclos). Aqui é o que o processo de verdade paga:
 o relógio de parede da decisão e o RSS que carregar cada rede custa.
 
@@ -20,7 +20,7 @@ DUAS DECISÕES DE PROTOCOLO, e o porquê delas:
    tocaria endereços vazios, medindo o caso mais barato.
 
 Uso:
-    uv run --group baseline python scripts/spec06_latencia_memoria.py
+    uv run --group baseline python scripts/spec03_latencia_memoria.py
     (--na/--ns escolhem a célula; sem MADDPG publicado a célula roda só as WNN)
 """
 from __future__ import annotations
@@ -249,7 +249,7 @@ def main() -> int:
   arcabouço  = o que os imports custam antes de qualquer peso (torch ≈ 0,5 GB)
   disco      = o artefato em disco; o .cleanrl_model traz ator E CRÍTICO juntos""")
 
-    saida = RAIZ / "reports" / f"spec06-latencia-memoria-a{a.na}s{a.ns}.json"
+    saida = RAIZ / "reports" / f"spec03-latencia-memoria-a{a.na}s{a.ns}.json"
     saida.write_text(json.dumps(linhas, indent=2))
     print(f"\n-> {saida.relative_to(RAIZ)}")
     for f in [_markdown(linhas, a.na, a.ns)] + _graficos(linhas, a.na, a.ns):
@@ -272,7 +272,7 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
 
     L = [f"# Latência e memória — {na}d/{ns}s, medidos",
          "",
-         f"Gerado por `scripts/spec06_latencia_memoria.py` em "
+         f"Gerado por `scripts/spec03_latencia_memoria.py` em "
          f"{datetime.date.today().isoformat()} · {platform.machine()} · "
          f"mesma observação para os três · um processo por modelo · "
          f"menor mediana de {BLOCOS}×{REPS_BLOCO}.",
@@ -319,10 +319,10 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
     for r in linhas:
         L.append(linha([r["modelo"], f"{r['rss_arcabouco_kb'] / 1024:,.0f} MB"]))
     L += ["",
-          f"![tempos](spec06-latencia-a{na}s{ns}.png)",
-          f"![memória](spec06-memoria-a{na}s{ns}.png)", ""]
+          f"![tempos](spec03-latencia-a{na}s{ns}.png)",
+          f"![memória](spec03-memoria-a{na}s{ns}.png)", ""]
 
-    f = RAIZ / "reports" / f"spec06-latencia-memoria-a{na}s{ns}.md"
+    f = RAIZ / "reports" / f"spec03-latencia-memoria-a{na}s{ns}.md"
     f.write_text("\n".join(L))
     return f
 
@@ -365,7 +365,7 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     ax.legend(frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    f = RAIZ / "reports" / f"spec06-latencia-a{na}s{ns}.png"
+    f = RAIZ / "reports" / f"spec03-latencia-a{na}s{ns}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
 
     # -- memória: TODAS as leituras, porque cada uma responde outra pergunta --
@@ -402,7 +402,7 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     ax.margins(y=0.18)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    f = RAIZ / "reports" / f"spec06-memoria-a{na}s{ns}.png"
+    f = RAIZ / "reports" / f"spec03-memoria-a{na}s{ns}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
     return saidas
 

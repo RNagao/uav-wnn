@@ -1,18 +1,18 @@
 # Latência e memória — 2d/24s, medidos
 
-Gerado por `scripts/spec06_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma observação para os três · um processo por modelo · menor mediana de 8×1000.
+Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma observação para os três · um processo por modelo · menor mediana de 8×1000.
 
 ## Tempo de inferência (decisão completa: obs → ação)
 
 | modelo | mediana | p99 |
 | --- | --- | --- |
-| wnn-T16 | 17.0 µs | 48.0 µs |
-| wnn-T32 | 18.9 µs | 57.7 µs |
-| maddpg | 48.8 µs | 188.6 µs |
+| wnn-T16 | 16.9 µs | 81.8 µs |
+| wnn-T32 | 20.0 µs | 59.8 µs |
+| maddpg | 45.4 µs | 107.3 µs |
 
-- wnn-T16 é **2.9×** mais rápida que o MADDPG
+- wnn-T16 é **2.7×** mais rápida que o MADDPG
 
-- wnn-T32 é **2.6×** mais rápida que o MADDPG
+- wnn-T32 é **2.3×** mais rápida que o MADDPG
 
 ## Memória, nas quatro leituras (KB)
 
@@ -33,7 +33,7 @@ Gerado por `scripts/spec06_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 | --- | --- |
 | wnn-T16 | 17 MB |
 | wnn-T32 | 17 MB |
-| maddpg | 482 MB |
+| maddpg | 479 MB |
 
-![tempos](spec06-latencia-a2s24.png)
-![memória](spec06-memoria-a2s24.png)
+![tempos](spec03-latencia-a2s24.png)
+![memória](spec03-memoria-a2s24.png)

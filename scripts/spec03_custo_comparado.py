@@ -14,7 +14,7 @@ O T2 tem duas leituras. Em CICLOS (independente de hardware) a WNN ganha; em
 wall-clock ela perde, porque compara NumPy com PyTorch — arcabouços, não
 algoritmos. As duas ficam na tabela, rotuladas.
 
-    uv run --group baseline python scripts/spec06_custo_comparado.py
+    uv run --group baseline python scripts/spec03_custo_comparado.py
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def medir_maddpg(na: int, ns: int) -> dict | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--json", type=Path, default=Path("reports/spec06-custo-comparado.json"))
+    ap.add_argument("--json", type=Path, default=Path("reports/spec03-custo-comparado.json"))
     a = ap.parse_args()
 
     linhas = []

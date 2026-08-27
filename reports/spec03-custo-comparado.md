@@ -4,7 +4,7 @@ Os três modelos medidos **na mesma execução e com o mesmo protocolo**. Juntar
 números de relatórios diferentes foi como a razão de tamanho acabou comparando
 checkpoints com orçamentos de treino distintos.
 
-Reprodução: `uv run --group baseline python scripts/spec06_custo_comparado.py`
+Reprodução: `uv run --group baseline python scripts/spec03_custo_comparado.py`
 
 ---
 
