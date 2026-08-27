@@ -133,9 +133,21 @@ def _filho_wnn(na: int, ns: int, t_res: int) -> dict:
         z = np.load(npz_critico, allow_pickle=True)
         critico_kb = sum(z[k].nbytes for k in z.files if k != "config") / 1024
 
+    # T1 modelado: o artefato mínimo (chave uint16 + valores float32) — a
+    # definição da SPEC-03, a mesma da tabela do custo-comparado. Difere do
+    # residente porque a LUT em execução usa chave GLOBAL int32 (ram·4096+end
+    # passa de 16 bits) mais o mapeamento das tuplas e os limiares.
+    from uavwnn.custo.memoria import custo_ntuple_de_rede
+    # `ordenado`, não `hash`: é a variante da tabela do custo-comparado — o
+    # vetor ordenado sem fator de carga, que é também o que a LUTPlana faz.
+    t1_kb = custo_ntuple_de_rede(
+        ap.ator, variante="ordenado", limiares_por_dim=t_res,
+        n_dims=cfg.observation_size,
+        rotulo=f"T{t_res} a{na}s{ns}").persistente / 1024
+
     med, p99 = _cronometrar(lambda: pol(x))
     return {"modelo": f"wnn-T{t_res}", "mediana_us": med, "p99_us": p99,
-            "critico_kb": critico_kb,
+            "critico_kb": critico_kb, "t1_kb": t1_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -173,7 +185,7 @@ def _filho_maddpg(na: int, ns: int) -> dict:
     with torch.no_grad():
         med, p99 = _cronometrar(lambda: pol(x))
     return {"modelo": "maddpg", "mediana_us": med, "p99_us": p99,
-            "critico_kb": critico_kb,
+            "critico_kb": critico_kb, "t1_kb": vivos_kb,
             "rss_base_kb": rss0, "rss_arcabouco_kb": rss_imports - rss0,
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
@@ -286,26 +298,38 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     f = RAIZ / "reports" / f"spec06-latencia-a{na}s{ns}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
 
-    # -- memória: ator (voa) × ator + crítico (treina) --
+    # -- memória: TODAS as leituras, porque cada uma responde outra pergunta --
+    #    T1 artefato   o mínimo gravável (chave u16 + valores f32) — SPEC-03
+    #    residente     o que ocupa RAM executando (chave global int32 + mapas)
+    #    disco         o arquivo como está (no MADDPG traz ator E crítico †)
+    #    + crítico     o custo de TREINO (crítico não voa)
     import numpy as np
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    fig, ax = plt.subplots(figsize=(8.0, 4.2))
     x = np.arange(len(nomes))
-    ator = [r["arrays_vivos_kb"] for r in linhas]
-    total = [r["arrays_vivos_kb"] + r.get("critico_kb", 0.0) for r in linhas]
-    b1 = ax.bar(x - 0.19, ator, 0.38, color=cores, label="ator (voa)")
-    b2 = ax.bar(x + 0.19, total, 0.38, color=cores, alpha=0.45,
-                hatch="//", label="ator + crítico (treino)")
-    for barras in (b1, b2):
-        for b in barras:
-            ax.annotate(f"{b.get_height():,.0f}",
-                        (b.get_x() + b.get_width() / 2, b.get_height()),
-                        ha="center", va="bottom", fontsize=9)
-    ax.set_xticks(x, nomes)
+    series = [
+        ("T1 artefato (u16+f32)", [r["t1_kb"] for r in linhas], 1.0, None),
+        ("residente (RAM)", [r["arrays_vivos_kb"] for r in linhas], 0.72, None),
+        ("disco", [r["disco_kb"] for r in linhas], 0.45, None),
+        ("ator + crítico (treino)",
+         [r["arrays_vivos_kb"] + r.get("critico_kb", 0.0) for r in linhas],
+         0.30, "//"),
+    ]
+    lg = 0.2
+    for i, (nome, vals, alfa, hachura) in enumerate(series):
+        b = ax.bar(x + (i - 1.5) * lg, vals, lg * 0.92, color=cores,
+                   alpha=alfa, hatch=hachura, label=nome)
+        for bb, v in zip(b, vals):
+            ax.annotate(f"{v:,.0f}", (bb.get_x() + bb.get_width() / 2, v),
+                        ha="center", va="bottom", fontsize=7.5, rotation=90,
+                        xytext=(0, 2), textcoords="offset points")
+    rotulos = [n + (" †" if n == "maddpg" else "") for n in nomes]
+    ax.set_xticks(x, rotulos)
     ax.set_ylabel("KB")
-    ax.set_title(f"Memória do modelo — {rot}\n"
-                 "arrays medidos: LUT+termômetro / tensores; crítico não voa",
-                 fontsize=10)
-    ax.legend(frameon=False)
+    ax.set_title(f"Memória do modelo, nas quatro leituras — {rot}\n"
+                 "† o .cleanrl_model traz ator e crítico no MESMO arquivo — "
+                 "a barra 'disco' dele já é o total", fontsize=9.5)
+    ax.legend(frameon=False, fontsize=9, ncol=2)
+    ax.margins(y=0.18)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     f = RAIZ / "reports" / f"spec06-memoria-a{na}s{ns}.png"
