@@ -150,3 +150,97 @@ retomando de 7,502,112 passos, 47,155 episódios (melhor-val 1.000) · alvo 50,0
 [75.5%] 37,761,973/50,000,000 · 247,461 ep · 453 passos/s · ETA 7.5 h
 [76.0%] 38,012,109/50,000,000 · 249,123 ep · 454 passos/s · ETA 7.3 h
 [76.5%] 38,262,140/50,000,000 · 250,806 ep · 454 passos/s · ETA 7.2 h
+[77.0%] 38,512,149/50,000,000 · 252,468 ep · 454 passos/s · ETA 7.0 h
+   eval @ 38,754,251: cob 0.973 · sr 0.900 · CT 88.2 s
+[77.5%] 38,762,272/50,000,000 · 254,114 ep · 454 passos/s · ETA 6.9 h
+[78.0%] 39,012,344/50,000,000 · 255,805 ep · 454 passos/s · ETA 6.7 h
+[78.5%] 39,262,439/50,000,000 · 257,472 ep · 455 passos/s · ETA 6.6 h
+Traceback (most recent call last):
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m364[0m, in [35m<module>[0m
+    raise SystemExit([31mmain[0m[1;31m()[0m)
+                     [31m~~~~[0m[1;31m^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m358[0m, in [35mmain[0m
+    [31mtreinar[0m[1;31m(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,[0m
+    [31m~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+            [1;31ma.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)[0m
+            [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/scripts/spec06_treino_multiagente.py"[0m, line [35m225[0m, in [35mtreinar[0m
+    [31mac.fim_de_episodio[0m[1;31m()[0m
+    [31m~~~~~~~~~~~~~~~~~~[0m[1;31m^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/src/uavwnn/agents/ac_continuo.py"[0m, line [35m598[0m, in [35mfim_de_episodio[0m
+    if l[1;31men(self._buffer) < sel[0mf.passos:
+        [1;31m^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/src/uavwnn/agents/ac_continuo.py"[0m, line [35m582[0m, in [35m_aplicar[0m
+  File [35m"/home/rnagao/mestrado/fusao/src/uavwnn/agents/ac_continuo.py"[0m, line [35m233[0m, in [35mascender_ator[0m
+    [31mself.ator.atualizar[0m[1;31m(np.atleast_2d(x), self.taxa_ator * np.asarray(direcao))[0m
+    [31m~~~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/src/uavwnn/wnn/redes.py"[0m, line [35m701[0m, in [35matualizar[0m
+    [1;31m**Consequência que nã[0mo é cosmética:** as taxas não são transferíveis entre
+    [1;31m^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/home/rnagao/mestrado/fusao/src/uavwnn/wnn/redes.py"[0m, line [35m296[0m, in [35m_verificar[0m
+    raise TreinoInstavel(
+    ...<4 lines>...
+    )
+[1;35muavwnn.wnn.redes.TreinoInstavel[0m: [35mpasso 0.5317 excede c_max=0.5 no passo de treino 63980007. Pela convenção de média (eq. 4.12) isto é a mudança direta em f, então reduza η ou recorte δ. Passe c_max=None para desligar a asserção.[0m
+SPEC-06 escalada multiagente · config vencedora (passo 0.0008, σ 0.35, T 32, n 12, φ 0.85, m 8)
+
+  c_max = None (padrão 0,5) — asserção de estabilidade DESLIGADA
+RETOMANDO de runs/spec06-50M/T32-a2s24/checkpoints/ultimo (ator/crítico/termômetro carregados)
+multiagente · Na=2 Ns=24 · T=32 · N=72 RAMs · B=864 bits · 2 trajetórias compartilhando a rede
+retomando de 38,754,251 passos, 254,060 episódios (melhor-val 1.000) · alvo 50,000,000
+[78.0%] 39,004,324/50,000,000 · 255,752 ep · 568 passos/s · ETA 5.4 h
+[78.5%] 39,254,336/50,000,000 · 257,417 ep · 574 passos/s · ETA 5.2 h
+[79.0%] 39,504,381/50,000,000 · 259,118 ep · 577 passos/s · ETA 5.1 h
+[79.5%] 39,754,405/50,000,000 · 260,831 ep · 578 passos/s · ETA 4.9 h
+   eval @ 40,004,268: cob 0.984 · sr 0.960 · CT 60.3 s
+[80.0%] 40,004,539/50,000,000 · 262,533 ep · 577 passos/s · ETA 4.8 h
+[80.5%] 40,254,631/50,000,000 · 264,258 ep · 578 passos/s · ETA 4.7 h
+[81.0%] 40,504,799/50,000,000 · 265,981 ep · 578 passos/s · ETA 4.6 h
+[81.5%] 40,754,812/50,000,000 · 267,705 ep · 579 passos/s · ETA 4.4 h
+[82.0%] 41,004,813/50,000,000 · 269,425 ep · 580 passos/s · ETA 4.3 h
+   eval @ 41,254,405: cob 0.980 · sr 0.880 · CT 96.8 s
+[82.5%] 41,254,871/50,000,000 · 271,115 ep · 579 passos/s · ETA 4.2 h
+[83.0%] 41,504,953/50,000,000 · 272,804 ep · 579 passos/s · ETA 4.1 h
+[83.5%] 41,755,099/50,000,000 · 274,492 ep · 580 passos/s · ETA 4.0 h
+[84.0%] 42,005,214/50,000,000 · 276,200 ep · 580 passos/s · ETA 3.8 h
+[84.5%] 42,255,337/50,000,000 · 277,920 ep · 580 passos/s · ETA 3.7 h
+   eval @ 42,504,422: cob 0.989 · sr 0.930 · CT 73.2 s
+[85.0%] 42,505,355/50,000,000 · 279,642 ep · 580 passos/s · ETA 3.6 h
+[85.5%] 42,755,399/50,000,000 · 281,355 ep · 580 passos/s · ETA 3.5 h
+[86.0%] 43,005,468/50,000,000 · 283,061 ep · 580 passos/s · ETA 3.3 h
+[86.5%] 43,255,575/50,000,000 · 284,775 ep · 580 passos/s · ETA 3.2 h
+[87.0%] 43,505,708/50,000,000 · 286,510 ep · 581 passos/s · ETA 3.1 h
+   eval @ 43,754,449: cob 0.981 · sr 0.920 · CT 79.2 s
+[87.5%] 43,755,810/50,000,000 · 288,195 ep · 581 passos/s · ETA 3.0 h
+[88.0%] 44,005,834/50,000,000 · 289,870 ep · 581 passos/s · ETA 2.9 h
+[88.5%] 44,255,868/50,000,000 · 291,521 ep · 581 passos/s · ETA 2.7 h
+[89.0%] 44,505,919/50,000,000 · 293,230 ep · 581 passos/s · ETA 2.6 h
+[89.5%] 44,755,968/50,000,000 · 294,911 ep · 581 passos/s · ETA 2.5 h
+   eval @ 45,004,492: cob 0.975 · sr 0.900 · CT 88.8 s
+[90.0%] 45,005,980/50,000,000 · 296,623 ep · 581 passos/s · ETA 2.4 h
+[90.5%] 45,256,085/50,000,000 · 298,312 ep · 581 passos/s · ETA 2.3 h
+[91.0%] 45,506,200/50,000,000 · 300,018 ep · 581 passos/s · ETA 2.1 h
+[91.5%] 45,756,341/50,000,000 · 301,719 ep · 581 passos/s · ETA 2.0 h
+[92.0%] 46,006,357/50,000,000 · 303,433 ep · 580 passos/s · ETA 1.9 h
+   eval @ 46,254,577: cob 0.973 · sr 0.910 · CT 82.5 s
+[92.5%] 46,256,431/50,000,000 · 305,149 ep · 580 passos/s · ETA 1.8 h
+[93.0%] 46,506,459/50,000,000 · 306,856 ep · 580 passos/s · ETA 1.7 h
+[93.5%] 46,756,564/50,000,000 · 308,532 ep · 580 passos/s · ETA 1.6 h
+[94.0%] 47,006,626/50,000,000 · 310,207 ep · 580 passos/s · ETA 1.4 h
+[94.5%] 47,256,653/50,000,000 · 311,906 ep · 580 passos/s · ETA 1.3 h
+   eval @ 47,504,672: cob 0.977 · sr 0.940 · CT 70.4 s
+[95.0%] 47,506,667/50,000,000 · 313,611 ep · 580 passos/s · ETA 1.2 h
+[95.5%] 47,756,831/50,000,000 · 315,299 ep · 580 passos/s · ETA 1.1 h
+[96.0%] 48,006,874/50,000,000 · 316,991 ep · 580 passos/s · ETA 1.0 h
+[96.5%] 48,256,956/50,000,000 · 318,684 ep · 581 passos/s · ETA 0.8 h
+[97.0%] 48,507,030/50,000,000 · 320,376 ep · 581 passos/s · ETA 0.7 h
+   eval @ 48,754,782: cob 0.978 · sr 0.940 · CT 69.3 s
+[97.5%] 48,757,100/50,000,000 · 322,084 ep · 580 passos/s · ETA 0.6 h
+[98.0%] 49,007,191/50,000,000 · 323,802 ep · 580 passos/s · ETA 0.5 h
+[98.5%] 49,257,281/50,000,000 · 325,501 ep · 580 passos/s · ETA 0.4 h
+[99.0%] 49,507,381/50,000,000 · 327,212 ep · 580 passos/s · ETA 0.2 h
+[99.5%] 49,757,424/50,000,000 · 328,921 ep · 581 passos/s · ETA 0.1 h
+deploy podado (70%): 532 KB · SR 96.0%→96.0% (val)
+
+Na=2 Ns=24: SR 96% · CT 59.1 s · cobertura 98.7% · melhor-val 100.0% (100 sementes)
+checkpoint (melhor): runs/spec06-50M/T32-a2s24/checkpoints/melhor
