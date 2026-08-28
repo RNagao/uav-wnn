@@ -586,8 +586,15 @@ class LUTPlana(_RedeNTupla):
     (512 B/RAM para n = 12), e a posição no vetor de valores é o RANK — quantos
     bits acesos vêm antes — que uma tabela de prefixos por palavra + um popcount
     (`np.bitwise_count`) resolvem em O(1), sem busca. Medido no T16 a2s24:
-    chaves int32 88 KB → ocupação+rank 28 KB, e a consulta fica mais rápida
-    (popcount contra busca binária de log₂ 22 453 ≈ 15 passos).
+    chaves int32 88 KB → ocupação+rank 28 KB.
+
+    O PREÇO, medido e não escondido: em NumPy a consulta fica ~5 µs MAIS LENTA
+    (15,8 → 20,8 µs a decisão completa) — o rank custa ~13 despachos de ufunc
+    pequenos contra a chamada única e compilada do `searchsorted`, e neste
+    tamanho de vetor o despacho domina. Em C a conta inverte: `POPCNT` é uma
+    instrução, contra ~15 desvios da busca binária — o bitmap é o formato certo
+    do ARTEFATO embarcado, e é por isso que fica. Quem precisar dos 5 µs de
+    volta no x86 reverte para a chave explícita, que era só isso: 60 KB a mais.
 
     Assume plataforma little-endian (x86/ARM) na reconstrução da `memoria`.
 
