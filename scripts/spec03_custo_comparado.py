@@ -61,7 +61,7 @@ def medir_wnn(rot: str, na: int, ns: int) -> dict | None:
     gc.collect(); depois = rss_mb()
 
     n_ram, n_tup = ap.ator.n_ram, ap.ator.tamanho_tupla
-    occ = ap.ator.chaves.size
+    occ = ap.ator.n_entradas
     d_obs = cfg.observation_size
     cm = custo_ntuple_de_rede(ap.ator, variante="ordenado", limiares_por_dim=T,
                               n_dims=d_obs, rotulo=rot)

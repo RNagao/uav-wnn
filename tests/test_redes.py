@@ -358,7 +358,7 @@ def test_lut_plana_e_equivalente_e_recusa_escrita():
     estrutura não introduz erro nenhum por si, só a escolha de precisão. Com
     `float32` o erro é o arredondamento do tipo, não da busca.
 
-    E ela tem de RECUSAR escrita: as chaves estão ordenadas e a busca binária
+    E ela tem de RECUSAR escrita: os valores estão empacotados pelo rank
     depende disso, então inserir exigiria reordenar. Degradar em silêncio seria
     pior que falhar.
     """
@@ -382,27 +382,30 @@ def test_lut_plana_e_equivalente_e_recusa_escrita():
     f32 = LUTPlana(rede)                      # padrão: float32
     np.testing.assert_allclose(f32.prever(prova), esperado, rtol=1e-6, atol=0)
 
-    # a estrutura interna: chaves globais, ordenadas
-    assert exata.chaves.dtype == np.int32
-    assert (np.diff(exata.chaves) > 0).all(), "chaves têm de estar ordenadas"
-    assert exata.chaves.size == sum(len(m) for m in rede.memoria)
+    # a estrutura interna: bitmap de ocupação + rank, sem chave nenhuma
+    assert exata.ocupacao.dtype == np.uint64
+    assert exata.n_entradas == sum(len(m) for m in rede.memoria)
+    assert int(np.bitwise_count(exata.ocupacao).sum()) == exata.n_entradas
+    # o rank de cada palavra é o total de bits acesos antes dela
+    pc = np.bitwise_count(exata.ocupacao).astype(np.int64).ravel()
+    assert np.array_equal(exata.rank.ravel()[1:], np.cumsum(pc)[:-1])
 
     for metodo in ("atualizar", "treinar", "salvar"):
         with pytest.raises(TypeError, match="imutável"):
             getattr(exata, metodo)(prova, np.zeros(3))
 
 
-def test_lut_plana_recusa_chave_grande_demais():
-    """`n_ram · 2ⁿ` precisa caber em `int32`. Estourar em silêncio daria
-    endereços negativos e uma rede que lê lixo sem levantar nada."""
-    import numpy as np
+def test_lut_plana_recusa_tabela_grande_demais():
+    """O bitmap tem um bit POR POSIÇÃO da tabela, então `n` grande explode a
+    ocupação mesmo vazia — a recusa explícita evita alocar centenas de MB em
+    silêncio (com chaves int32 o limite era o mesmo, por outro motivo)."""
     import pytest
 
     from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
 
-    # n = 28 → 2^28 por RAM; com ~9 RAMs já passa de 2^31
+    # n = 28 → 2^28 posições por RAM; com ~9 RAMs o bitmap passaria de 256 MB
     rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=28, n_saidas=1)
-    with pytest.raises(ValueError, match="int32"):
+    with pytest.raises(ValueError, match="bitmap"):
         LUTPlana(rede)
 
 

@@ -573,15 +573,23 @@ class LUTPlana(_RedeNTupla):
     136 B (5,7× o conteúdo), mais 28 do `int` boxed e 37 do slot do dict. São
     259 mil objetos Python minúsculos, cada um com seu cabeçalho.
 
-    A ESTRUTURA
+    A ESTRUTURA — bitmap + rank, sem chave nenhuma
 
-        chaves   int32   (occ,)     chave GLOBAL = ram·2ⁿ + endereço, ORDENADA
-        valores  float32 (occ, d)
-        desloc   int32   (N,)       ram·2ⁿ, pré-computado
+        ocupacao  uint64  (N, 2ⁿ/64)  um BIT por posição da tabela
+        rank      uint32  (N, 2ⁿ/64)  nº de entradas antes de cada palavra
+        valores   float32 (occ, d)    empacotados em ordem RAM-crescente,
+                                      endereço-crescente
 
-    A chave global é o ponto: em vez de `N` tabelas separadas, **uma** ordenada.
-    Com `N = 72` e `n = 12` a chave máxima é 294 912 — cabe em `int32` com folga,
-    e o construtor recusa se não couber.
+    A primeira versão guardava a chave global `int32` de cada entrada e fazia
+    busca binária. Mas a chave de uma tabela com 2ⁿ posições tem exatamente
+    2ⁿ bits de informação POR RAM, não 32 por entrada: o bitmap diz quem existe
+    (512 B/RAM para n = 12), e a posição no vetor de valores é o RANK — quantos
+    bits acesos vêm antes — que uma tabela de prefixos por palavra + um popcount
+    (`np.bitwise_count`) resolvem em O(1), sem busca. Medido no T16 a2s24:
+    chaves int32 88 KB → ocupação+rank 28 KB, e a consulta fica mais rápida
+    (popcount contra busca binária de log₂ 22 453 ≈ 15 passos).
+
+    Assume plataforma little-endian (x86/ARM) na reconstrução da `memoria`.
 
     O GANHO, medido no ator de `T=32, Na=2, Ns=24` (129 664 entradas):
 
@@ -618,21 +626,29 @@ class LUTPlana(_RedeNTupla):
         self._pot_mat = rede._pot_mat
         self._n_passos = 0
 
-        desloc = 1 << self.tamanho_tupla
-        maximo = self.n_ram * desloc
-        if maximo >= 2**31:
+        slots = 1 << self.tamanho_tupla
+        if self.n_ram * slots >= 2**31:
             raise ValueError(
-                f"chave global máxima {maximo:,} não cabe em int32 "
-                f"(n_ram={self.n_ram}, tupla={self.tamanho_tupla})")
-        chaves, valores = [], []
+                f"tabela com {self.n_ram * slots:,} posições — o bitmap "
+                f"passaria de 256 MB (n_ram={self.n_ram}, "
+                f"tupla={self.tamanho_tupla})")
+        palavras = (slots + 63) >> 6
+        self.ocupacao = np.zeros((self.n_ram, palavras), np.uint64)
+        valores = []
+        um = np.uint64(1)
         for i, m in enumerate(rede.memoria):
-            for k in sorted(m):                       # ORDENADO por RAM, e as
-                chaves.append(i * desloc + k)         # RAMs em ordem crescente
-                valores.append(m[int(k)])             # → o vetor global já sai
-        self.chaves = np.asarray(chaves, np.int32)    #   ordenado, sem sort
+            for k in sorted(m):                       # RAM-crescente, endereço-
+                k = int(k)                            # crescente: a MESMA ordem
+                self.ocupacao[i, k >> 6] |= um << np.uint64(k & 63)
+                valores.append(m[k])                  # da chave global de antes
         self.valores = (np.asarray(valores, dtype_valor).reshape(-1, self.n_saidas)
                         if valores else np.zeros((0, self.n_saidas), dtype_valor))
-        self._desloc = (np.arange(self.n_ram) * desloc).astype(np.int32)
+        pc = np.bitwise_count(self.ocupacao).astype(np.int64)
+        acum = np.cumsum(pc.ravel())
+        self.n_entradas = int(acum[-1]) if acum.size else 0
+        self.rank = np.concatenate(
+            [[0], acum[:-1]]).astype(np.uint32).reshape(self.n_ram, palavras)
+        self._arange_ram = np.arange(self.n_ram)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
         """Eq. (4.12), com busca binária vetorizada. `(M, B) -> (M, d)`.
@@ -642,13 +658,16 @@ class LUTPlana(_RedeNTupla):
         """
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
-        if self.chaves.size:
+        if self.n_entradas:
+            um = np.uint64(1)
             for m, linha in enumerate(end):
-                g = self._desloc + linha.astype(np.int32)
-                j = np.minimum(np.searchsorted(self.chaves, g), self.chaves.size - 1)
-                ok = self.chaves[j] == g
+                w, b = linha >> np.uint64(6), linha & np.uint64(63)
+                palavra = self.ocupacao[self._arange_ram, w]
+                ok = (palavra >> b) & um != 0
+                pos = (self.rank[self._arange_ram, w]
+                       + np.bitwise_count(palavra & ((um << b) - um)))
                 if ok.any():
-                    saida[m] = self.valores[j[ok]].sum(axis=0, dtype=np.float64)
+                    saida[m] = self.valores[pos[ok]].sum(axis=0, dtype=np.float64)
         return saida / self.n_ram if self.convencao == "media" else saida
 
     def consulta_do_vetor(self, dim_por_bit, limiar_por_bit):
@@ -676,10 +695,12 @@ class LUTPlana(_RedeNTupla):
         lim = np.concatenate([np.asarray(limiar_por_bit, float),
                               [np.inf]])[self._tuplas]
         pot = self._pot_mat
-        chaves, valores, desloc = self.chaves, self.valores, self._desloc
-        tam, n_saidas = chaves.size, self.n_saidas
+        ocupacao, rank, valores = self.ocupacao, self.rank, self.valores
+        arange_ram, tem = self._arange_ram, self.n_entradas > 0
+        n_saidas = self.n_saidas
         divisor = self.n_ram if self.convencao == "media" else 1
         d_obs = int(np.asarray(dim_por_bit).max()) + 1
+        um, seis, m63 = np.uint64(1), np.uint64(6), np.uint64(63)
 
         def consulta(v):
             if v.size != d_obs:
@@ -687,12 +708,14 @@ class LUTPlana(_RedeNTupla):
                                  f"esperado {d_obs}")
             addr = ((v[dim] >= lim) * pot).sum(axis=1)
             saida = np.zeros(n_saidas)
-            if tam:
-                g = desloc + addr.astype(np.int32)
-                j = np.minimum(np.searchsorted(chaves, g), tam - 1)
-                ok = chaves[j] == g
+            if tem:
+                w, b = addr >> seis, addr & m63
+                palavra = ocupacao[arange_ram, w]
+                ok = (palavra >> b) & um != 0
                 if ok.any():
-                    saida = valores[j[ok]].sum(axis=0, dtype=np.float64)
+                    pos = (rank[arange_ram, w]
+                           + np.bitwise_count(palavra & ((um << b) - um)))
+                    saida = valores[pos[ok]].sum(axis=0, dtype=np.float64)
             return saida / divisor
 
         return consulta
@@ -704,10 +727,17 @@ class LUTPlana(_RedeNTupla):
         Reconstrói dicionários — é caro, e de propósito: quem precisar disto num
         caminho quente está usando a estrutura errada.
         """
-        desloc = 1 << self.tamanho_tupla
-        saida = [{} for _ in range(self.n_ram)]
-        for k, v in zip(self.chaves.tolist(), self.valores):
-            saida[k // desloc][k % desloc] = v
+        # little-endian: os bytes da palavra uint64 saem em ordem crescente de
+        # bit com `bitorder="little"`, então o índice do bit é o endereço.
+        slots = 1 << self.tamanho_tupla
+        bits = np.unpackbits(self.ocupacao.view(np.uint8),
+                             bitorder="little").reshape(self.n_ram, -1)
+        saida, pos = [], 0
+        for i in range(self.n_ram):
+            idx = np.flatnonzero(bits[i, :slots])
+            saida.append({int(a): self.valores[pos + j]
+                          for j, a in enumerate(idx)})
+            pos += idx.size
         return saida
 
     def _imutavel(self, *_a, **_k):

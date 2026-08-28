@@ -119,7 +119,7 @@ def _filho_wnn(na: int, ns: int, t_res: int) -> dict:
     from uavwnn.encoding import TermometroQuantil
     termo = TermometroQuantil.carregar(ckpt / "termometro.npz")
     lut = ap.ator
-    arrays = (lut.chaves, lut.valores, lut._desloc, lut._tuplas, lut._pot_mat,
+    arrays = (lut.ocupacao, lut.rank, lut.valores, lut._tuplas, lut._pot_mat,
               termo.limiares)
     vivos_kb = sum(a.nbytes for a in arrays) / 1024
 
@@ -159,7 +159,7 @@ def _filho_wnn(na: int, ns: int, t_res: int) -> dict:
             "rss_modelo_kb": rss_carregado - rss_imports,
             "arrays_vivos_kb": vivos_kb,
             "disco_kb": sum(f.stat().st_size for f in ckpt.iterdir()) / 1024,
-            "params": int(lut.chaves.size)}
+            "params": int(lut.n_entradas)}
 
 
 def _filho_maddpg(na: int, ns: int) -> dict:
