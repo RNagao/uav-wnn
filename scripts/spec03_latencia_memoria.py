@@ -323,9 +323,9 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
           "da SPEC-03, comparável com as demais tabelas do projeto;",
           "- **residente**: o que ocupa RAM executando — na WNN, a `LUTPlana` "
           "(bitmap de ocupação + rank + valores, mapeamento, limiares) + "
-          "buffers de trabalho — com o bitmap ele fica ABAIXO do T1, que modela "
-          "chave `uint16` explícita por entrada; 
-          "no MADDPG, pesos + entrada e ativações (2×256) que o forward usa. "
+          "buffers de trabalho; com o bitmap ele fica ABAIXO do T1, que modela "
+          "chave `uint16` explícita por entrada. No MADDPG, pesos + entrada e "
+          "ativações (2×256) que o forward usa. "
           "Sem os buffers do MADDPG a comparação seria assimétrica: o T1 da "
           "WNN embute os dela;",
           "- **disco**: o arquivo como está; † o `.cleanrl_model` traz ator E "

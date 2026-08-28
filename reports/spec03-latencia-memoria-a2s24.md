@@ -6,9 +6,9 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 
 | modelo | mediana | p99 |
 | --- | --- | --- |
-| wnn-T16 | 20.8 µs | 41.6 µs |
-| wnn-T32 | 23.8 µs | 46.9 µs |
-| maddpg | 44.2 µs | 84.7 µs |
+| wnn-T16 | 21.0 µs | 42.0 µs |
+| wnn-T32 | 23.2 µs | 45.2 µs |
+| maddpg | 44.8 µs | 87.0 µs |
 
 - wnn-T16 é **2.1×** mais rápida que o MADDPG
 
@@ -23,7 +23,7 @@ Gerado por `scripts/spec03_latencia_memoria.py` em 2026-08-27 · x86_64 · mesma
 | maddpg † | 287 | 289 | 1,438 | 1,433 |
 
 - **T1 artefato**: chave `uint16` + valores `float32` — a definição da SPEC-03, comparável com as demais tabelas do projeto;
-- **residente**: o que ocupa RAM executando — na WNN, a `LUTPlana` (chave global `int32`, mapeamento, limiares) + buffers de trabalho; no MADDPG, pesos + entrada e ativações (2×256) que o forward usa. Sem os buffers do MADDPG a comparação seria assimétrica: o T1 da WNN embute os dela;
+- **residente**: o que ocupa RAM executando — na WNN, a `LUTPlana` (bitmap de ocupação + rank + valores, mapeamento, limiares) + buffers de trabalho; com o bitmap ele fica ABAIXO do T1, que modela chave `uint16` explícita por entrada. No MADDPG, pesos + entrada e ativações (2×256) que o forward usa. Sem os buffers do MADDPG a comparação seria assimétrica: o T1 da WNN embute os dela;
 - **disco**: o arquivo como está; † o `.cleanrl_model` traz ator E crítico no mesmo arquivo, a barra dele já é o total;
 - **ator + crítico**: o custo de treino — o crítico não voa.
 
