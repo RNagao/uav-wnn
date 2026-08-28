@@ -200,6 +200,42 @@ contra 76,4 µs.
 Num Cortex-M0 sem FPU a conta inverte: 13 mil ciclos contra 9,2 milhões, e 296 KB
 contra 287 KB de memória — a WNN passa a ser a única das duas que roda.
 
+## Por que a MLP compete em memória, apesar de pesos e camadas
+
+A pergunta certa — checada em três frentes na célula 2d/24s (50 M):
+
+**1. A contabilidade dos dois lados confere.** MADDPG: 27→256→256→2 dá
+72 960 pesos + 514 vieses = 73 474 números × 4 B = 287 KB, batendo com os
+tensores medidos. WNN: valores + endereços + codificador, conferidos array a
+array.
+
+**2. A WNN T=16 não guarda mais números — guarda MENOS.**
+
+| | números que definem a função | endereços | bytes |
+|---|---|---|---|
+| MADDPG | 73 474 | 0 (implícito na posição) | 287 KB |
+| wnn-T16 | **67 359** | 22 453 explícitos (+14 %) | 310 KB |
+| wnn-T32 | 124 428 | 41 476 (+14 %) | 572 KB |
+
+A diferença de 8 % do T16 é quase toda o **custo do endereçamento**: numa
+tabela esparsa cada valor carrega a própria chave; numa matriz densa o
+endereço é o layout. O T32 é 2× porque guarda 1,7× mais números que a MLP —
+tabela maior, não desperdício.
+
+**3. `float16` nos valores não passa no portão comportamental.** Metade dos
+bytes (307→175 KB) custa SR 95 %→90 % e CT 66→87 s no `val` — 2,5× a
+tolerância da poda. Os 4 B por valor são informação, não folga.
+
+**A razão de fundo é o trade que define o método.** A MLP é representação
+DISTRIBUÍDA: todo peso participa de toda decisão (reuso máximo por byte), e a
+capacidade é fixada a priori — 287 KB com 6,75 M ou 50 M de passos. A n-tupla
+é representação LOCAL: cada entrada serve só às observações que caem na sua
+célula, e a ocupação cresce com a experiência (o deploy do T16 foi de 10 965
+entradas a 6,75 M para 22 453 a 50 M). Memoriza-se em tabela para não
+multiplicar — o eixo em que a WNN ganha é o das 4 contra 72 964
+multiplicações, e **empatar em memória (+8 %) já é o resultado forte**, não
+uma promessa quebrada.
+
 ## Ressalvas
 
 - O `T1` conta **só o ator** dos dois lados; o crítico do MADDPG (1 146 KB) e o
