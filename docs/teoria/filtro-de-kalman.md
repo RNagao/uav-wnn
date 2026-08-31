@@ -65,40 +65,204 @@ deliberado (§7).
 
 ---
 
-## 3. As equações
+## 3. As equações — cada uma, de onde vem e para que serve
 
-### Inicialização
+O ciclo tem duas fases. A **predição** responde *"onde acho que estou, antes de
+olhar o GPS?"* e roda uma vez por intervalo entre eventos. A **correção**
+responde *"como reparto a confiança entre essa previsão e o fix que chegou?"* e
+roda uma vez por medida. Cada equação abaixo existe para uma dessas perguntas —
+e cada uma tem um modo de falhar específico se for trocada pela alternativa
+"óbvia".
+
+### 3.1 Inicialização
 
 ```
 x̂ = z₀        a primeira estimativa É a primeira leitura de GPS
 P  = R         logo, a incerteza inicial é a do GPS
 ```
 
-Não se começa com `x̂ = 0` e `P` grande: isso faria o NEES explodir nos primeiros
-passos, obrigando a descartar o transiente — que é onde a política toma as
-decisões mais consequentes.
+**De onde vem.** Antes do primeiro fix o filtro não sabe nada; depois dele, a
+melhor estimativa possível *é* o próprio fix. O erro dessa estimativa é então
+exatamente o ruído do GPS, cuja covariância é `R` — declarar `P = R` é a única
+escolha honesta.
 
-### Predição
+**Por que importa.** Com essa escolha o erro inicial `e₀ = z₀ − p` é, por
+construção, `N(0, R)` — logo o NEES `ε₀ = e₀ᵀP₀⁻¹e₀ ~ χ²(2)` **exatamente, desde
+o passo zero**. A alternativa de livro-texto (`x̂ = 0` com `P` "grande") faz o
+NEES explodir nos primeiros passos e obriga a descartar o transiente da
+análise — que é justamente onde a política toma as decisões mais consequentes.
+Aqui não há transiente a esconder.
 
-```
-dt = t − t_anterior
-Q  = [ q_w·dt + (σ_v0² + κ·‖u − u_anterior‖²)·dt² ] · I
-
-x̂ ← x̂ + dt·u         ando na direção que mandei
-P  ← P + Q            e fico menos certo de onde estou
-```
-
-Com `q_w = 4` e `dt = 0,5`: **Q = 2 m²**, ou 1,41 m de desvio acrescentado.
-
-### Correção
+### 3.2 Predição da média
 
 ```
-y = z − x̂                       o GPS discorda de mim em `y` metros
-S = P + R                       eu esperava discordância dessa magnitude
-K = P · S⁻¹                     aceito a fração K do desacordo
-x̂ ← x̂ + K·y                     ando parte do caminho até o GPS
-P ← (I−K)P(I−K)ᵀ + K·R·Kᵀ       e fico mais certo   (forma de Joseph)
+x̂ ← x̂ + dt·u          ando na direção que mandei
 ```
+
+**De onde vem.** É a forma geral do Kalman, `x̂⁻ = F·x̂ + B·u`, com `F = I` e
+`B = dt·I`. `F = I` porque a posição não evolui sozinha — sem comando, o drone
+paira; não há dinâmica a extrapolar só do estado. O termo `dt·u` é física pura
+(dead reckoning): posição nova = posição velha + velocidade × tempo, e `u` é
+constante durante o intervalo porque a política só decide nos eventos.
+
+**Para que serve.** É o que transporta informação **através** do intervalo sem
+GPS — e é o ingrediente que falta a qualquer filtro que só faz média de
+medidas. Um passa-baixa perseguindo um alvo a `v` m/s carrega atraso de regime
+`v·dt·(1−α)/α` (~30 m no nosso regime, uma ordem acima do próprio σ do GPS):
+não é só mais ruidoso, é **enviesado**. O comando elimina esse viés de graça,
+porque o agente o conhece — foi ele quem o escolheu.
+
+**Detalhe de taxa.** Como `F = I` e `u` é constante, propagar a média em 1
+passo de 2 s ou em 20 de 0,1 s dá o mesmo `x̂`. A covariância **não** tem essa
+indiferença — ver §3.4.
+
+### 3.3 Predição da covariância
+
+```
+P ← P + Q             e fico menos certo de onde estou
+```
+
+**De onde vem.** Forma geral `P⁻ = F·P·Fᵀ + Q`; com `F = I` sobra a soma.
+
+**Por que só cresce.** Prever não acrescenta informação nenhuma — só reposiciona
+a estimativa — então `P` não pode encolher aqui. E cresce por `Q` porque o
+modelo "andar exatamente `dt·u`" é imperfeito: enquanto o filtro voa às cegas
+entre fixes, a desobediência do voo real acumula erro que ninguém mediu ainda.
+
+**Para que serve.** Duas funções, e as duas são vitais:
+
+1. **Honestidade**: `P` precisa acompanhar o erro real para o NEES ter
+   significado e para quem consome `x̂` saber a barra de erro.
+2. **Calibrar o ganho**: o `P` que sai daqui é o numerador de `K` no próximo
+   fix. `Q` pequeno demais → `P` cresce de menos → `K` pequeno → o filtro
+   ignora o GPS e vira **otimista** (erra mais do que admite). `Q` grande
+   demais → **conservador** (joga fora predição boa). `Q` é o botão; `P` é a
+   contabilidade que ele alimenta.
+
+### 3.4 O ruído de processo `Q`, termo a termo
+
+```
+Q(dt) = [ q_w·dt + (σ_v0² + κ·‖u − u_anterior‖²)·dt² ] · I
+```
+
+`Q` responde: *"quanto o deslocamento real desobedece `dt·u`?"* A equação
+decompõe a desobediência em duas fontes **fisicamente distintas**, que se
+distinguem por como escalam com `dt`:
+
+**`q_w·dt` — desobediência sem memória (linear em `dt`).** Perturbações de
+velocidade descorrelacionadas de um instante para o outro — rajada, vibração,
+e no nosso caso a fonte dominante: o tranco da própria política a cada decisão
+(§6). Empurrões independentes somam **em variância**, daí o crescimento linear.
+`q_w` é densidade (m²/s), não variância. Esse termo é **invariante à taxa**:
+20 composições de `q_w·0,1` = 1 composição de `q_w·2`.
+
+**`(σ_v0² + κ‖Δu‖²)·dt²` — erro constante dentro do passo (quadrático em
+`dt`).** Modela um erro de velocidade `δ` sorteado uma vez e mantido o passo
+inteiro (atuador entregando `u + δ`): vira `δ·dt` de posição, logo variância
+`∝ dt²`. Esse termo **não** é invariante à taxa — 20 passos de 0,1 s dão
+`σ²·0,2`, mas 1 passo de 2 s dá `σ²·4`, fator 20 de diferença. Daí a regra dura
+do módulo: **um `predizer_ate` por intervalo entre eventos, nunca um por tique
+de mobilidade** — a taxa de chamada é parte da definição de `Q` (a armadilha
+da T-07.2). Dentro do fator:
+
+* `σ_v0²` é o piso — erro de atuação que existe mesmo em rumo constante;
+* `κ‖Δu‖²` torna `Q` **adaptativo ao salto de comando**: logo após uma virada,
+  inércia e dinâmica do controlador fazem o modelo cinemático errar mais, e o
+  filtro abre a guarda exatamente aí (o `_u_ant` do código existe só para
+  isso). Com `κ = 0`, `Q` volta a ser estacionário.
+
+Nas corridas deste projeto `σ_v0 = κ = 0`: toda a desobediência medida coube no
+termo linear (§6).
+
+**O `·I`** — ruído isotrópico: o rumo comandado é uniforme, não há direção
+privilegiada; mesma variância em `x` e `y`, sem correlação entre eixos.
+
+Números: `q_w = 4`, `dt = 0,5` → **Q = 2 m²** (1,41 m acrescentados por passo);
+`q_w = 16` (WNN T=16, 8 drones) → 8 m² (2,83 m).
+
+### 3.5 Inovação
+
+```
+y = z − x̂             o GPS discorda de mim em `y` metros
+```
+
+**Para que serve.** É a **única informação nova** do ciclo: o que o GPS sabe e
+a previsão não anteviu. Todo o resto da correção decide apenas que fração de
+`y` aceitar.
+
+**O subproduto de graça.** Se o modelo está certo, `y ~ N(0, S)` e a sequência
+de inovações é **branca** (descorrelacionada no tempo). Inovação correlacionada
+é a assinatura direta de erro não modelado — GPS não branco, inércia,
+discretização — e é o diagnóstico mais informativo do arsenal de consistência,
+porque acusa viés pequeno-mas-persistente que o NEES médio mascara.
+
+### 3.6 Covariância da inovação
+
+```
+S = P + R             eu esperava discordância dessa magnitude
+```
+
+**De onde vem.** Forma geral `S = H·P·Hᵀ + R`; como o GPS mede diretamente a
+posição, `H = I` e sobra a soma. A discordância esperada entre previsão e
+medida é o erro de um **mais** o erro do outro, porque os dois são
+independentes — variâncias de fontes independentes somam.
+
+**Para que serve, duas vezes.** É o denominador do ganho (§3.7) — a régua que
+diz se um `y` de 15 m é escândalo ou rotina — e é a escala do **NIS**
+(`ν = yᵀS⁻¹y`), o teste de consistência que não precisa da verdade e por isso é
+o único que existiria num voo real.
+
+### 3.7 O ganho
+
+```
+K = P · S⁻¹           aceito a fração K do desacordo
+```
+
+**É aqui que mora a otimalidade.** A derivação escalar cabe em três linhas:
+combinar duas estimativas independentes da mesma grandeza — a previsão `a`
+(variância `P`) e a medida `b` (variância `R`) — como `x̂ = (1−k)·a + k·b` dá
+erro quadrático médio `(1−k)²P + k²R`; derivando em `k` e zerando,
+
+```
+k* = P / (P + R)
+```
+
+— que é exatamente `K = P·S⁻¹`. Qualquer outro peso erra mais, em média.
+
+**Comportamento nos extremos.** `P ≫ R` (muito tempo sem fix, ou logo após
+virada com `κ > 0`) → `K → 1`, obedece o GPS. `P ≪ R` (previsão fresca, sensor
+ruim) → `K → 0`, segura a previsão. Ninguém programou esse número: ele cai da
+contabilidade que as equações 3.3 e 3.4 mantêm — é o que a tabela da §4 mostra
+acontecendo passo a passo.
+
+### 3.8 Correção da média
+
+```
+x̂ ← x̂ + K·y           ando parte do caminho até o GPS
+```
+
+Rearranjada, é uma média ponderada explícita: `x̂ = (1−K)·previsão + K·z`. A
+diferença para o passa-baixa não é a fórmula — é que lá o peso `α` é um chute
+fixo, e aqui `K` é recalculado a cada ciclo a partir de quem está mais incerto
+naquele momento.
+
+### 3.9 Correção da covariância — forma de Joseph
+
+```
+P ← (I−K)·P·(I−K)ᵀ + K·R·Kᵀ       e fico mais certo
+```
+
+**Por que não a forma curta `P ← (I−K)·P` dos livros?** As duas são
+algebricamente iguais **apenas quando `K` é exatamente o ótimo**. A curta ainda
+subtrai duas quantidades quase iguais (cancelamento catastrófico em ponto
+flutuante) e pode devolver um `P` assimétrico ou com autovalor negativo — que
+não é covariância de coisa nenhuma, e um NEES calculado com ele não significa
+nada. A forma de Joseph é soma de dois termos positivos-semidefinidos, logo `P`
+sai simétrica e positiva-definida **para qualquer `K`** — e "qualquer `K`" é
+exatamente o regime das ablações de desintonia da §6, onde o ganho é subótimo
+de propósito e é o NEES que precisa acusar. Custa ~30 flops a mais; barato
+pelo que garante. A linha 183 ainda simetriza `P ← (P+Pᵀ)/2` contra deriva
+numérica residual.
 
 ---
 
