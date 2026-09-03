@@ -1,0 +1,23 @@
+26/08 09:40:26 [1396443]  ────────────────────────────────────────────────────────────────
+26/08 09:40:26 [1396443]  supervisor no ar · base 106 passos/s · alvo 6 · máx 6 · recua <96 · sobe >103
+26/08 09:40:26 [1396443]  herdando 6 corridas de um supervisor anterior: wnn-T16 a1s12 sem-kf, wnn-T16 a2s24 limpo, wnn-T16 a2s36 limpo, wnn-T32 a1s12 sem-kf, wnn-T32 a2s24 limpo, wnn-T32 a2s36 limpo
+26/08 09:45:04 [1396443]  lançada wnn-T16 a2s12 sem-kf
+26/08 09:46:42 [1396443]  lançada wnn-T32 a2s12 sem-kf
+26/08 09:49:50 [1396443]  lançada maddpg a2s24 sem-kf
+26/08 09:49:58 [1396443]  lançada wnn-T16 a2s24 sem-kf
+26/08 09:54:37 [1396443]  lançada wnn-T32 a2s24 sem-kf
+26/08 10:03:45 [1396443]  lançada maddpg a2s36 sem-kf
+26/08 10:05:23 [1396443]  lançada wnn-T16 a2s36 sem-kf
+26/08 10:05:31 [1396443]  lançada wnn-T32 a2s36 sem-kf
+26/08 10:07:09 [1396443]  lançada wnn-T16 a1s12 com-kf
+26/08 10:19:17 [1396443]  lançada wnn-T32 a1s12 com-kf
+26/08 10:20:55 [1396443]  lançada maddpg a2s12 com-kf
+26/08 10:24:03 [1396443]  lançada wnn-T16 a2s12 com-kf
+26/08 10:28:41 [1396443]  lançada wnn-T32 a2s12 com-kf
+26/08 10:31:49 [1396443]  lançada maddpg a2s24 com-kf
+26/08 10:33:27 [1396443]  lançada wnn-T16 a2s24 com-kf
+26/08 10:44:06 [1396443]  lançada wnn-T32 a2s24 com-kf
+26/08 10:45:44 [1396443]  lançada maddpg a2s36 com-kf
+26/08 10:47:22 [1396443]  lançada wnn-T16 a2s36 com-kf
+26/08 10:49:00 [1396443]  lançada wnn-T32 a2s36 com-kf
+26/08 11:23:32 [1396443]  nada pendente e nada em voo — campanha completa

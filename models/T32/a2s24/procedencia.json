@@ -16,16 +16,30 @@
     "replica": "1b",
     "parameter_sharing": true,
     "recompensa_por_na": true,
+    "retomado_de": "runs/spec06-50M/T32-a2s24/checkpoints/ultimo",
     "critico": "descentralizado (Alg. 4.4)"
   },
-  "passos": 7502112,
-  "episodios": 47155,
+  "passos": 50000000,
+  "episodios": 330585,
   "melhor_val_cobertura": 1.0,
   "metrica_test": {
-    "sr": 0.91,
-    "ct_cens": 80.86,
-    "cobertura": 0.9670833333333334,
+    "sr": 0.96,
+    "ct_cens": 59.105,
+    "cobertura": 0.9866666666666667,
     "n": 100
   },
-  "fonte": "spec06_treino_multiagente.py"
+  "fonte": "spec06_treino_multiagente.py",
+  "deploy": {
+    "poda": 0.7,
+    "deploy_kb": 532.0556640625,
+    "sr_cheio": 0.96,
+    "sr_podado": 0.96
+  },
+  "metrica_test_final": {
+    "sr": 0.96,
+    "ct_cens": 59.105,
+    "cobertura": 0.9866666666666667,
+    "n": 100
+  },
+  "promovido_de": "runs/spec06-50M/T32-a2s24"
 }

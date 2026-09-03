@@ -125,6 +125,25 @@ class TreinoInstavel(RuntimeError):
     """
 
 
+_TETO_DENSO_BYTES = 16 * 2**20
+"""Teto para o armazenamento DENSO (bytes do bloco de valores, float64).
+
+Para `n = 12` cada RAM tem só 4 096 posições, e o dicionário por entrada
+custava 218 B (ator) e 361 B (crítico) para 24 e 12 B de dado útil — medido
+por tracemalloc num checkpoint real: 15,9 MB e 26,4 MB de RAM para o que o
+denso guarda em 3,5 MB e 1,7 MB, sem chave nenhuma e com indexação direta.
+
+O teto existe porque a classe aceita `n` até 64 e `2^64` posições não são
+alocáveis — é o achado da SPEC-03 que fez as redes nascerem esparsas. Denso
+só quando cabe (16 MiB cobre todos os modelos do projeto, `n = 12`); acima
+disso fica o dicionário de sempre, intocado. A troca é INVISÍVEL de fora:
+`memoria` continua legível como lista de dicts, e todos os caminhos quentes
+replicam as operações do modo esparso na MESMA ordem — a igualdade bit a bit
+com o comportamento anterior é pinada em teste e verificada por treino de
+referência com sementes fixas.
+"""
+
+
 class _RedeNTupla:
     """Endereçamento comum às duas redes — §3.2.1 (p.22), fig. 3.1 e 3.2.
 
@@ -177,6 +196,61 @@ class _RedeNTupla:
             for t in self.mapeamento
         ]
         self._montar_endereco_vetorizado()
+
+    def _iniciar_armazenamento(self, com_contador: bool) -> None:
+        """Denso quando cabe (ver `_TETO_DENSO_BYTES`); dicionários senão."""
+        slots = 1 << self.tamanho_tupla
+        self._densa = (self.n_ram * slots * self.n_saidas * 8
+                       <= _TETO_DENSO_BYTES)
+        if self._densa:
+            self._val = np.zeros((self.n_ram, slots, self.n_saidas))
+            self._ocup = np.zeros((self.n_ram, slots), dtype=bool)
+            self._cnt = (np.zeros((self.n_ram, slots, self.n_saidas),
+                                  dtype=np.uint32) if com_contador else None)
+            self._memo = None
+        else:
+            self._memo = [{} for _ in range(self.n_ram)]
+            self._cnt = None
+
+    @property
+    def memoria(self):
+        """Lista de dicts, como sempre foi — reconstruída sob demanda no denso.
+
+        No modo denso isto é uma VISTA (os arrays de valor são views nos blocos
+        densos): ler é barato e coerente, mas ESCREVER num dict reconstruído se
+        perde — quem precisa popular uma rede de fora atribui a lista inteira
+        (`rede.memoria = dicts`), que o setter ingere no armazenamento certo.
+        É o padrão que `carregar` e `spec06_importar_ppo` já usavam.
+        """
+        if not getattr(self, "_densa", False):
+            return self._memo
+        saida = []
+        for i in range(self.n_ram):
+            idx = np.flatnonzero(self._ocup[i])
+            if self._cnt is None:
+                saida.append({int(a): self._val[i, a] for a in idx})
+            else:
+                saida.append({int(a): (self._val[i, a], self._cnt[i, a])
+                              for a in idx})
+        return saida
+
+    @memoria.setter
+    def memoria(self, dicts) -> None:
+        if not getattr(self, "_densa", False):
+            self._memo = dicts               # mesmo objeto: mutação externa vale
+            return
+        self._val[:] = 0.0
+        self._ocup[:] = False
+        if self._cnt is not None:
+            self._cnt[:] = 0
+        for i, m in enumerate(dicts):
+            for k, v in m.items():
+                if isinstance(v, tuple):
+                    self._val[i, k] = v[0]
+                    self._cnt[i, k] = v[1]
+                else:
+                    self._val[i, k] = v
+                self._ocup[i, k] = True
 
     def _montar_endereco_vetorizado(self) -> None:
         """Pré-computa as duas matrizes que tornam `enderecos` uma chamada só.
@@ -332,22 +406,48 @@ class _RedeNTupla:
         import json
 
         enderecos, valores, contadores, tamanhos = [], [], [], []
-        for m in self.memoria:
-            tamanhos.append(len(m))
-            for chave, v in m.items():
-                enderecos.append(chave)
-                if isinstance(v, tuple):          # crítico: (valor, contador)
-                    valores.append(v[0])
-                    contadores.append(v[1])
-                else:
-                    valores.append(v)
+        if getattr(self, "_densa", False):
+            # denso: entradas em ordem crescente de endereço, por RAM. No modo
+            # esparso a ordem era a de inserção do dict — o CONTEÚDO é o mesmo,
+            # e nada no projeto depende da ordem (prever soma por RAM, não por
+            # entrada; a LUTPlana ordena as chaves ao nascer).
+            for i in range(self.n_ram):
+                idx = np.flatnonzero(self._ocup[i])
+                tamanhos.append(int(idx.size))
+                for a in idx:
+                    enderecos.append(int(a))
+                    valores.append(self._val[i, a])
+                    if self._cnt is not None:
+                        contadores.append(self._cnt[i, a])
+        else:
+            for m in self._memo:
+                tamanhos.append(len(m))
+                for chave, v in m.items():
+                    enderecos.append(chave)
+                    if isinstance(v, tuple):      # crítico: (valor, contador)
+                        valores.append(v[0])
+                        contadores.append(v[1])
+                    else:
+                        valores.append(v)
+        # dtypes ESTREITOS, dimensionados pelo que o conteúdo exige — não pelo
+        # que a aritmética interna usa. O endereço local à RAM tem
+        # `tamanho_tupla` bits (12 -> máx 4095), e gravá-lo em uint64 fazia o
+        # campo pesar 40 % do checkpoint do crítico para carregar zeros. O
+        # `carregar` é agnóstico a dtype (os arrays viram índices/ints), então
+        # arquivos antigos em uint64 continuam legíveis; a igualdade bit a bit
+        # do round-trip é pinada em teste. Os VALORES ficam em float64 de
+        # propósito: são estado de treino, e truncá-los mudaria a retomada.
+        t_end = (np.uint16 if self.tamanho_tupla <= 16
+                 else np.uint32 if self.tamanho_tupla <= 32 else np.uint64)
+        t_map = np.uint16 if self.n_bits < 2**16 else np.int64
         dados = {
             "config": np.array(json.dumps(self._config())),
-            "mapeamento": np.concatenate(self.mapeamento).astype(np.int64),
-            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento], np.int64),
-            "tamanhos_ram": np.array(tamanhos, np.int64),
-            "enderecos": np.array(enderecos, np.uint64) if enderecos
-                         else np.zeros(0, np.uint64),
+            "mapeamento": np.concatenate(self.mapeamento).astype(t_map),
+            "tamanhos_tupla": np.array([len(t) for t in self.mapeamento],
+                                       np.int32),
+            "tamanhos_ram": np.array(tamanhos, np.int32),
+            "enderecos": np.array(enderecos, t_end) if enderecos
+                         else np.zeros(0, t_end),
             "valores": (np.stack(valores) if valores
                         else np.zeros((0, self.n_saidas))),
         }
@@ -404,23 +504,32 @@ class _RedeNTupla:
         valores = z["valores"]
         contadores = z["contadores"] if "contadores" in z else None
 
-        rede.memoria = [{} for _ in range(rede.n_ram)]
+        # `rede` e não `cls`: o `carregar` devolve a CLASSE GRAVADA, que pode
+        # não ser a que recebeu a chamada.
+        tipo_cont = getattr(type(rede), "TIPO_CONTADOR", np.uint32)
+        if rede._densa:
+            i = 0
+            for r, n in enumerate(tamanhos):
+                for _ in range(int(n)):
+                    chave = int(enderecos[i])
+                    rede._val[r, chave] = valores[i]
+                    if contadores is not None:
+                        rede._cnt[r, chave] = contadores[i].astype(tipo_cont)
+                    rede._ocup[r, chave] = True
+                    i += 1
+            return rede
+        memo = [{} for _ in range(rede.n_ram)]
         i = 0
         for r, n in enumerate(tamanhos):
             for _ in range(int(n)):
                 chave = int(enderecos[i])
                 if contadores is not None:
-                    rede.memoria[r][chave] = (valores[i].copy(),
-                                              # `rede` e não `cls`: o `carregar`
-                                              # devolve a CLASSE GRAVADA, que pode
-                                              # não ser a que recebeu a chamada.
-                                              contadores[i].astype(
-                                                  getattr(type(rede),
-                                                          "TIPO_CONTADOR",
-                                                          np.uint32)))
+                    memo[r][chave] = (valores[i].copy(),
+                                      contadores[i].astype(tipo_cont))
                 else:
-                    rede.memoria[r][chave] = valores[i].copy()
+                    memo[r][chave] = valores[i].copy()
                 i += 1
+        rede.memoria = memo
         return rede
 
     def entradas_ocupadas(self) -> int:
@@ -431,7 +540,9 @@ class _RedeNTupla:
         **realizado** (o footprint da estrutura de dados). Ver
         `src/uavwnn/custo/memoria.py`.
         """
-        return sum(len(m) for m in self.memoria)
+        if getattr(self, "_densa", False):
+            return int(self._ocup.sum())
+        return sum(len(m) for m in self._memo)
 
     def reiniciar(self) -> None:
         """Equivalente ao `reset!` do `Ramnet.jl` (`empty!(node.memory)`).
@@ -440,7 +551,13 @@ class _RedeNTupla:
         ao estado inicial `v[i]_0(x) = 0 ∀x`, que é a condição inicial que
         §4.3.1 (p.38) declara explicitamente.
         """
-        for m in self.memoria:
+        if getattr(self, "_densa", False):
+            self._val[:] = 0.0
+            self._ocup[:] = False
+            if self._cnt is not None:
+                self._cnt[:] = 0
+            return
+        for m in self._memo:
             m.clear()
 
 
@@ -456,15 +573,30 @@ class LUTPlana(_RedeNTupla):
     136 B (5,7× o conteúdo), mais 28 do `int` boxed e 37 do slot do dict. São
     259 mil objetos Python minúsculos, cada um com seu cabeçalho.
 
-    A ESTRUTURA
+    A ESTRUTURA — bitmap + rank, sem chave nenhuma
 
-        chaves   int32   (occ,)     chave GLOBAL = ram·2ⁿ + endereço, ORDENADA
-        valores  float32 (occ, d)
-        desloc   int32   (N,)       ram·2ⁿ, pré-computado
+        ocupacao  uint64  (N, 2ⁿ/64)  um BIT por posição da tabela
+        rank      uint32  (N, 2ⁿ/64)  nº de entradas antes de cada palavra
+        valores   float32 (occ, d)    empacotados em ordem RAM-crescente,
+                                      endereço-crescente
 
-    A chave global é o ponto: em vez de `N` tabelas separadas, **uma** ordenada.
-    Com `N = 72` e `n = 12` a chave máxima é 294 912 — cabe em `int32` com folga,
-    e o construtor recusa se não couber.
+    A primeira versão guardava a chave global `int32` de cada entrada e fazia
+    busca binária. Mas a chave de uma tabela com 2ⁿ posições tem exatamente
+    2ⁿ bits de informação POR RAM, não 32 por entrada: o bitmap diz quem existe
+    (512 B/RAM para n = 12), e a posição no vetor de valores é o RANK — quantos
+    bits acesos vêm antes — que uma tabela de prefixos por palavra + um popcount
+    (`np.bitwise_count`) resolvem em O(1), sem busca. Medido no T16 a2s24:
+    chaves int32 88 KB → ocupação+rank 28 KB.
+
+    O PREÇO, medido e não escondido: em NumPy a consulta fica ~5 µs MAIS LENTA
+    (15,8 → 20,8 µs a decisão completa) — o rank custa ~13 despachos de ufunc
+    pequenos contra a chamada única e compilada do `searchsorted`, e neste
+    tamanho de vetor o despacho domina. Em C a conta inverte: `POPCNT` é uma
+    instrução, contra ~15 desvios da busca binária — o bitmap é o formato certo
+    do ARTEFATO embarcado, e é por isso que fica. Quem precisar dos 5 µs de
+    volta no x86 reverte para a chave explícita, que era só isso: 60 KB a mais.
+
+    Assume plataforma little-endian (x86/ARM) na reconstrução da `memoria`.
 
     O GANHO, medido no ator de `T=32, Na=2, Ns=24` (129 664 entradas):
 
@@ -501,21 +633,29 @@ class LUTPlana(_RedeNTupla):
         self._pot_mat = rede._pot_mat
         self._n_passos = 0
 
-        desloc = 1 << self.tamanho_tupla
-        maximo = self.n_ram * desloc
-        if maximo >= 2**31:
+        slots = 1 << self.tamanho_tupla
+        if self.n_ram * slots >= 2**31:
             raise ValueError(
-                f"chave global máxima {maximo:,} não cabe em int32 "
-                f"(n_ram={self.n_ram}, tupla={self.tamanho_tupla})")
-        chaves, valores = [], []
+                f"tabela com {self.n_ram * slots:,} posições — o bitmap "
+                f"passaria de 256 MB (n_ram={self.n_ram}, "
+                f"tupla={self.tamanho_tupla})")
+        palavras = (slots + 63) >> 6
+        self.ocupacao = np.zeros((self.n_ram, palavras), np.uint64)
+        valores = []
+        um = np.uint64(1)
         for i, m in enumerate(rede.memoria):
-            for k in sorted(m):                       # ORDENADO por RAM, e as
-                chaves.append(i * desloc + k)         # RAMs em ordem crescente
-                valores.append(m[int(k)])             # → o vetor global já sai
-        self.chaves = np.asarray(chaves, np.int32)    #   ordenado, sem sort
+            for k in sorted(m):                       # RAM-crescente, endereço-
+                k = int(k)                            # crescente: a MESMA ordem
+                self.ocupacao[i, k >> 6] |= um << np.uint64(k & 63)
+                valores.append(m[k])                  # da chave global de antes
         self.valores = (np.asarray(valores, dtype_valor).reshape(-1, self.n_saidas)
                         if valores else np.zeros((0, self.n_saidas), dtype_valor))
-        self._desloc = (np.arange(self.n_ram) * desloc).astype(np.int32)
+        pc = np.bitwise_count(self.ocupacao).astype(np.int64)
+        acum = np.cumsum(pc.ravel())
+        self.n_entradas = int(acum[-1]) if acum.size else 0
+        self.rank = np.concatenate(
+            [[0], acum[:-1]]).astype(np.uint32).reshape(self.n_ram, palavras)
+        self._arange_ram = np.arange(self.n_ram)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
         """Eq. (4.12), com busca binária vetorizada. `(M, B) -> (M, d)`.
@@ -525,13 +665,16 @@ class LUTPlana(_RedeNTupla):
         """
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
-        if self.chaves.size:
+        if self.n_entradas:
+            um = np.uint64(1)
             for m, linha in enumerate(end):
-                g = self._desloc + linha.astype(np.int32)
-                j = np.minimum(np.searchsorted(self.chaves, g), self.chaves.size - 1)
-                ok = self.chaves[j] == g
+                w, b = linha >> np.uint64(6), linha & np.uint64(63)
+                palavra = self.ocupacao[self._arange_ram, w]
+                ok = (palavra >> b) & um != 0
+                pos = (self.rank[self._arange_ram, w]
+                       + np.bitwise_count(palavra & ((um << b) - um)))
                 if ok.any():
-                    saida[m] = self.valores[j[ok]].sum(axis=0, dtype=np.float64)
+                    saida[m] = self.valores[pos[ok]].sum(axis=0, dtype=np.float64)
         return saida / self.n_ram if self.convencao == "media" else saida
 
     def consulta_do_vetor(self, dim_por_bit, limiar_por_bit):
@@ -559,10 +702,12 @@ class LUTPlana(_RedeNTupla):
         lim = np.concatenate([np.asarray(limiar_por_bit, float),
                               [np.inf]])[self._tuplas]
         pot = self._pot_mat
-        chaves, valores, desloc = self.chaves, self.valores, self._desloc
-        tam, n_saidas = chaves.size, self.n_saidas
+        ocupacao, rank, valores = self.ocupacao, self.rank, self.valores
+        arange_ram, tem = self._arange_ram, self.n_entradas > 0
+        n_saidas = self.n_saidas
         divisor = self.n_ram if self.convencao == "media" else 1
         d_obs = int(np.asarray(dim_por_bit).max()) + 1
+        um, seis, m63 = np.uint64(1), np.uint64(6), np.uint64(63)
 
         def consulta(v):
             if v.size != d_obs:
@@ -570,12 +715,14 @@ class LUTPlana(_RedeNTupla):
                                  f"esperado {d_obs}")
             addr = ((v[dim] >= lim) * pot).sum(axis=1)
             saida = np.zeros(n_saidas)
-            if tam:
-                g = desloc + addr.astype(np.int32)
-                j = np.minimum(np.searchsorted(chaves, g), tam - 1)
-                ok = chaves[j] == g
+            if tem:
+                w, b = addr >> seis, addr & m63
+                palavra = ocupacao[arange_ram, w]
+                ok = (palavra >> b) & um != 0
                 if ok.any():
-                    saida = valores[j[ok]].sum(axis=0, dtype=np.float64)
+                    pos = (rank[arange_ram, w]
+                           + np.bitwise_count(palavra & ((um << b) - um)))
+                    saida = valores[pos[ok]].sum(axis=0, dtype=np.float64)
             return saida / divisor
 
         return consulta
@@ -587,10 +734,17 @@ class LUTPlana(_RedeNTupla):
         Reconstrói dicionários — é caro, e de propósito: quem precisar disto num
         caminho quente está usando a estrutura errada.
         """
-        desloc = 1 << self.tamanho_tupla
-        saida = [{} for _ in range(self.n_ram)]
-        for k, v in zip(self.chaves.tolist(), self.valores):
-            saida[k // desloc][k % desloc] = v
+        # little-endian: os bytes da palavra uint64 saem em ordem crescente de
+        # bit com `bitorder="little"`, então o índice do bit é o endereço.
+        slots = 1 << self.tamanho_tupla
+        bits = np.unpackbits(self.ocupacao.view(np.uint8),
+                             bitorder="little").reshape(self.n_ram, -1)
+        saida, pos = [], 0
+        for i in range(self.n_ram):
+            idx = np.flatnonzero(bits[i, :slots])
+            saida.append({int(a): self.valores[pos + j]
+                          for j, a in enumerate(idx)})
+            pos += idx.size
         return saida
 
     def _imutavel(self, *_a, **_k):
@@ -701,12 +855,10 @@ class RedeGradienteFuncional(_RedeNTupla):
         **Consequência que não é cosmética:** as taxas não são transferíveis entre
         as convenções sem dividir por `N`. A `taxa_equivalente` abaixo faz a
         conversão explícita, em vez de deixá-la como pegadinha."""
-        # Um dicionário por RAM, espelhando `FunctionalNode{D}` do Ramnet.jl:
-        #     struct FunctionalNode{D}; memory::Dict{UInt,Vector{Float64}}
-        # Posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
-        self.memoria: list[dict[int, NDArray[np.float64]]] = [
-            {} for _ in range(self.n_ram)
-        ]
+        # Espelha `FunctionalNode{D}` do Ramnet.jl (Dict{UInt,Vector{Float64}});
+        # posição ausente vale zero — a condição inicial v[i]_0(x) = 0 da §4.3.1.
+        # Denso quando cabe, dicts senão; ver `_TETO_DENSO_BYTES`.
+        self._iniciar_armazenamento(com_contador=False)
 
     def prever(self, bits: NDArray[np.bool_]) -> NDArray[np.float64]:
         """Eq. (4.12): `f(x) = (1/N) Σ_i v[i](x)`. `(M, B) -> (M, d)`.
@@ -719,11 +871,21 @@ class RedeGradienteFuncional(_RedeNTupla):
         """
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
-        for m, linha in enumerate(end):
-            for i, e in enumerate(linha):
-                v = self.memoria[i].get(int(e))
-                if v is not None:
-                    saida[m] += v
+        if self._densa:
+            # A MESMA soma sequencial do modo esparso, com indexação direta no
+            # lugar do dict.get — a ordem de acumulação é idêntica, e a
+            # igualdade é bit a bit (pinada em teste).
+            val, ocup = self._val, self._ocup
+            for m, linha in enumerate(end):
+                for i, e in enumerate(linha):
+                    if ocup[i, e]:
+                        saida[m] += val[i, e]
+        else:
+            for m, linha in enumerate(end):
+                for i, e in enumerate(linha):
+                    v = self._memo[i].get(int(e))
+                    if v is not None:
+                        saida[m] += v
         return saida / self.n_ram if self.convencao == "media" else saida
 
     def atualizar(self, bits: NDArray[np.bool_], passo: NDArray[np.float64]) -> None:
@@ -745,12 +907,21 @@ class RedeGradienteFuncional(_RedeNTupla):
         """
         passo = np.atleast_1d(np.asarray(passo, dtype=np.float64))
         self._verificar(passo)
+        if self._densa:
+            for i, e in enumerate(self.enderecos(bits)[0]):
+                if self._ocup[i, e]:
+                    self._val[i, e] += passo
+                else:
+                    # Primeira escrita: v_0 = 0, logo v_1 = passo.
+                    self._val[i, e] = passo
+                    self._ocup[i, e] = True
+            return
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
-            v = self.memoria[i].get(chave)
+            v = self._memo[i].get(chave)
             if v is None:
                 # Primeira escrita nesta posição: v_0 = 0, logo v_1 = passo.
-                self.memoria[i][chave] = passo.copy()
+                self._memo[i][chave] = passo.copy()
             else:
                 v += passo
 
@@ -869,9 +1040,8 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         # (p.37) atualiza só `v[i](S_code, A)`, a componente da ação tomada, e um
         # contador compartilhado degradaria a média ponderada da (4.9) para as
         # ações menos visitadas. Ver `treinar_componente`.
-        self.memoria: list[dict[int, tuple[NDArray, NDArray]]] = [
-            {} for _ in range(self.n_ram)
-        ]
+        # (valor, contador) por posição; denso quando cabe, dicts senão.
+        self._iniciar_armazenamento(com_contador=True)
 
     TIPO_CONTADOR = np.uint32
     """O contador é uma CONTAGEM DE VISITAS — inteiro por construção (`c += 1`).
@@ -934,13 +1104,20 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         # eq. (4.9) não prescreve — ela é uma soma sobre `i`, sem ordem.
         end = self.enderecos(bits)
         saida = np.zeros((end.shape[0], self.n_saidas))
+        densa = self._densa
         for m, linha in enumerate(end):
             vals, cnts = [], []
-            for i, e in enumerate(linha):
-                item = self.memoria[i].get(int(e))
-                if item is not None:
-                    vals.append(item[0])
-                    cnts.append(item[1])
+            if densa:
+                for i, e in enumerate(linha):
+                    if self._ocup[i, e]:
+                        vals.append(self._val[i, e])
+                        cnts.append(self._cnt[i, e])
+            else:
+                for i, e in enumerate(linha):
+                    item = self._memo[i].get(int(e))
+                    if item is not None:
+                        vals.append(item[0])
+                        cnts.append(item[1])
             if not vals:
                 continue                      # eq. (4.9): `Σ s = 0 → 0`, explícito
             num = np.sum(vals, axis=0)
@@ -961,13 +1138,26 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         """
         alvo = np.atleast_1d(np.asarray(alvo, dtype=np.float64))
         self._verificar(alvo)
+        if self._densa:
+            for i, e in enumerate(self.enderecos(bits)[0]):
+                if self._ocup[i, e]:
+                    v = self._val[i, e]
+                    v *= self.phi      # primeiro o esquecimento...
+                    v += alvo          # ...depois a observação nova
+                    self._cnt[i, e] += 1
+                else:
+                    # Posição virgem: v_1 = φ·0 + y = y  e  c_1 = 1.
+                    self._val[i, e] = alvo
+                    self._cnt[i, e] = 1
+                    self._ocup[i, e] = True
+            return
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
-            item = self.memoria[i].get(chave)
+            item = self._memo[i].get(chave)
             if item is None:
                 # Posição virgem: v_0 = 0 e c_0 = 0, logo (4.8) dá
                 # v_1 = φ·0 + y = y  e  c_1 = 1.
-                self.memoria[i][chave] = (
+                self._memo[i][chave] = (
                     alvo.astype(np.float64).copy(),
                     np.ones(self.n_saidas, dtype=self.TIPO_CONTADOR))
             else:
@@ -999,15 +1189,26 @@ class RedeRegressaoEsquecimento(_RedeNTupla):
         """
         if not 0 <= indice < self.n_saidas:
             raise ValueError(f"indice={indice} fora de [0, {self.n_saidas})")
+        if self._densa:
+            for i, e in enumerate(self.enderecos(bits)[0]):
+                if self._ocup[i, e]:
+                    self._val[i, e, indice] = (self.phi * self._val[i, e, indice]
+                                               + float(alvo))
+                    self._cnt[i, e, indice] += 1
+                else:
+                    self._val[i, e, indice] = float(alvo)
+                    self._cnt[i, e, indice] = 1
+                    self._ocup[i, e] = True
+            return
         for i, e in enumerate(self.enderecos(bits)[0]):
             chave = int(e)
-            item = self.memoria[i].get(chave)
+            item = self._memo[i].get(chave)
             if item is None:
                 v = np.zeros(self.n_saidas)
                 c = np.zeros(self.n_saidas, dtype=self.TIPO_CONTADOR)
                 v[indice] = float(alvo)
                 c[indice] = 1
-                self.memoria[i][chave] = (v, c)
+                self._memo[i][chave] = (v, c)
             else:
                 v, c = item
                 v[indice] = self.phi * v[indice] + float(alvo)

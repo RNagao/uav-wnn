@@ -55,7 +55,8 @@ como o conjunto único de hiperparâmetros do Lamenza exige."""
 SEED_TREINO_BASE = 2_000_000
 
 
-def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None):
+def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None,
+              c_max: float | None = 0.5):
     """Rede compartilhada + `na` trajetórias de AC (uma por drone).
 
     Se ``retomar`` for um dir de checkpoint, carrega ator/crítico/termômetro dali
@@ -84,6 +85,19 @@ def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None):
         rp = Path(retomar)
         ap.ator = type(ap.ator).carregar(next(rp.glob("*ator.npz")))
         ap.critico = type(ap.critico).carregar(next(rp.glob("*critico.npz")))
+    if c_max != 0.5:
+        # A asserção TreinoInstavel é NOSSA tripwire de sanidade (§4.2), não
+        # parte do Algoritmo 4.4 — que não recorta a atualização. Ela existe
+        # para pegar divergência cedo; aos 64 M de atualizações do T32-a2s24
+        # um pico isolado de δ chegou a 0,5317 e derrubou a corrida a 40 M.
+        # Como a retomada é determinística por semente de episódio, relançar
+        # sem mudar nada reproduz o MESMO crash — daí o botão. Desligar não
+        # altera nenhuma atualização abaixo do teto; apenas deixa passar as
+        # que a asserção teria abortado. A curva de validação (a cada 1,25 M)
+        # é quem vigia divergência de verdade.
+        ap.ator.c_max = c_max
+        print(f"  c_max = {c_max} (padrão 0,5) — asserção de estabilidade "
+              f"{'DESLIGADA' if c_max is None else 'ajustada'}", flush=True)
 
     def codificar(v, _t=termo):
         return _t.codificar(np.asarray(v, float)[None, :])[0]
@@ -129,7 +143,8 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
 def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             progresso_cada: int, t_res: int = T_RES,
             retomar: Path | None = None, sem_parada: bool = False,
-            passos_previos: int | None = None, val_n: int = 20) -> dict:
+            passos_previos: int | None = None, val_n: int = 20,
+            c_max: float | None = 0.5) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -143,7 +158,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
-    ap, termo, acs = construir(cfg_tr, na, t_res, retomar)
+    ap, termo, acs = construir(cfg_tr, na, t_res, retomar, c_max=c_max)
     t_res = termo.n_bits // cfg_tr.observation_size     # o efetivo, após retomar
     if retomar is not None:
         print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)",
@@ -330,6 +345,11 @@ def main() -> int:
     ap.add_argument("--retomar", type=Path, default=None,
                     help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
+    ap.add_argument("--c-max", default="0.5",
+                    help="teto do passo efetivo (asserção TreinoInstavel da "
+                         "§4.2). 'none' desliga — usado para retomar o "
+                         "T32-a2s24, que caiu num pico isolado de δ a 40 M e "
+                         "reproduziria o mesmo crash pela mesma semente.")
     ap.add_argument("--val-n", type=int, default=20,
                     help="sementes do banco val por avaliação (máx. 100). Com 20, "
                          "a SR tem resolução de 5 pp e um único episódio move a "
@@ -356,7 +376,8 @@ def main() -> int:
           f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
           flush=True)
     treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
-            a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n)
+            a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n,
+            None if str(a.c_max).lower() == "none" else float(a.c_max))
     return 0
 
 

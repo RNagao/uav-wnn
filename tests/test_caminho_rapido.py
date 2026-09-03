@@ -103,3 +103,34 @@ def test_via_rapida_ponta_a_ponta():
             k = 2 * int(rng.integers(0, 12))
             v[k:k + 2] = -1.0
         assert np.array_equal(pol(v), lenta(v))
+
+
+def test_salvar_estreita_dtypes_e_roundtrip_bit_exato():
+    """`salvar` grava endereços no menor inteiro que os contém (u16 p/ n=12).
+
+    Gravar em uint64 fazia o campo pesar 40 % do checkpoint do crítico para
+    carregar zeros. A igualdade aqui é BIT A BIT — valores de treino não podem
+    mudar num round-trip, senão a retomada muda.
+    """
+    import tempfile
+
+    import numpy as np
+
+    from uavwnn.wnn.redes import RedeGradienteFuncional
+
+    rede = RedeGradienteFuncional(n_bits=48, tamanho_tupla=12, n_saidas=3,
+                                  seed=3)
+    rng = np.random.default_rng(5)
+    for _ in range(300):
+        bits = rng.random(48) > 0.5
+        rede.atualizar(bits[None, :], rng.normal(0, 1, 3))
+    with tempfile.NamedTemporaryFile(suffix=".npz") as f:
+        rede.salvar(f.name)
+        z = np.load(f.name)
+        assert z["enderecos"].dtype == np.uint16
+        assert z["mapeamento"].dtype == np.uint16
+        outra = RedeGradienteFuncional.carregar(f.name)
+    for a, b in zip(rede.memoria, outra.memoria):
+        assert set(a) == set(b)
+        for k in a:
+            assert np.array_equal(a[k], b[k])

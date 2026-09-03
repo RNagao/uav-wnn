@@ -358,7 +358,7 @@ def test_lut_plana_e_equivalente_e_recusa_escrita():
     estrutura não introduz erro nenhum por si, só a escolha de precisão. Com
     `float32` o erro é o arredondamento do tipo, não da busca.
 
-    E ela tem de RECUSAR escrita: as chaves estão ordenadas e a busca binária
+    E ela tem de RECUSAR escrita: os valores estão empacotados pelo rank
     depende disso, então inserir exigiria reordenar. Degradar em silêncio seria
     pior que falhar.
     """
@@ -382,27 +382,30 @@ def test_lut_plana_e_equivalente_e_recusa_escrita():
     f32 = LUTPlana(rede)                      # padrão: float32
     np.testing.assert_allclose(f32.prever(prova), esperado, rtol=1e-6, atol=0)
 
-    # a estrutura interna: chaves globais, ordenadas
-    assert exata.chaves.dtype == np.int32
-    assert (np.diff(exata.chaves) > 0).all(), "chaves têm de estar ordenadas"
-    assert exata.chaves.size == sum(len(m) for m in rede.memoria)
+    # a estrutura interna: bitmap de ocupação + rank, sem chave nenhuma
+    assert exata.ocupacao.dtype == np.uint64
+    assert exata.n_entradas == sum(len(m) for m in rede.memoria)
+    assert int(np.bitwise_count(exata.ocupacao).sum()) == exata.n_entradas
+    # o rank de cada palavra é o total de bits acesos antes dela
+    pc = np.bitwise_count(exata.ocupacao).astype(np.int64).ravel()
+    assert np.array_equal(exata.rank.ravel()[1:], np.cumsum(pc)[:-1])
 
     for metodo in ("atualizar", "treinar", "salvar"):
         with pytest.raises(TypeError, match="imutável"):
             getattr(exata, metodo)(prova, np.zeros(3))
 
 
-def test_lut_plana_recusa_chave_grande_demais():
-    """`n_ram · 2ⁿ` precisa caber em `int32`. Estourar em silêncio daria
-    endereços negativos e uma rede que lê lixo sem levantar nada."""
-    import numpy as np
+def test_lut_plana_recusa_tabela_grande_demais():
+    """O bitmap tem um bit POR POSIÇÃO da tabela, então `n` grande explode a
+    ocupação mesmo vazia — a recusa explícita evita alocar centenas de MB em
+    silêncio (com chaves int32 o limite era o mesmo, por outro motivo)."""
     import pytest
 
     from uavwnn.wnn.redes import LUTPlana, RedeGradienteFuncional
 
-    # n = 28 → 2^28 por RAM; com ~9 RAMs já passa de 2^31
+    # n = 28 → 2^28 posições por RAM; com ~9 RAMs o bitmap passaria de 256 MB
     rede = RedeGradienteFuncional(n_bits=256, tamanho_tupla=28, n_saidas=1)
-    with pytest.raises(ValueError, match="int32"):
+    with pytest.raises(ValueError, match="bitmap"):
         LUTPlana(rede)
 
 
@@ -433,3 +436,67 @@ def test_montar_com_plana_da_a_mesma_acao(tmp_path):
         np.testing.assert_allclose(np.asarray(p_plana(obs), float),
                                    np.asarray(p_dict(obs), float),
                                    rtol=1e-6, atol=1e-9)
+
+
+def test_denso_e_esparso_sao_bit_a_bit_identicos(monkeypatch):
+    """O armazenamento denso (n pequeno) replica o esparso operação a operação.
+
+    O denso existe porque o dict custava 218–361 B por entrada para 12–24 B de
+    dado (medido em checkpoint real: 26,4 MB de RAM no crítico para 900 KB de
+    conteúdo). A equivalência não é aproximada: mesmo laço, mesma ordem de
+    acumulação — qualquer refactor que quebre isso muda trajetórias de treino.
+    """
+    import uavwnn.wnn.redes as W
+
+    def gemeas(classe, **kw):
+        densa = classe(**kw)
+        assert densa._densa, "o cenário do teste deveria caber no denso"
+        monkeypatch.setattr(W, "_TETO_DENSO_BYTES", 0)
+        esparsa = classe(**kw)
+        assert not esparsa._densa
+        monkeypatch.undo()
+        return densa, esparsa
+
+    rng = np.random.default_rng(9)
+
+    # ator: atualizar + prever + reiniciar + salvar
+    da, ea = gemeas(W.RedeGradienteFuncional, n_bits=48, tamanho_tupla=12,
+                    n_saidas=3, seed=4)
+    for _ in range(200):
+        bits = rng.random(48) > 0.5
+        passo = rng.normal(0, 0.3, 3)
+        da.atualizar(bits[None, :], passo)
+        ea.atualizar(bits[None, :], passo)
+    sonda = rng.random((40, 48)) > 0.5
+    assert np.array_equal(da.prever(sonda), ea.prever(sonda))
+    assert da.entradas_ocupadas() == ea.entradas_ocupadas()
+    for md, me in zip(da.memoria, ea.memoria):
+        assert set(md) == set(me)
+        for k in md:
+            assert np.array_equal(md[k], me[k])
+
+    # crítico: treinar + treinar_componente + prever
+    dc, ec = gemeas(W.RedeRegressaoEsquecimento, n_bits=48, tamanho_tupla=12,
+                    n_saidas=2, phi=0.85, seed=4)
+    for j in range(200):
+        bits = rng.random(48) > 0.5
+        if j % 3:
+            alvo = rng.normal(0, 2, 2)
+            dc.treinar(bits[None, :], alvo)
+            ec.treinar(bits[None, :], alvo)
+        else:
+            alvo1 = float(rng.normal())
+            dc.treinar_componente(bits[None, :], j % 2, alvo1)
+            ec.treinar_componente(bits[None, :], j % 2, alvo1)
+    sonda = rng.random((40, 48)) > 0.5
+    assert np.array_equal(dc.prever(sonda), ec.prever(sonda))
+    for md, me in zip(dc.memoria, ec.memoria):
+        assert set(md) == set(me)
+        for k in md:
+            assert np.array_equal(md[k][0], me[k][0])
+            assert np.array_equal(md[k][1], me[k][1])
+
+    # reiniciar volta ao estado inicial nos dois modos
+    da.reiniciar(); ea.reiniciar()
+    assert da.entradas_ocupadas() == ea.entradas_ocupadas() == 0
+    assert np.array_equal(da.prever(sonda), ea.prever(sonda))

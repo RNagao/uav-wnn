@@ -26,42 +26,42 @@ O filtro combina duas fontes que sozinhas são ruins:
 
 ### O que o filtro estima
 
-| símbolo | nome | o que é | dimensão | unidade | no código |
-|---|---|---|---|---|---|
-| `x̂` | estimativa do estado | onde o filtro **acha** que o drone está | vetor 2 | m | `self._x` |
-| `P` | covariância do estado | o **erro típico ao quadrado** dessa estimativa — a incerteza que o filtro anuncia sobre si mesmo | 2×2 | m² | `self._P` |
-| `t` | instante | tempo a que `x̂` e `P` se referem | escalar | s | `self._t` |
+| símbolo | nome                   | o que é                                                                                                | dimensão | unidade | no código  |
+| -------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | --------- | ------- | ----------- |
+| `x̂`  | estimativa do estado   | onde o filtro **acha** que o drone está                                                           | vetor 2   | m       | `self._x` |
+| `P`    | covariância do estado | o **erro típico ao quadrado** dessa estimativa — a incerteza que o filtro anuncia sobre si mesmo | 2×2      | m²     | `self._P` |
+| `t`    | instante               | tempo a que `x̂` e `P` se referem                                                                   | escalar   | s       | `self._t` |
 
 O estado tem **2 componentes** — só `x` e `y`. Não há velocidade nele, e isso é
 deliberado (§7).
 
 ### O que entra de fora
 
-| símbolo | nome | o que é | no código |
-|---|---|---|---|
-| `z` | medição | leitura crua do GPS: posição verdadeira + ruído | argumento de `atualizar` |
-| `σ_gps` | desvio do GPS | quanto o GPS erra tipicamente — **10 m** no nosso regime | `sigma_gps` |
-| `R` | covariância da medição | `R = σ_gps²·I`. Com σ=10 → **100 m²**. É **fixo** | `self._R` |
-| `u` | comando de velocidade | a **ação que a política acabou de escolher**: `u = s·[cos θ, sin θ]` | `self._u` |
-| `dt` | intervalo | tempo desde a última predição — **0,5 s** entre decisões | `t − self._t` |
+| símbolo   | nome                      | o que é                                                                          | no código                |
+| ---------- | ------------------------- | --------------------------------------------------------------------------------- | ------------------------- |
+| `z`      | medição                 | leitura crua do GPS: posição verdadeira + ruído                                | argumento de `atualizar` |
+| `σ_gps` | desvio do GPS             | quanto o GPS erra tipicamente — **10 m** no nosso regime                    | `sigma_gps`             |
+| `R`      | covariância da medição | `R = σ_gps²·I`. Com σ=10 → **100 m²**. É **fixo**            | `self._R`               |
+| `u`      | comando de velocidade     | a **ação que a política acabou de escolher**: `u = s·[cos θ, sin θ]` | `self._u`               |
+| `dt`     | intervalo                 | tempo desde a última predição — **0,5 s** entre decisões                | `t − self._t`          |
 
 ### Parâmetros de sintonia
 
-| símbolo | o que é | valor nas corridas |
-|---|---|---|
-| `q_w` | quanto o drone **desobedece o comando**, por segundo | 1 a 16 (do gate) |
-| `σ_v0` | erro de atuação base | 0 |
-| `κ` | sensibilidade ao salto de rumo | 0 |
-| `Q` | incerteza **acrescentada** a cada predição | calculada |
+| símbolo  | o que é                                                  | valor nas corridas |
+| --------- | --------------------------------------------------------- | ------------------ |
+| `q_w`   | quanto o drone **desobedece o comando**, por segundo | 1 a 16 (do gate)   |
+| `σ_v0` | erro de atuação base                                    | 0                  |
+| `κ`    | sensibilidade ao salto de rumo                            | 0                  |
+| `Q`     | incerteza **acrescentada** a cada predição         | calculada          |
 
 ### Intermediárias da correção
 
-| símbolo | o que é |
-|---|---|
-| `y` | **inovação** — o quanto o GPS discorda da minha previsão |
-| `S` | o quanto de discordância eu **esperava** |
-| `K` | **ganho** — a fração do desacordo que aceito. 0 = ignoro o GPS, 1 = obedeço |
-| `I` | identidade 2×2 |
+| símbolo | o que é                                                                              |
+| -------- | ------------------------------------------------------------------------------------- |
+| `y`    | **inovação** — o quanto o GPS discorda da minha previsão                    |
+| `S`    | o quanto de discordância eu **esperava**                                        |
+| `K`    | **ganho** — a fração do desacordo que aceito. 0 = ignoro o GPS, 1 = obedeço |
+| `I`    | identidade 2×2                                                                       |
 
 ---
 
@@ -125,11 +125,11 @@ programou "confie mais na predição": o filtro descobre isso comparando `P` com
 
 Três arquivos, com papéis separados:
 
-| arquivo | papel |
-|---|---|
-| `src/uavwnn/fusion/kalman.py:68–228` | **o filtro** — a matemática, sem saber de drone |
-| `src/uavwnn/fusion/ambiente_ruidoso.py` | **o laço** — chama na ordem certa, por drone |
-| `scripts/spec08_gate_rf05.py` | **o ajuste** — descobre `q_w` medindo o NEES |
+| arquivo                                   | papel                                                   |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `src/uavwnn/fusion/kalman.py:68–228`   | **o filtro** — a matemática, sem saber de drone |
+| `src/uavwnn/fusion/ambiente_ruidoso.py` | **o laço** — chama na ordem certa, por drone    |
+| `scripts/spec08_gate_rf05.py`           | **o ajuste** — descobre `q_w` medindo o NEES   |
 
 ### As variáveis nascem — `kalman.py:101–107`
 
@@ -255,11 +255,11 @@ O filtro não sabe qual `q_w` usar. `R` vem do datasheet do sensor; `Q` depende 
 137      veredito = "consistente"
 ```
 
-| veredito | significa | risco |
-|---|---|---|
-| **otimista** | o filtro erra mais do que admite | **perigoso** — quem consome confia demais |
-| **consistente** | `P` corresponde ao erro real | ✅ |
-| **conservador** | erra menos do que admite | seguro, mas desperdiça informação |
+| veredito              | significa                        | risco                                            |
+| --------------------- | -------------------------------- | ------------------------------------------------ |
+| **otimista**    | o filtro erra mais do que admite | **perigoso** — quem consome confia demais |
+| **consistente** | `P` corresponde ao erro real   | ✅                                               |
+| **conservador** | erra menos do que admite         | seguro, mas desperdiça informação             |
 
 ### A varredura — `spec08_gate_rf05.py:111–124`
 
@@ -286,12 +286,12 @@ q_w = 64,00  →  ε =  1,52   conservador
 
 O `q_w` mede a política, não o hardware. Valores medidos neste projeto:
 
-| quem pilota | `q_w` | desvio acrescentado por passo |
-|---|---|---|
-| MADDPG | 1,0 | 0,71 m |
-| WNN T=32 | 1,5 – 4,0 | 0,87 – 1,41 m |
-| WNN T=16, 2 drones | 8,0 | 2,00 m |
-| **WNN T=16, 8 drones** | **16,0** | **2,83 m** |
+| quem pilota                  | `q_w`        | desvio acrescentado por passo |
+| ---------------------------- | -------------- | ----------------------------- |
+| MADDPG                       | 1,0            | 0,71 m                        |
+| WNN T=32                     | 1,5 – 4,0     | 0,87 – 1,41 m                |
+| WNN T=16, 2 drones           | 8,0            | 2,00 m                        |
+| **WNN T=16, 8 drones** | **16,0** | **2,83 m**              |
 
 **Fator 16 entre extremos.** O MADDPG voa suave; a WNN voa aos trancos, e piora
 com mais drones. Usar o `q_w` de um na outra faria o filtro acreditar num drone
@@ -332,18 +332,18 @@ na medida.
 
 ## 8. O ciclo inteiro
 
-| etapa | código | o que faz |
-|---|---|---|
-| nascem as variáveis | `kalman.py:101–107` | `x̂`, `P`, `R`, `u` |
-| 1ª estimativa | `kalman.py:120–122` | `x̂ = z₀`, `P = R` |
-| registra o comando | `kalman.py:133` ← `ambiente:152` | `u` |
-| calcula `Q` | `kalman.py:139–141` | `q_w·dt` |
-| **prediz** | `kalman.py:158–159` | `x̂+dt·u`, `P+Q` |
-| **corrige** | `kalman.py:173–183` | `S`, `K`, `y`, Joseph |
-| loga (não observa) | `ambiente:166–170` | `P`, inovação, erro |
-| **mede a honestidade** | `consistencia.py:44` | `ε = eᵀP⁻¹e` |
-| **escolhe `q_w`** | `gate:115–122` | o `ε` mais perto de 2 |
-| **usa** | `escada.py` | `q_w` → construtor |
+| etapa                        | código                               | o que faz                    |
+| ---------------------------- | ------------------------------------- | ---------------------------- |
+| nascem as variáveis         | `kalman.py:101–107`                | `x̂`, `P`, `R`, `u` |
+| 1ª estimativa               | `kalman.py:120–122`                | `x̂ = z₀`, `P = R`     |
+| registra o comando           | `kalman.py:133` ← `ambiente:152` | `u`                        |
+| calcula `Q`                 | `kalman.py:139–141`                | `q_w·dt`                  |
+| **prediz**             | `kalman.py:158–159`                | `x̂+dt·u`, `P+Q`       |
+| **corrige**            | `kalman.py:173–183`                | `S`, `K`, `y`, Joseph  |
+| loga (não observa)          | `ambiente:166–170`                 | `P`, inovação, erro      |
+| **mede a honestidade** | `consistencia.py:44`                | `ε = eᵀP⁻¹e`           |
+| **escolhe `q_w`**    | `gate:115–122`                     | o `ε` mais perto de 2      |
+| **usa**                | `escada.py`                         | `q_w` → construtor        |
 
 ---
 

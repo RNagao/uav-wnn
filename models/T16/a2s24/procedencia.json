@@ -16,16 +16,30 @@
     "replica": "1b",
     "parameter_sharing": true,
     "recompensa_por_na": true,
+    "retomado_de": "models/T16/a2s24",
     "critico": "descentralizado (Alg. 4.4)"
   },
-  "passos": 6752492,
-  "episodios": 40521,
+  "passos": 50000000,
+  "episodios": 327825,
   "melhor_val_cobertura": 1.0,
   "metrica_test": {
-    "sr": 0.86,
-    "ct_cens": 110.65,
-    "cobertura": 0.9508333333333333,
+    "sr": 0.96,
+    "ct_cens": 61.5,
+    "cobertura": 0.9845833333333333,
     "n": 100
   },
-  "fonte": "spec06_treino_multiagente.py"
+  "fonte": "spec06_treino_multiagente.py",
+  "deploy": {
+    "poda": 0.7,
+    "deploy_kb": 288.5458984375,
+    "sr_cheio": 0.89,
+    "sr_podado": 0.95
+  },
+  "metrica_test_final": {
+    "sr": 0.96,
+    "ct_cens": 61.5,
+    "cobertura": 0.9845833333333333,
+    "n": 100
+  },
+  "promovido_de": "runs/spec06-50M/T16-a2s24"
 }
