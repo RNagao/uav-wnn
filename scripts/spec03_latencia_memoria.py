@@ -364,7 +364,7 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
 
     nomes = [r["modelo"] for r in linhas]
     cores = [CORES.get(n, "#888") for n in nomes]
-    rot = f"{na} drone{'s' if na > 1 else ''} · {ns} sensores"
+    rot = f"{na} drone{'s' if na > 1 else ''} · {ns} sensors"
     saidas = []
 
     # -- tempos: mediana como barra, p99 como haste --
@@ -378,10 +378,10 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     for b, m in zip(barras, med):
         ax.annotate(f"{m:.1f} µs", (b.get_x() + b.get_width() / 2, m),
                     ha="center", va="bottom", fontsize=10, weight="bold")
-    ax.set_ylabel("tempo por decisão (µs)")
-    ax.set_title(f"Tempo de inferência — {rot}\n"
-                 "mesma observação · um processo por modelo · menor mediana "
-                 "de 8×1000", fontsize=10)
+    ax.set_ylabel("time per decision (µs)")
+    ax.set_title(f"Inference time — {rot}\n"
+                 "same observation · one process per model · lowest median "
+                 "of 8×1000", fontsize=10)
     ax.legend(frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
@@ -397,11 +397,11 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     fig, ax = plt.subplots(figsize=(8.0, 4.2))
     x = np.arange(len(nomes))
     series = [
-        ("T1 artefato (u16+f32)", [r["t1_kb"] for r in linhas], 1.0, None),
-        ("residente (RAM)", [r["arrays_vivos_kb"] + r.get("trabalho_kb", 0.0)
+        ("T1 artifact (u16+f32)", [r["t1_kb"] for r in linhas], 1.0, None),
+        ("resident (RAM)", [r["arrays_vivos_kb"] + r.get("trabalho_kb", 0.0)
                              for r in linhas], 0.72, None),
-        ("disco", [r["disco_kb"] for r in linhas], 0.45, None),
-        ("ator + crítico (treino)",
+        ("disk", [r["disco_kb"] for r in linhas], 0.45, None),
+        ("actor + critic (training)",
          [r["arrays_vivos_kb"] + r.get("critico_kb", 0.0) for r in linhas],
          0.30, "//"),
     ]
@@ -416,9 +416,9 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     rotulos = [n + (" †" if n == "maddpg" else "") for n in nomes]
     ax.set_xticks(x, rotulos)
     ax.set_ylabel("KB")
-    ax.set_title(f"Memória do modelo, nas quatro leituras — {rot}\n"
-                 "† o .cleanrl_model traz ator e crítico no MESMO arquivo — "
-                 "a barra 'disco' dele já é o total", fontsize=9.5)
+    ax.set_title(f"Model memory, across the four readings — {rot}\n"
+                 "† the .cleanrl_model carries actor and critic in the SAME file — "
+                 "its 'disk' bar is already the total", fontsize=9.5)
     ax.legend(frameon=False, fontsize=9, ncol=2)
     ax.margins(y=0.18)
     ax.spines[["top", "right"]].set_visible(False)

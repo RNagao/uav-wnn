@@ -270,14 +270,14 @@ def comparar(args) -> int:
         ax.set_aspect("equal"); ax.set_xlabel("x (m)")
         ax.grid(alpha=0.16, lw=0.6)
         ct = info.get("completion_time", float("nan"))
-        ax.set_title(f"{tipo}  ·  conclusão {ct:.1f} s\n"
-                     f"separação média entre UAVs: {sep:.1f} m",
+        ax.set_title(f"{tipo}  ·  completion {ct:.1f} s\n"
+                     f"mean UAV separation: {sep:.1f} m",
                      fontsize=10.5)
         ax.legend(fontsize=7, loc="upper right", framealpha=0.92, ncol=2)
 
     eixos[0].set_ylabel("y (m)")
-    fig.suptitle(f"{args.agents} UAVs · {args.sensors} sensores · semente {args.seed}"
-                 f"  ·  alcance de comunicação {20:.0f} m", fontsize=11)
+    fig.suptitle(f"{args.agents} UAVs · {args.sensors} sensors · seed {args.seed}"
+                 f"  ·  communication range {20:.0f} m", fontsize=11)
     fig.tight_layout()
     fig.savefig(args.compare, dpi=160)
     print(f"gráfico salvo: {args.compare}")
@@ -303,9 +303,9 @@ def salvar_grafico(arquivo, trilhas, sensores, env, cfg, args) -> None:
 
     # Sensores: preenchidos = coletados, vazios = perdidos.
     ax.scatter(sensores[~coletado, 0], sensores[~coletado, 1], s=42, facecolors="none",
-               edgecolors="#B03A48", linewidths=1.4, label="sensor não coletado", zorder=3)
+               edgecolors="#B03A48", linewidths=1.4, label="uncollected sensor", zorder=3)
     ax.scatter(sensores[coletado, 0], sensores[coletado, 1], s=26, c="#2B2F36",
-               marker="x", linewidths=1.3, label="sensor coletado", zorder=3)
+               marker="x", linewidths=1.3, label="collected sensor", zorder=3)
 
     cores = plt.cm.tab10.colors
     n = len(trilhas)
@@ -331,7 +331,7 @@ def salvar_grafico(arquivo, trilhas, sensores, env, cfg, args) -> None:
                           fill=False, ec="#8A929C", ls=":", lw=1.1, zorder=4))
     ax.set_xlim(-S * 1.02, S * 1.02); ax.set_ylim(-S * 1.02, S * 1.02)
     ax.set_aspect("equal"); ax.set_xlabel("x (m)"); ax.set_ylabel("y (m)")
-    ax.set_title(f"{cfg.num_drones} UAVs · {cfg.num_sensors} sensores · política {args.policy} · semente {args.seed}",
+    ax.set_title(f"{cfg.num_drones} UAVs · {cfg.num_sensors} sensors · policy {args.policy} · seed {args.seed}",
                  fontsize=10)
     ax.legend(fontsize=7.5, loc="upper right", framealpha=0.92)
     ax.grid(alpha=0.16, lw=0.6)

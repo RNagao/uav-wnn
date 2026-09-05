@@ -85,13 +85,13 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
     d0 = [comp["celulas"][c]["degrau0"]["ct"] for c in celulas]
     d1 = [comp["celulas"][c]["sigmas"]["10"]["degrau1"]["ct"] for c in celulas]
     d4 = [comp["celulas"][c]["sigmas"]["10"]["degrau4"]["ct"] for c in celulas]
-    ax.bar(x - 1.5 * w, pub, w, label="Lamenza (publicado)", color=CINZA)
-    ax.bar(x - 0.5 * w, d0, w, label="degrau 0 (limpo)", color=TEAL)
-    ax.bar(x + 0.5 * w, d1, w, label="degrau 1 (bruto, σ=10)", color=VERM)
-    ax.bar(x + 1.5 * w, d4, w, label="degrau 4 (KF, σ=10)", color=AMBAR)
+    ax.bar(x - 1.5 * w, pub, w, label="Lamenza (published)", color=CINZA)
+    ax.bar(x - 0.5 * w, d0, w, label="step 0 (clean)", color=TEAL)
+    ax.bar(x + 0.5 * w, d1, w, label="step 1 (raw, σ=10)", color=VERM)
+    ax.bar(x + 1.5 * w, d4, w, label="step 4 (KF, σ=10)", color=AMBAR)
     ax.set_xticks(x); ax.set_xticklabels(celulas)
-    ax.set_ylabel("tempo de conclusão (s)")
-    ax.set_title("MADDPG sob ruído × Lamenza — o KF devolve ao patamar publicado")
+    ax.set_ylabel("completion time (s)")
+    ax.set_title("MADDPG under noise vs Lamenza — the KF restores the published level")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "comparacao_lamenza.png", dpi=110); plt.close(fig)
 
@@ -103,14 +103,14 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
         base = cel["degrau0"]["ct"]
         bruto = [0.0] + [cel["sigmas"][str(s)]["degrau1"]["ct"] - base for s in (10, 20)]
         kf = [0.0] + [cel["sigmas"][str(s)]["degrau4"]["ct"] - base for s in (10, 20)]
-        ax.plot(sig, bruto, "o-", color=VERM, label="bruto (sem filtro)")
-        ax.plot(sig, kf, "s-", color=AMBAR, label="KF+controle")
+        ax.plot(sig, bruto, "o-", color=VERM, label="raw (no filter)")
+        ax.plot(sig, kf, "s-", color=AMBAR, label="KF+control")
         ax.axhline(0, color=CINZA, lw=1, ls=":")
-        ax.set_title(c); ax.set_xlabel("σ do GPS (m)")
-    axes[0].set_ylabel("Δ tempo vs limpo (s)")
+        ax.set_title(c); ax.set_xlabel("GPS σ (m)")
+    axes[0].set_ylabel("Δ time vs clean (s)")
     axes[0].legend(fontsize=8)
     axes[1].axvline(10, color=CINZA, alpha=0.3, lw=8)  # marca a grade declarada
-    fig.suptitle("Degradação do tempo de conclusão × σ — o bruto cresce, o KF fica plano")
+    fig.suptitle("Completion-time degradation vs σ — raw grows, the KF stays flat")
     fig.tight_layout()
     fig.savefig(DIR / "degradacao_vs_sigma.png", dpi=110); plt.close(fig)
 
@@ -123,11 +123,11 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
         nees = [ladder["celulas"][c][f"sigma_{s}"]["degrau4"]["nees_medio"] for c in cels9]
         ax.bar(x + (j - 0.5) * w, nees, w, label=f"σ={s}")
     lo, hi = faixa_chi2_individual(2)
-    ax.axhline(2.0, color=CINZA, ls=":", lw=1, label="alvo NEES=2")
+    ax.axhline(2.0, color=CINZA, ls=":", lw=1, label="NEES=2 target")
     ax.set_yscale("log")
     ax.set_xticks(x); ax.set_xticklabels([c.replace("a_", "").replace("-s_", "×") for c in cels9], rotation=45)
-    ax.set_ylabel("NEES médio (log)")
-    ax.set_title("NEES do KF no ambiente real — otimista com Q=0 (acima de 2), pior em σ menor")
+    ax.set_ylabel("mean NEES (log)")
+    ax.set_title("KF NEES in the real environment — optimistic with Q=0 (above 2), worse at smaller σ")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "nees_real.png", dpi=110); plt.close(fig)
 
@@ -137,10 +137,10 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
         rmse = [ladder["celulas"][c][f"sigma_{s}"]["degrau4"]["rmse_estimativa"] for c in cels9]
         ax.bar(x + (j - 0.5) * w, rmse, w, label=f"KF σ={s}")
         ax.axhline(s * np.sqrt(2), color=(VERM if s == 10 else AMBAR), ls="--", lw=1,
-                   label=f"cru σ={s} (σ√2={s*np.sqrt(2):.1f})")
+                   label=f"raw σ={s} (σ√2={s*np.sqrt(2):.1f})")
     ax.set_xticks(x); ax.set_xticklabels([c.replace("a_", "").replace("-s_", "×") for c in cels9], rotation=45)
-    ax.set_ylabel("RMSE de posição (m)")
-    ax.set_title("Erro do KF nas trajetórias reais — bem abaixo da medida crua")
+    ax.set_ylabel("position RMSE (m)")
+    ax.set_title("KF error on real trajectories — well below the raw measurement")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "rmse_real.png", dpi=110); plt.close(fig)
 
@@ -148,10 +148,10 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
     fig, ax = plt.subplots(figsize=(8, 5))
     nas = [2, 4, 8]
     ax.bar([f"MADDPG\nNa={na}" for na in nas], [MADDPG_MULT_FP[na] for na in nas],
-           color=TEAL, label="mult. fp do ator (MADDPG)")
+           color=TEAL, label="actor fp mults (MADDPG)")
     ax.axhline(merito["kf_flops"], color=AMBAR, lw=2, label=f"KF total = {merito['kf_flops']} flops")
-    ax.set_yscale("log"); ax.set_ylabel("operações por decisão (log)")
-    ax.set_title("Figura de mérito T3 — o filtro é desprezível ao lado da política")
+    ax.set_yscale("log"); ax.set_ylabel("operations per decision (log)")
+    ax.set_title("Figure of merit T3 — the filter is negligible next to the policy")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "custo_com_filtro.png", dpi=110); plt.close(fig)
 

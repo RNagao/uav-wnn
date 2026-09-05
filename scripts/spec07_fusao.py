@@ -231,7 +231,7 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
 
     # 1. escada — barras de RMSE por σ e degrau
     fig, ax = plt.subplots(figsize=(9, 5))
-    degraus = [("d1_bruto", "1 bruto"), ("d2_ema", "2 EMA"), ("d2_ema_cmd", "2 EMA+u"),
+    degraus = [("d1_bruto", "1 raw"), ("d2_ema", "2 EMA"), ("d2_ema_cmd", "2 EMA+u"),
                ("d3_kf_vc", "3 KF-VC"), ("d4_kf_controle", "4 KF+u")]
     sig = [e["sigma"] for e in esc]
     x = np.arange(len(sig))
@@ -239,8 +239,8 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
     for i, (chave, rot) in enumerate(degraus):
         ax.bar(x + (i - 2) * larg, [e[chave] for e in esc], larg, label=rot)
     ax.set_xticks(x); ax.set_xticklabels([f"σ={s:.0f}" for s in sig])
-    ax.set_ylabel("RMSE de posição (m)"); ax.set_yscale("log")
-    ax.set_title("Escada de ablação — RMSE por degrau e σ (bancada B2)")
+    ax.set_ylabel("position RMSE (m)"); ax.set_yscale("log")
+    ax.set_title("Ablation ladder — RMSE by step and σ (testbed B2)")
     ax.legend(ncol=5, fontsize=8); fig.tight_layout()
     fig.savefig(dir_saida / "escada.png", dpi=110); plt.close(fig)
 
@@ -250,13 +250,13 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
     c3, _ = _curva_consistencia(trajs_b1, sigma_fig, lambda: FiltroVelocidadeConstante(sigma_gps=sigma_fig, q_a=qa3))
     fig, ax = plt.subplots(figsize=(9, 5))
     k4 = np.arange(1, len(c4.media_por_passo) + 1)
-    ax.plot(k4, c4.media_por_passo, color=TEAL, label="degrau 4 (KF+controle)")
+    ax.plot(k4, c4.media_por_passo, color=TEAL, label="step 4 (KF+control)")
     ax.plot(np.arange(1, len(c3.media_por_passo) + 1), c3.media_por_passo, color=AMBAR,
-            label=f"degrau 3 (KF-VC, q_a={qa3:g})")
-    ax.axhspan(c4.faixa[0], c4.faixa[1], color=CINZA, alpha=0.25, label="faixa χ² 95 %")
+            label=f"step 3 (KF-VC, q_a={qa3:g})")
+    ax.axhspan(c4.faixa[0], c4.faixa[1], color=CINZA, alpha=0.25, label="χ² 95% band")
     ax.axhline(2.0, color=CINZA, ls=":", lw=1)
-    ax.set_xlabel("passo de decisão k"); ax.set_ylabel("NEES médio ε̄ₖ")
-    ax.set_title(f"Consistência por passo, σ={sigma_fig:.0f} m — KF-VC otimista no q_a natural")
+    ax.set_xlabel("decision step k"); ax.set_ylabel("mean NEES ε̄ₖ")
+    ax.set_title(f"Per-step consistency, σ={sigma_fig:.0f} m — KF-VC optimistic at natural q_a")
     ax.legend(); fig.tight_layout()
     fig.savefig(dir_saida / "nees_degraus.png", dpi=110); plt.close(fig)
 
@@ -273,12 +273,12 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
     K = trajs_b1[0].n_passos; lim = limiar_brancura(K)
     fig, ax = plt.subplots(figsize=(9, 5))
     lags = np.arange(1, 21)
-    ax.bar(lags - 0.2, rho_b, 0.4, color=TEAL, label="branco (filtro correto)")
-    ax.bar(lags + 0.2, rho_gm, 0.4, color=AMBAR, label="Gauss-Markov (filtro branco)")
-    ax.axhline(lim, color=CINZA, ls="--", lw=1, label=f"envelope ±1,96/√K = ±{lim:.3f}")
+    ax.bar(lags - 0.2, rho_b, 0.4, color=TEAL, label="white (correct filter)")
+    ax.bar(lags + 0.2, rho_gm, 0.4, color=AMBAR, label="Gauss-Markov (white filter)")
+    ax.axhline(lim, color=CINZA, ls="--", lw=1, label=f"envelope ±1.96/√K = ±{lim:.3f}")
     ax.axhline(-lim, color=CINZA, ls="--", lw=1)
-    ax.set_xlabel("lag l"); ax.set_ylabel("autocorrelação ρ(l)")
-    ax.set_title(f"Brancura da inovação, σ={sigma_fig:.0f} m — o detector acusa a correlação")
+    ax.set_xlabel("lag l"); ax.set_ylabel("autocorrelation ρ(l)")
+    ax.set_title(f"Innovation whiteness, σ={sigma_fig:.0f} m — the detector flags the correlation")
     ax.legend(); fig.tight_layout()
     fig.savefig(dir_saida / "correlograma.png", dpi=110); plt.close(fig)
 
@@ -294,12 +294,12 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
     k = np.arange(1, len(erro_rms) + 1)
     ideal = sigma_fig * np.sqrt(2.0 / (k + 1))
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(k, erro_rms, color=TEAL, label="erro RMS medido")
-    ax.plot(k, trp, color=AMBAR, ls="--", label="√tr P (predito pelo filtro)")
+    ax.plot(k, erro_rms, color=TEAL, label="measured RMS error")
+    ax.plot(k, trp, color=AMBAR, ls="--", label="√tr P (filter prediction)")
     ax.plot(k, ideal, color=CINZA, ls=":", label="ideal σ√(2/(k+1))")
-    ax.axhline(sigma_fig * np.sqrt(2), color=CINZA, alpha=0.4, lw=1, label="medida crua σ√2")
-    ax.set_xlabel("passo de decisão k"); ax.set_ylabel("erro de posição (m)")
-    ax.set_title(f"Transiente do filtro, σ={sigma_fig:.0f} m — a média do episódio esconde o início")
+    ax.axhline(sigma_fig * np.sqrt(2), color=CINZA, alpha=0.4, lw=1, label="raw measurement σ√2")
+    ax.set_xlabel("decision step k"); ax.set_ylabel("position error (m)")
+    ax.set_title(f"Filter transient, σ={sigma_fig:.0f} m — the episode mean hides the onset")
     ax.legend(); fig.tight_layout()
     fig.savefig(dir_saida / "erro_transiente.png", dpi=110); plt.close(fig)
 
@@ -315,10 +315,10 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
         medido.append(float(p[0] - pb.media[0]))
     teorico = [v * dt * (1 - a) / a for a in alphas]
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(alphas, teorico, color=CINZA, ls="--", label="teórico v·dt·(1−α)/α")
-    ax.scatter(alphas, medido, color=AMBAR, zorder=3, label="medido")
-    ax.set_xlabel("α do EMA"); ax.set_ylabel("atraso em regime (m)")
-    ax.set_title("Degrau 2 sem comando é enviesado, não só menos eficiente")
+    ax.plot(alphas, teorico, color=CINZA, ls="--", label="theoretical v·dt·(1−α)/α")
+    ax.scatter(alphas, medido, color=AMBAR, zorder=3, label="measured")
+    ax.set_xlabel("EMA α"); ax.set_ylabel("steady-state lag (m)")
+    ax.set_title("Step 2 without command is biased, not just less efficient")
     ax.legend(); fig.tight_layout()
     fig.savefig(dir_saida / "passa_baixa_alpha.png", dpi=110); plt.close(fig)
 
@@ -331,11 +331,11 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
         neeses.append(c.nees_medio)
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(fatores, neeses, "o-", color=TEAL)
-    ax.axhspan(c4.faixa[0], c4.faixa[1], color=CINZA, alpha=0.25, label="faixa χ² 95 %")
-    ax.set_xscale("log"); ax.set_xlabel("σ do filtro / σ verdadeiro"); ax.set_ylabel("NEES médio")
-    ax.set_title("Potência do detector — R errado tira o NEES da faixa")
-    ax.annotate("otimista\n(P pequeno demais)", (0.25, neeses[0]), fontsize=8, va="bottom")
-    ax.annotate("conservador", (4.0, neeses[-1]), fontsize=8, ha="right", va="top")
+    ax.axhspan(c4.faixa[0], c4.faixa[1], color=CINZA, alpha=0.25, label="χ² 95% band")
+    ax.set_xscale("log"); ax.set_xlabel("filter σ / true σ"); ax.set_ylabel("mean NEES")
+    ax.set_title("Detector power — wrong R pulls NEES out of the band")
+    ax.annotate("optimistic\n(P too small)", (0.25, neeses[0]), fontsize=8, va="bottom")
+    ax.annotate("conservative", (4.0, neeses[-1]), fontsize=8, ha="right", va="top")
     ax.legend(); fig.tight_layout()
     fig.savefig(dir_saida / "detector_nees_R.png", dpi=110); plt.close(fig)
 
@@ -345,14 +345,14 @@ def gerar_figuras(esc, cons, kfvc, trajs_b1, dir_saida: Path, sigma_fig: float =
     rmse_qa = [l["rmse"] for l in kfvc["varredura"]]
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(qas, nees_qa, "o-", color=TEAL, label="NEES")
-    ax.axhspan(kfvc["faixa"][0], kfvc["faixa"][1], color=CINZA, alpha=0.25, label="faixa χ² 95 %")
-    ax.set_xscale("log"); ax.set_xlabel("q_a (KF-VC)"); ax.set_ylabel("NEES médio", color=TEAL)
+    ax.axhspan(kfvc["faixa"][0], kfvc["faixa"][1], color=CINZA, alpha=0.25, label="χ² 95% band")
+    ax.set_xscale("log"); ax.set_xlabel("q_a (KF-VC)"); ax.set_ylabel("mean NEES", color=TEAL)
     ax.tick_params(axis="y", labelcolor=TEAL)
     ax2 = ax.twinx()
     ax2.plot(qas, rmse_qa, "s--", color=AMBAR, label="RMSE")
     ax2.axhline(sigma_fig * np.sqrt(2), color=CINZA, alpha=0.4, lw=1)
-    ax2.set_ylabel("RMSE de posição (m)", color=AMBAR); ax2.tick_params(axis="y", labelcolor=AMBAR)
-    ax.set_title(f"Degrau 3, σ={sigma_fig:.0f} — otimista no q_a natural, consistente só sem filtrar")
+    ax2.set_ylabel("position RMSE (m)", color=AMBAR); ax2.tick_params(axis="y", labelcolor=AMBAR)
+    ax.set_title(f"Step 3, σ={sigma_fig:.0f} — optimistic at natural q_a, consistent only without filtering")
     fig.tight_layout()
     fig.savefig(dir_saida / "kfvc_tradeoff.png", dpi=110); plt.close(fig)
 
