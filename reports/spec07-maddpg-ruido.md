@@ -179,21 +179,29 @@ um `q_w` um pouco maior — a sintonia por célula/σ é o trabalho da SPEC-08.)
 
 ## Figuras de mérito com o filtro embutido (RNF-05)
 
-O KF é código que voa no UAV e conta no orçamento. Recalculadas com o filtro
+O KF é código que voa no UAV e conta no orçamento. Mas ele é **termo comum**: WNN e
+MADDPG podem usar o MESMO filtro, então em H1 ele **cancela** — não é cobrado de
+nenhuma das políticas. Por isso é contabilizado **à parte**, contra o **orçamento de
+tempo real** (uma decisão a cada 2 s), que é o prazo que o deploy precisa cumprir
 (`scripts/spec07_figuras_maddpg.py`, artefato `spec07-maddpg-merito.json`):
 
-| figura | KF+controle | referência (ator MADDPG) | fração |
+| figura | KF+controle | referência | fração |
 |---|---|---|---|
-| **T3** operações/decisão | **48 flops** (27 mult, 20 soma, 1 div) | ~74 000 mult. fp | **0,065 %** |
-| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | 291 KB | 0,007 % |
+| **T2** latência/decisão (MEDIDA) | **~100 µs** (ciclo do KF, protótipo NumPy) | orçamento de 2 s | **~0,005 %** |
+| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | 291 KB (ator MADDPG) | 0,007 % |
 
-O ponto que a RNF-05 pede que se declare: o filtro **não é grátis** (usa somas fp
-e uma divisão), mas é uma **constante pequena e fixa, independente da capacidade
-do modelo** — enquanto o custo da política cresce com a rede. Contra o MADDPG a
-fração é 0,07 %; contra a MLP pareada (o par de H1) o KF **cancela**, porque a MLP
-precisaria exatamente do mesmo filtro.
+Trocamos a figura antiga (que contava multiplicações fp por decisão) pela
+**latência empírica medida** — contar multiplicação subestima o KF por construção
+(ele mal multiplica), e o relógio é o custo real. O ciclo do KF leva ~100 µs no
+protótipo NumPy (dominado por overhead de dispatch em matrizes 2×2, não pelo
+algoritmo de ~50 flops); da MESMA ordem que uma decisão do ator MADDPG (~236 µs,
+SPEC-03/a2s24) e **~4 ordens de grandeza abaixo** do prazo de 2 s. O ponto que a
+RNF-05 pede que se declare: o filtro **não é grátis**, mas é uma **constante pequena
+e fixa, independente da capacidade do modelo** — e, sendo comum a qualquer política
+co-implantada, **cancela** na comparação de H1 (tanto a WNN quanto o MADDPG
+precisariam exatamente do mesmo filtro).
 
-![Barras em escala log das multiplicações fp do ator do MADDPG (Na=2/4/8, ~74 mil) contra a linha do KF em 48 flops, três ordens de grandeza abaixo](img/spec07-maddpg/custo_com_filtro.png)
+![Barras em escala log: o ciclo do KF (~100 µs) e uma decisão do ator MADDPG (~236 µs, referência de escala) contra o orçamento de decisão de 2 s, quatro ordens de grandeza acima — o filtro é desprezível contra o prazo de tempo real](img/spec07-maddpg/latencia_kf.png)
 
 ## Ressalvas
 
