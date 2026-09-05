@@ -13,9 +13,13 @@ Reprodução: `uv run --group baseline python scripts/spec03_custo_comparado.py`
 | eixo | quem ganha | por quanto |
 |---|---|---|
 | **T1 memória** | MADDPG | 1,9× (287 KB contra 537 KB) |
-| **T3 operações** | **WNN** | **18 241×** (4 contra 72 964 mult. fp) |
 | **T2 ciclos** (Cortex-M0) | **WNN** | **1 913×** |
-| T2 wall-clock | MADDPG | 1,8× — mas ver §4 |
+| **T2 latência medida** (após via rápida) | **WNN** | **2,3×** (ver §4) |
+
+*A antiga linha **T3 (multiplicações fp)** foi retirada: contar multiplicação
+favorece a WNN por construção — ela é* weightless *e quase não multiplica. O custo
+de computação fica nos **ciclos** (§3, que somam todas as operações) e na **latência
+empírica medida** (§4). A tabela de operações do §2 permanece só como perfil.*
 
 ---
 
@@ -53,14 +57,18 @@ lá com a poda de 70 % e o export `float32`/`uint16`; sem eles seriam ~2 MB.
 | 2d/24s | wnn-T16 | **4** | 110 | 108 | 432 |
 | 2d/24s | wnn-T32 | **4** | 218 | 216 | 864 |
 
-**As 4 multiplicações da WNN são do amostrador Box-Muller, não do aproximador.**
-Com `incluir_amostragem=False` o aproximador dá **zero** — é a alegação central
-de H1. E o MADDPG paga as mesmas 4 (72 964 = 72 960 MACs + 4), então a
-comparação é entre iguais.
+**Esta tabela é o PERFIL de operações — não é mais a figura de mérito de custo.**
+A contagem de multiplicações fp foi retirada como veredito: a WNN é *weightless* e
+quase não multiplica, então "4 contra 72 964" favorece o método por construção e
+não captura o custo real (consultas à LUT, acesso a memória). As 4 mult. da WNN são
+do amostrador Box-Muller (comum aos dois; `incluir_amostragem=False` dá **zero** no
+aproximador), e o MADDPG paga as mesmas 4.
 
-A WNN troca multiplicação por **consulta e soma inteira**: 108 acessos à LUT e
-432 somas de endereço, contra 73 mil MACs. É outro perfil de custo, não um custo
-menor em tudo.
+O que a tabela mostra, e continua válido: a WNN troca multiplicação por **consulta
+e soma inteira** — 108 acessos à LUT e 432 somas de endereço, contra 73 mil MACs.
+É **outro perfil de custo**, não um custo menor em tudo. O veredito de computação
+vem dos **ciclos** (§3, que somam todas essas operações) e da **latência medida**
+(§4), não desta contagem de multiplicação.
 
 ---
 
@@ -82,7 +90,7 @@ menor em tudo.
 | WNN T=32 é mais rápida | 31× | 86× | 438× |
 
 No **Cortex-M0 não há FPU**: cada multiplicação em ponto flutuante vira rotina de
-software. É onde a alegação "sem MACs" vale mais — e é o alvo de quem embarca num
+software. É onde a estrutura sem multiplicação fp mais pesa nos ciclos — e é o alvo de quem embarca num
 drone pequeno.
 
 ---
@@ -186,9 +194,10 @@ Cortex-M0 sem FPU é o que uma implementação em C entregaria.
 
 ## 5. Leitura
 
-**A WNN não é "mais barata"; ela troca eixos.** Ganha em computação por 4 ordens
-de grandeza, perde ou empata em memória, e o wall-clock depende de quem
-implementou.
+**A WNN não é "mais barata"; ela troca eixos.** Ganha em computação — em **ciclos**
+(31–703× conforme o hardware, §3) e na **latência medida** após a via rápida (2,3×,
+§4) — e perde ou empata em memória. O relógio dependeu de quem implementou: a versão
+NumPy inicial parecia perder, mas o gargalo era o nosso decodificador, não o método.
 
 **A poda mudou o quadro do T1.** Antes dela a WNN era 3,4–6,3× o MADDPG; com ela
 o `T=16` chega a 296 KB contra 287 KB — **empate**. O que era a fraqueza clara do
@@ -232,9 +241,9 @@ capacidade é fixada a priori — 287 KB com 6,75 M ou 50 M de passos. A n-tupla
 é representação LOCAL: cada entrada serve só às observações que caem na sua
 célula, e a ocupação cresce com a experiência (o deploy do T16 foi de 10 965
 entradas a 6,75 M para 22 453 a 50 M). Memoriza-se em tabela para não
-multiplicar — o eixo em que a WNN ganha é o das 4 contra 72 964
-multiplicações, e **empatar em memória (+8 %) já é o resultado forte**, não
-uma promessa quebrada.
+multiplicar — o eixo em que a WNN ganha é o de **ciclos e latência** (§3–§4: a
+consulta substitui os 73 mil MACs), e **empatar em memória (+8 %) já é o resultado
+forte**, não uma promessa quebrada.
 
 ## Ressalvas
 

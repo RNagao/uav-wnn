@@ -161,10 +161,12 @@ travados, e o ruído os elimina.
 dessa economia é justamente esta variância. Não use essa coluna para comparar
 modelos sem aumentar o n.
 
-**A latência não distingue os braços de forma útil.** A WNN mede 102–137 µs contra
-55–65 µs do MADDPG, mas isso é wall-clock de NumPy contra PyTorch — arcabouços
-diferentes. A figura honesta é a contagem de operações: **4 multiplicações contra
-72 960**. O `spec06-merito.md` trata disso.
+**A latência da campanha não compara os braços de forma útil.** A coluna mede a WNN
+(NumPy) contra o MADDPG (PyTorch) — arcabouços diferentes — e o número do MADDPG
+usa a medida antiga/assimétrica. A comparação honesta está no `spec06-merito.md`:
+sob o protocolo da SPEC-03 (um processo por modelo, mesma observação, menor mediana
+de 8×1000), a WNN é **~2× mais rápida** que o ator MADDPG no relógio (118–121 µs ×
+236 µs, célula a2s24).
 
 ---
 

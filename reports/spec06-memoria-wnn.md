@@ -185,10 +185,12 @@ que inflassem nosso lado. Duas contas estavam certas; uma estava errada.
 `mapeamento_tuplas` (1,7 KB) entram no persistente. O termômetro é estado
 treinado e viaja com o modelo — omiti-lo inflaria nossa vantagem.
 
-**T3 cobra o amostrador dos dois lados.** As 4 `mult_fp` da WNN são do
-amostrador Box-Muller, não do aproximador (`incluir_amostragem=False` dá zero);
-o MADDPG também paga 4 (72 964 = 72 960 MACs + 4). A alegação "elimina os MACs"
-é sobre o aproximador, e está declarada assim.
+**T3 (operações fp) foi retirada como figura de mérito.** A antiga contava
+multiplicações fp e cobrava o amostrador dos dois lados (as 4 `mult_fp` são do
+Box-Muller, comuns a WNN e MADDPG). Saiu porque contar multiplicação favorece a WNN
+por construção — ela é *weightless* e quase não multiplica; o custo de computação
+passou a ser reportado por ciclos e por latência empírica (ver `spec06-merito.md`).
+Nada disso muda a conta de **memória** (T1), que é o objeto deste relatório.
 
 **Fora da conta do MADDPG:** os buffers `action_scale`/`action_bias`, 4
 parâmetros = 16 bytes (0,001 % do ator). Constantes do espaço de ação, não

@@ -1,85 +1,108 @@
 {
   "wnn": {
-    "T=32 (1/12)": {
-      "persistente_kb": 1221.228515625,
+    "T=32 (2/24)": {
+      "persistente_kb": 572.40625,
       "variante_principal": "ordenado",
       "persistente_kb_por_variante": {
-        "ordenado": 1221.228515625,
-        "hash": 2296.74609375,
-        "denso": 3220.703125
+        "ordenado": 572.40625,
+        "hash": 1071.7890625,
+        "denso": 3461.0703125
       },
-      "residente_kb": 1221.611328125,
-      "entradas_ocupadas": 88961,
-      "mult_fp": 4,
-      "soma_fp": 203,
-      "lookups": 201,
-      "soma_int": 804,
-      "total_sem_mac": 1208
+      "residente_kb": 572.81640625,
+      "entradas_ocupadas": 41476,
+      "ciclos_ref": 4784,
+      "operacoes": {
+        "mult_fp": 4,
+        "soma_fp": 218,
+        "div_fp": 3,
+        "transcendental_fp": 5,
+        "lookups": 216,
+        "soma_int": 864,
+        "op_bits": 1728,
+        "comparacoes": 864,
+        "flops_mult": 4,
+        "flops_total": 230,
+        "nao_flop": 2808
+      }
     },
-    "T=16 (1/12)": {
-      "persistente_kb": 587.8203125,
+    "T=16 (2/24)": {
+      "persistente_kb": 309.654296875,
       "variante_principal": "ordenado",
       "persistente_kb_por_variante": {
-        "ordenado": 587.8203125,
-        "hash": 1196.283203125,
-        "denso": 1634.3671875
+        "ordenado": 309.654296875,
+        "hash": 595.9296875,
+        "denso": 1730.5390625
       },
-      "residente_kb": 588.025390625,
-      "entradas_ocupadas": 42812,
-      "mult_fp": 4,
-      "soma_fp": 104,
-      "lookups": 102,
-      "soma_int": 408,
-      "total_sem_mac": 614
+      "residente_kb": 309.87109375,
+      "entradas_ocupadas": 22453,
+      "ciclos_ref": 2516,
+      "operacoes": {
+        "mult_fp": 4,
+        "soma_fp": 110,
+        "div_fp": 3,
+        "transcendental_fp": 5,
+        "lookups": 108,
+        "soma_int": 432,
+        "op_bits": 864,
+        "comparacoes": 432,
+        "flops_mult": 4,
+        "flops_total": 122,
+        "nao_flop": 1404
+      }
     }
   },
   "maddpg": {
     "Na=2": {
       "persistente_kb": 287.0078125,
-      "mult_fp": 72964,
-      "D": 27
-    },
-    "Na=4": {
-      "persistente_kb": 291.0078125,
-      "mult_fp": 73988,
-      "D": 31
-    },
-    "Na=8": {
-      "persistente_kb": 299.0078125,
-      "mult_fp": 76036,
-      "D": 39
+      "ciclos_ref": 147152,
+      "D": 27,
+      "operacoes": {
+        "mult_fp": 72964,
+        "soma_fp": 73476,
+        "div_fp": 0,
+        "transcendental_fp": 5,
+        "lookups": 0,
+        "soma_int": 0,
+        "op_bits": 0,
+        "comparacoes": 512,
+        "flops_mult": 72964,
+        "flops_total": 146445,
+        "nao_flop": 0
+      }
     }
-  },
-  "mlp_pareada": {
-    "persistente_kb": 7.6328125,
-    "mult_fp": 1892
   },
   "t2_ciclos": {
     "x86-64 (com FPU e SIMD)": {
-      "wnn": 4465,
-      "maddpg": 149200,
-      "ganho_wnn": 33.41545352743561
+      "wnn": 4784,
+      "maddpg": 147152,
+      "ganho_wnn": 30.759197324414714
     },
     "Cortex-M4F (com FPU)": {
-      "wnn": 4777,
-      "maddpg": 446476,
-      "ganho_wnn": 93.4636801339753
+      "wnn": 5096,
+      "maddpg": 440332,
+      "ganho_wnn": 86.40737833594976
     },
     "Cortex-M0 (SEM FPU)": {
-      "wnn": 19809,
-      "maddpg": 9281172,
-      "ganho_wnn": 468.53309101923367
+      "wnn": 20908,
+      "maddpg": 9153172,
+      "ganho_wnn": 437.7832408647408
     }
   },
-  "t2_wallclock_us": {
-    "wnn_numpy": {
-      "mediana": 173.0,
-      "p99": 321.8
-    },
-    "maddpg_pytorch": {
-      "mediana": 35.0,
-      "p99": 115.1
-    },
-    "nota": "NumPy×PyTorch; a figura defensável é ciclos, não wall-clock"
+  "latencia_us": {
+    "celula": "a2s24",
+    "por_modelo": {
+      "wnn-T16": {
+        "mediana_us": 118.0475,
+        "p99_us": 323.20321
+      },
+      "wnn-T32": {
+        "mediana_us": 120.8155,
+        "p99_us": 196.75953000000018
+      },
+      "maddpg": {
+        "mediana_us": 235.66649999999998,
+        "p99_us": 343.6464500000001
+      }
+    }
   }
 }

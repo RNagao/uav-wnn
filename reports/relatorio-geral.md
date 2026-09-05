@@ -62,22 +62,35 @@ o canal de ruído.
 
 ## 3. Figuras de mérito de custo — WNN × MADDPG (conclusão firme)
 
-Propriedades do modelo, medidas (SPEC-02/03), pouco sensíveis ao cenário.
+Propriedades do modelo, medidas (SPEC-02/03), pouco sensíveis ao cenário. Modelos
+de **deploy** (`models/deploy`), a mesma fonte da latência medida.
 
-| eixo | WNN (1/12, treinado) | MADDPG (256×256) | vencedor |
+| eixo | WNN (a2s24, Na=2, deploy) | MADDPG (256×256, Na=2) | vencedor |
 |---|---|---|---|
-| **T1 tamanho** | 975 KB–1,8 MB (70 950 entradas) | 287–299 KB | **MADDPG** (WNN 3,3–6,3× maior) |
-| **T2 inferência (ciclos)** | 4,5 k (x86) · 20 k (M0) | 149 k (x86) · 9,3 M (M0) | **WNN** — 33× (x86) a **469× (Cortex-M0 sem FPU)** |
-| **T3 operações** | **4 MACs** + lookups/somas | ~74 000 MACs | **WNN** (0,005%) |
+| **T1 tamanho** | T=32: 572 KB (41 476 entradas) · T=16: 310 KB | 287 KB | **MADDPG** (T=32 perde 2,0×; T=16 empata) |
+| **T2 inferência (ciclos)** | 4,8 k (x86) · 21 k (M0) | 147 k (x86) · 9,15 M (M0) | **WNN** — 31× (x86) a **438× (Cortex-M0 sem FPU)** |
+| **T2 inferência (latência medida)** | 118–121 µs (a2s24, NumPy) | 236 µs (PyTorch) | **WNN** — ~2× no relógio |
 
-- **T2 wall-clock** (protótipos): WNN NumPy 173 µs × MADDPG PyTorch 35 µs — o
-  relógio inverte por overhead de implementação (Python × BLAS), **não** pelo
-  algoritmo. A figura defensável é ciclos (RNF-12).
-- **KF da fusão:** +48 flops/decisão — desprezível ao lado de qualquer dos dois.
+**Mesma célula (a2s24, Na=2)** dos dois lados — WNN de deploy e MADDPG publicado —,
+sem a ressalva de "célula diferente" de versões anteriores. Como cada figura foi
+calculada: ver `spec06-merito.md` (seção *Metodologia*).
 
-**Conclusão:** a rede sem peso **troca memória por computação** — perde em tamanho,
-ganha (estruturalmente, sem MACs) em inferência, com vantagem que explode em
-hardware **sem FPU**. É o lado de custo de H1, e é o resultado mais sólido do
+- **Latência empírica (SPEC-03, a2s24):** um processo por modelo, mesma observação,
+  menor mediana de 8×1000 — a WNN é **~2× mais rápida** que o ator MADDPG, mesmo
+  NumPy × PyTorch. (Corrige uma versão anterior que citava 173/35 µs hardcoded
+  dizendo o wall-clock invertido.) O overhead de arcabouço achata a vantagem que os
+  ciclos preveem; compilada, a WNN realizaria mais dela.
+- **KF da fusão:** ~100 µs/decisão medidos (protótipo NumPy) = **~0,005 %** do
+  orçamento de tempo real de 2 s — e é **termo comum** (WNN e MADDPG usam o mesmo,
+  cancela em H1). Contabilizado à parte, não cobrado de nenhuma política.
+- **Operações fp (MACs):** figura **retirada** — contar multiplicação favorece a
+  WNN por construção (ela é *weightless* e quase não multiplica); o custo de
+  computação passou a ser reportado por ciclos e pela latência empírica.
+
+**Conclusão:** a rede sem peso **ganha em inferência** — nos ciclos e no relógio
+medido —, com vantagem que explode em hardware **sem FPU**. Em memória o veredito
+depende da resolução: o T=32 paga (troca memória por computação), o T=16 de deploy
+ganha nos dois eixos. É o lado de custo de H1, e é o resultado mais sólido do
 trabalho até aqui (independe de a política ser ótima).
 
 ---
@@ -134,8 +147,10 @@ sensor (cortado pela D13) para ter dano a reparar.
 ## 7. Conclusões até aqui
 
 1. **Custo (H1):** a rede sem peso é estruturalmente mais barata em inferência
-   (0 MACs; 33–469× menos ciclos, sobretudo sem FPU) ao **custo de memória**
-   (3,3–6,3×). É a contribuição mais firme e independe da qualidade da política.
+   (31–438× menos ciclos, sobretudo sem FPU; **~2× mais rápida no relógio medido**),
+   na **mesma célula** (a2s24). Em memória ela **paga**: o T=32 ocupa ~2× o ator
+   MADDPG e o T=16 empata. É a contribuição mais firme e independe da qualidade da
+   política.
 2. **Robustez a ruído:** a WNN treinada tolera ruído de GPS (σ ≤ 10 m) **sem
    filtro**, e até se beneficia dele (*dithering*). A cobertura sobe de ~90 % para
    94–98 %.

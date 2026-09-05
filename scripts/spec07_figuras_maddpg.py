@@ -4,9 +4,10 @@ Consome os artefatos JSON já gerados (sem re-rodar o simulador — o princípio
 SPEC-10: figura vem de artefato, não de nova medição) e produz:
 
 - **Figuras de mérito com o filtro embutido (RNF-05 / SPEC-08 T-08.10):** T1
-  (estado do KF somado ao ator) e T3 (flops do KF contra os MACs do MADDPG),
-  impressas como tabela e como figura. O ponto: o custo do filtro é uma
-  **constante pequena e fixa**, independente da capacidade do modelo.
+  (estado do KF somado ao ator) e T2 (latência empírica MEDIDA de um ciclo do KF
+  contra a decisão do ator MADDPG, protocolo da SPEC-03), impressas como tabela e
+  como figura. O ponto: o custo do filtro é uma **constante pequena e fixa**,
+  independente da capacidade do modelo.
 - **Imagens** em `reports/img/spec07-maddpg/`: comparação com Lamenza, degradação
   × σ, NEES no ambiente real, RMSE do filtro.
 
@@ -24,8 +25,12 @@ from uavwnn.fusion.kalman import FiltroKalmanControle
 from uavwnn.fusion.consistencia import faixa_chi2_individual
 
 # MADDPG, dos pesos publicados (reports/spec02-baseline-maddpg.md).
-MADDPG_MULT_FP = {2: 72960, 4: 73984, 8: 76032}   # multiplicações fp por decisão (ator)
 MADDPG_ATOR_KB = {2: 287.0, 4: 291.0, 8: 299.0}   # tamanho do ator, fp32
+# Célula do artefato de latência da SPEC-03 (única com WNN deploy E MADDPG).
+CELULA_LATENCIA = (2, 24)
+# Orçamento de tempo real: uma decisão a cada 2 s (PRD §5.5). O KF é termo COMUM
+# (WNN e MADDPG usam o mesmo filtro), contabilizado à parte contra esse prazo.
+INTERVALO_DECISAO_S = 2.0
 
 DIR = Path("reports/img/spec07-maddpg")
 TEAL, AMBAR, CINZA, VERM = "#1C7293", "#F2A93B", "#808A96", "#B0637C"
@@ -35,34 +40,113 @@ def _ler(p):
     return json.loads(Path(p).read_text())
 
 
-def figuras_de_merito() -> dict:
-    """T1 e T3 do KF embutido, relativas ao MADDPG (RNF-05).
+def _latencia_ator_maddpg(na: int = CELULA_LATENCIA[0],
+                          ns: int = CELULA_LATENCIA[1]) -> dict | None:
+    """Latência MEDIDA da decisão do ator MADDPG, do artefato da SPEC-03.
 
-    O KF é **termo comum** (a MLP pareada precisaria do mesmo filtro), então na
-    comparação de H1 ele cancela; aqui o contraste é contra o MADDPG só para
-    dimensionar o quão pequeno o filtro é ao lado da política.
+    Baseline honesto para dimensionar o KF: o mesmo protocolo (um processo por
+    modelo, mesma observação, menor mediana de 8×1000) que mede a WNN mede o ator.
     """
-    kf = FiltroKalmanControle.custo_operacoes()
+    art = Path(f"reports/spec03-latencia-memoria-a{na}s{ns}.json")
+    if not art.exists():
+        print(f"  aviso: {art} ausente — rode a SPEC-03 para a célula {na}d/{ns}s "
+              f"antes; a latência da política fica de fora", flush=True)
+        return None
+    for r in json.loads(art.read_text()):
+        if r["modelo"] == "maddpg":
+            return {"celula": f"a{na}s{ns}", "mediana_us": r["mediana_us"],
+                    "p99_us": r["p99_us"]}
+    return None
+
+
+def _medir_kf_latencia(sigma_gps: float = 10.0, dt: float = 2.0) -> dict:
+    """Latência empírica de UM ciclo do KF (comando + predição + correção), por drone.
+
+    Mesmo espírito da SPEC-03: aquece, cronometra em blocos e reporta a MENOR
+    mediana de bloco (o estimador sem contenção) mais o p99 global. O KF é
+    determinístico e minúsculo — a medida é o custo real que ele soma à decisão da
+    política, para poder dizer 'desprezível' com o relógio, e não só com contagem
+    de flops (que subestima o filtro por construção).
+    """
+    import time
+
+    rng = np.random.default_rng(12345)
+    passos = 4096
+    ang = rng.uniform(0.0, 2 * np.pi, passos)
+    us = 15.0 * np.stack([np.cos(ang), np.sin(ang)], axis=1)   # comandos de rumo
+    zs = rng.normal(0.0, sigma_gps, size=(passos, 2))          # medidas ruidosas
+    kf = FiltroKalmanControle(sigma_gps=sigma_gps, q_w=1.0)
+    kf.iniciar(zs[0], t0=0.0)
+    est = {"t": 0.0, "k": 0}
+
+    def um_ciclo():
+        k = est["k"] % passos
+        est["t"] += dt
+        kf.comando(us[k])
+        kf.atualizar(zs[k], est["t"])
+        est["k"] += 1
+
+    for _ in range(1000):                                      # aquecimento
+        um_ciclo()
+    blocos, reps = 8, 2000
+    tudo, medianas = [], []
+    for _ in range(blocos):
+        t = np.empty(reps)
+        for i in range(reps):
+            t0 = time.perf_counter_ns(); um_ciclo(); t[i] = time.perf_counter_ns() - t0
+        arr = t / 1000.0
+        medianas.append(float(np.median(arr))); tudo.append(arr)
+    return {"mediana_us": min(medianas),
+            "p99_us": float(np.percentile(np.concatenate(tudo), 99)),
+            "sigma_gps": sigma_gps, "dt": dt}
+
+
+def figuras_de_merito() -> dict:
+    """T1 (memória) e T2 (latência empírica MEDIDA) do KF, contabilizado À PARTE.
+
+    O KF é **termo comum**: WNN e MADDPG podem usar o MESMO filtro, então na
+    comparação de H1 ele **cancela** — não é cobrado de nenhuma das políticas. Por
+    isso é medido de forma autônoma e referido ao **orçamento de tempo real** (uma
+    decisão a cada 2 s), que é o que o deploy precisa cumprir, independente de qual
+    aproximador roda. A latência de uma política entra só como referência de escala.
+
+    A figura antiga contava multiplicações em ponto flutuante (T3). Foi trocada
+    pela **latência empírica**: contar multiplicação subestima o KF por construção
+    (ele mal multiplica); o relógio é o custo real, e contra o prazo de 2 s ele é
+    desprezível. (O protótipo do KF é NumPy — 2×2 dominado por overhead de dispatch;
+    o número absoluto é do protótipo, não do algoritmo, mas o veredito contra o
+    orçamento de 2 s vale com folga de 4 ordens de grandeza.)
+    """
     # T1: estado residente do KF por drone = x̂ (2) + P simétrica (3) floats fp32
     kf_bytes_por_drone = (2 + 3) * 4
-    merito = {"kf_flops": kf.total, "kf_mult_fp": kf.mult_fp, "kf_div_fp": kf.div_fp,
-              "kf_bytes_por_drone": kf_bytes_por_drone, "por_Na": {}}
-    print("Figuras de mérito com o filtro embutido (RNF-05)\n")
-    print("T3 — operações por decisão")
-    print(f"  KF+controle: {kf.total} flops ({kf.mult_fp} mult, {kf.soma_fp} soma, {kf.div_fp} div)")
-    print(f"{'Na':>4} {'MADDPG mult_fp':>15} {'KF flops':>9} {'KF / MADDPG':>12}")
-    for na in (2, 4, 8):
-        frac = kf.total / MADDPG_MULT_FP[na]
-        merito["por_Na"][na] = {"maddpg_mult_fp": MADDPG_MULT_FP[na],
-                                "fracao_flops": frac,
-                                "fracao_bytes": kf_bytes_por_drone / (MADDPG_ATOR_KB[na] * 1024)}
-        print(f"{na:>4} {MADDPG_MULT_FP[na]:>15} {kf.total:>9} {frac:>11.3%}")
+    kf_lat = _medir_kf_latencia()
+    pol = _latencia_ator_maddpg()          # referência de escala, não denominador
+    orcamento_us = INTERVALO_DECISAO_S * 1e6
+    frac_orc = kf_lat["mediana_us"] / orcamento_us
+    merito = {"kf_bytes_por_drone": kf_bytes_por_drone,
+              "kf_latencia": kf_lat, "politica_latencia": pol,
+              "intervalo_decisao_s": INTERVALO_DECISAO_S,
+              "fracao_orcamento": frac_orc, "por_Na": {}}
+
+    print("Figuras de mérito — o KF contabilizado à parte (termo comum a WNN e MADDPG)\n")
+    print("T2 — latência empírica por decisão (MEDIDA, protocolo SPEC-03)")
+    print(f"  KF (comando+predição+correção): {kf_lat['mediana_us']:.2f} µs "
+          f"(mediana)  {kf_lat['p99_us']:.2f} µs (p99)")
+    print(f"  contra o orçamento de {INTERVALO_DECISAO_S:.0f} s por decisão: "
+          f"{frac_orc:.4%} — desprezível contra o prazo de tempo real")
+    if pol:
+        print(f"  (escala: uma decisão do ator MADDPG é ~{pol['mediana_us']:.0f} µs, "
+              f"SPEC-03/{pol['celula']} — mesma ordem, ambas << 2 s)")
+
     print("\nT1 — memória residente")
-    print(f"  estado do KF por drone: {kf_bytes_por_drone} bytes "
-          f"(x̂ 2 + P sim. 3, fp32) — contra {MADDPG_ATOR_KB[4]:.0f} KB do ator MADDPG "
-          f"({merito['por_Na'][4]['fracao_bytes']:.4%})")
-    print("\nLeitura: o filtro é constante e desprezível ao lado da política — o custo")
-    print("que a alegação 'sem MACs' precisa declarar (RNF-05) é ~0,07% do ator do MADDPG.\n")
+    for na in (2, 4, 8):
+        merito["por_Na"][na] = {
+            "fracao_bytes": kf_bytes_por_drone / (MADDPG_ATOR_KB[na] * 1024)}
+    print(f"  estado do KF por drone: {kf_bytes_por_drone} bytes (x̂ 2 + P sim. 3, fp32)")
+
+    print("\nLeitura: o KF é um custo fixo e pequeno, COMUM aos dois aproximadores")
+    print(f"(cancela em H1). Contra o prazo de {INTERVALO_DECISAO_S:.0f} s da decisão é "
+          f"~{frac_orc:.3%}; e o estado residente por drone são {kf_bytes_por_drone} bytes.\n")
     return merito
 
 
@@ -144,16 +228,30 @@ def imagens(comp: dict, ladder: dict, merito: dict) -> None:
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "rmse_real.png", dpi=110); plt.close(fig)
 
-    # 5. Figura de mérito: custo do KF contra o ator do MADDPG (T3)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    nas = [2, 4, 8]
-    ax.bar([f"MADDPG\nNa={na}" for na in nas], [MADDPG_MULT_FP[na] for na in nas],
-           color=TEAL, label="actor fp mults (MADDPG)")
-    ax.axhline(merito["kf_flops"], color=AMBAR, lw=2, label=f"KF total = {merito['kf_flops']} flops")
-    ax.set_yscale("log"); ax.set_ylabel("operations per decision (log)")
-    ax.set_title("Figure of merit T3 — the filter is negligible next to the policy")
-    ax.legend(fontsize=8); fig.tight_layout()
-    fig.savefig(DIR / "custo_com_filtro.png", dpi=110); plt.close(fig)
+    # 5. Figura de mérito: latência MEDIDA do KF contra o orçamento de 2 s (T2).
+    #    O KF é termo COMUM (WNN e MADDPG usam o mesmo) — contabilizado à parte, não
+    #    cobrado de nenhuma política. A referência é o prazo de decisão de tempo real;
+    #    a política entra só como escala (mesma ordem do KF, ambas << 2 s).
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    orc_us = merito["intervalo_decisao_s"] * 1e6
+    kf_lat = merito["kf_latencia"]["mediana_us"]
+    pol = merito.get("politica_latencia")
+    rot, val, cor = ["KF cycle\n(cmd+pred+corr)"], [kf_lat], [AMBAR]
+    if pol:
+        rot.append(f"MADDPG actor\n({pol['celula']}, for scale)")
+        val.append(pol["mediana_us"]); cor.append(TEAL)
+    rot.append(f"decision budget\n({merito['intervalo_decisao_s']:.0f} s)")
+    val.append(orc_us); cor.append(CINZA)
+    barras = ax.bar(rot, val, color=cor)
+    for b, v in zip(barras, val):
+        txt = f"{v / 1e6:.0f} s" if v >= 1e5 else f"{v:.0f} µs"
+        ax.annotate(txt, (b.get_x() + b.get_width() / 2, v),
+                    ha="center", va="bottom", fontsize=10, weight="bold")
+    ax.set_yscale("log"); ax.set_ylabel("measured latency per decision (µs, log)")
+    ax.set_title("The KF is a shared constant, negligible vs the 2 s budget\n"
+                 "measured (SPEC-03 protocol); the KF cancels between WNN and MADDPG in H1")
+    fig.tight_layout()
+    fig.savefig(DIR / "latencia_kf.png", dpi=110); plt.close(fig)
 
     print(f"[imagens] 5 figuras em {DIR}/")
 
