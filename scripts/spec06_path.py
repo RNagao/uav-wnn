@@ -61,11 +61,11 @@ def plotar(traj, sensores, ct, ok, saida: Path, titulo: str) -> None:
     if naovis:
         xy = np.array(naovis)
         ax.scatter(xy[:, 0], xy[:, 1], facecolors="none", edgecolors="#B0637C",
-                   s=55, linewidths=1.3, label="sensor não coletado", zorder=2)
+                   s=55, linewidths=1.3, label="uncollected sensor", zorder=2)
     if vis:
         xy = np.array(vis)
         ax.scatter(xy[:, 0], xy[:, 1], c="#6A994E", s=45, marker="o",
-                   label="sensor coletado", zorder=2)
+                   label="collected sensor", zorder=2)
     for i, (aid, pts) in enumerate(traj.items()):
         p = np.array(pts); c = CORES[i % len(CORES)]
         ax.plot(p[:, 0], p[:, 1], "-", color=c, lw=1.7, alpha=0.9,
@@ -73,9 +73,9 @@ def plotar(traj, sensores, ct, ok, saida: Path, titulo: str) -> None:
         ax.scatter(*p[0], c=c, s=110, marker="*", edgecolors="k", zorder=4)
         ax.scatter(*p[-1], c=c, s=55, marker="s", edgecolors="k", zorder=4)
     ncol = len(vis)
-    ax.set_title(f"{titulo}\ncoletados {ncol}/{len(sensores)} · "
-                 f"{'SUCESSO' if ok else 'incompleto'} · CT {ct:.0f} s"
-                 f"   (★ início · ■ fim)")
+    ax.set_title(f"{titulo}\ncollected {ncol}/{len(sensores)} · "
+                 f"{'SUCCESS' if ok else 'incomplete'} · CT {ct:.0f} s"
+                 f"   (★ start · ■ end)")
     ax.set_aspect("equal"); ax.grid(alpha=0.2)
     ax.legend(fontsize=8, loc="best")
     fig.tight_layout(); fig.savefig(saida, dpi=120); plt.close(fig)
@@ -94,7 +94,7 @@ def main() -> int:
     traj, sensores, ct, ok = rodar_e_gravar(cfg, pol, a.seed)
     a.saida.parent.mkdir(parents=True, exist_ok=True)
     plotar(traj, sensores, ct, ok, a.saida,
-           f"WNN Na={a.na} Ns={a.ns} (semente {a.seed})")
+           f"WNN Na={a.na} Ns={a.ns} (seed {a.seed})")
     print(f"coletados {sum(1 for _, c in sensores if c)}/{len(sensores)} · "
           f"sucesso={ok} · CT {ct:.1f} s")
     print(f"imagem: {a.saida}")

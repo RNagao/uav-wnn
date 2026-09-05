@@ -171,12 +171,12 @@ def figuras(m: dict) -> None:
     rot, val, cor = [], [], []
     if diss:
         rot.append("WNN\nT=32"); val.append(max(diss["mult_fp"], 0.5)); cor.append(AMBAR)
-    rot.append("MLP pareada\n(1/12)"); val.append(m["mlp_pareada"]["mult_fp"]); cor.append(CINZA)
+    rot.append("paired MLP\n(1/12)"); val.append(m["mlp_pareada"]["mult_fp"]); cor.append(CINZA)
     for na, mm in m["maddpg"].items():
         rot.append(f"MADDPG\n{na}"); val.append(mm["mult_fp"]); cor.append(TEAL)
     ax.bar(rot, val, color=cor)
-    ax.set_yscale("log"); ax.set_ylabel("multiplicações fp por decisão (log)")
-    ax.set_title("T3 — a WNN elimina os MACs (0 mult. fp; barra fixada em 0,5 p/ log)")
+    ax.set_yscale("log"); ax.set_ylabel("fp multiplications per decision (log)")
+    ax.set_title("T3 — the WNN eliminates MACs (0 fp mult; bar pinned at 0.5 for log)")
     fig.tight_layout(); fig.savefig(DIR / "t3_operacoes.png", dpi=110); plt.close(fig)
 
     # 2. T1 — memória persistente (KB), log
@@ -184,13 +184,13 @@ def figuras(m: dict) -> None:
     rot, val, cor = [], [], []
     for nome, w in m["wnn"].items():
         rot.append(f"WNN\n{nome}"); val.append(w["persistente_kb"]); cor.append(AMBAR)
-    rot.append("MLP pareada\n(1/12)"); val.append(m["mlp_pareada"]["persistente_kb"]); cor.append(CINZA)
+    rot.append("paired MLP\n(1/12)"); val.append(m["mlp_pareada"]["persistente_kb"]); cor.append(CINZA)
     for na, mm in m["maddpg"].items():
         rot.append(f"MADDPG\n{na}"); val.append(mm["persistente_kb"]); cor.append(TEAL)
     ax.bar(rot, val, color=cor)
-    ax.set_yscale("log"); ax.set_ylabel("memória persistente (KB, log)")
-    ax.set_title("T1 — a WNN paga em memória (LUTs treinadas > pesos densos)\n"
-                 "WNN na variante `ordenado`; a `hash` custa 1,85× mais")
+    ax.set_yscale("log"); ax.set_ylabel("persistent memory (KB, log)")
+    ax.set_title("T1 — the WNN pays in memory (trained LUTs > dense weights)\n"
+                 "WNN in the `ordered` variant; the `hash` costs 1.85× more")
     fig.tight_layout(); fig.savefig(DIR / "t1_memoria.png", dpi=110); plt.close(fig)
 
     # 3. trade-off: memória × computação (o mapa de mérito)
@@ -199,16 +199,16 @@ def figuras(m: dict) -> None:
         ax.scatter(diss["mult_fp"] + 0.5, diss["persistente_kb"], s=140, color=AMBAR,
                    zorder=3, label="WNN T=32 (1/12)")
     ax.scatter(m["mlp_pareada"]["mult_fp"], m["mlp_pareada"]["persistente_kb"],
-               s=120, color=CINZA, marker="s", zorder=3, label="MLP pareada (1/12)")
+               s=120, color=CINZA, marker="s", zorder=3, label="paired MLP (1/12)")
     for na, mm in m["maddpg"].items():
         ax.scatter(mm["mult_fp"], mm["persistente_kb"], s=120, color=TEAL, marker="^", zorder=3)
     ax.annotate("MADDPG\n(Na=2,4,8)", (list(m["maddpg"].values())[1]["mult_fp"],
                 list(m["maddpg"].values())[1]["persistente_kb"]),
                 textcoords="offset points", xytext=(8, 8), color=TEAL)
     ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel("computação — mult. fp por decisão (log)")
-    ax.set_ylabel("memória persistente (KB, log)")
-    ax.set_title("Mapa de mérito: a WNN troca memória por computação")
+    ax.set_xlabel("computation — fp mult per decision (log)")
+    ax.set_ylabel("persistent memory (KB, log)")
+    ax.set_title("Merit map: the WNN trades memory for computation")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "mapa_merito.png", dpi=110); plt.close(fig)
 
@@ -217,13 +217,13 @@ def figuras(m: dict) -> None:
     hws = list(m["t2_ciclos"].keys())
     x = np.arange(len(hws)); w = 0.38
     ax.bar(x - w / 2, [m["t2_ciclos"][h]["wnn"] for h in hws], w,
-           color=AMBAR, label="WNN dissertação")
+           color=AMBAR, label="WNN (thesis)")
     ax.bar(x + w / 2, [m["t2_ciclos"][h]["maddpg"] for h in hws], w,
            color=TEAL, label="MADDPG 256×256")
     ax.set_yscale("log"); ax.set_xticks(x)
     ax.set_xticklabels([h.split(" (")[0] for h in hws])
-    ax.set_ylabel("ciclos por decisão (log)")
-    ax.set_title("T2 — ciclos por decisão: WNN vence, e mais ainda sem FPU (470× no M0)")
+    ax.set_ylabel("cycles per decision (log)")
+    ax.set_title("T2 — cycles per decision: WNN wins, even more without an FPU (470× on the M0)")
     ax.legend(fontsize=8); fig.tight_layout()
     fig.savefig(DIR / "t2_ciclos.png", dpi=110); plt.close(fig)
     print(f"[figuras] 4 imagens em {DIR}/")
