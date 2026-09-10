@@ -613,3 +613,29 @@ E agora a direção reproduz de fato o achado da §5.3 dele — *"much more bene
 greater model capacity than generalization ability"* — com o significado certo, porque
 os retornos representam **resolver** e não assentar num ótimo local. (A versão
 anterior desta varredura tinha o mesmo sinal e significado oposto.)
+
+## Adendo — 2026-09-10: o vizinho recebe a posição divulgada, não a verdadeira
+
+**O que estava.** No `AmbienteRuidoso`, o ruído entrava só na posição própria; a
+posição dos **vizinhos** vinha exata do simulador (`drones[outros]`), à espera do
+canal correlacionado da Etapa 3. Consequência: o drone `i` via o drone `j` onde `j`
+realmente estava, mesmo que `j` se visse 50 m ao lado.
+
+**O que muda.** Cada drone calcula uma vez por observação a sua posição
+**divulgada** — medida crua no degrau 1, estimativa do filtro nos degraus 2–4,
+exata no degrau 0 — e é essa posição que entra na observação própria **e** na dos
+vizinhos, com o ranking de vizinhos feito sobre ela. Vale igualmente para MADDPG,
+WNN T16 e T32 (mesmo ambiente). A divulgação é instantânea e sem perda; atraso,
+perda e correlação continuam na SPEC-09 (`FilaMedidas` segue como provisão).
+
+**Invariantes preservados.** `σ = 0` continua bit-idêntico ao pai (teste). A ordem
+das chamadas ao canal de GPS por drone não muda, então a realização de ruído (CRN)
+e as entradas de sensores são as mesmas de antes — só as entradas de vizinho mudam.
+RF-04 fica mais forte: a verdade de nenhum drone entra em nenhuma observação.
+Guarda nova: com `Na = 2`, `obs_i(viz) + obs_j(viz) = 1` em cada coordenada
+(`test_vizinho_recebe_a_posicao_divulgada_nao_a_verdadeira`).
+
+**Consequência para os resultados.** Toda campanha com ruído e `Na ≥ 2` medida
+antes desta data (`reports/campanha/*-sigma*`, `reports/spec07-maddpg-ruido.json`)
+usou vizinho exato e precisa ser refeita para comparar com números novos. Os
+regimes `limpo` não mudam.
