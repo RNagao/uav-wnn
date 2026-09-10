@@ -209,6 +209,12 @@ def main() -> int:
     a = ap.parse_args()
 
     saida = RAIZ / "reports" / f"spec03-latencia-memoria-a{a.na}s{a.ns}.json"
+    if a.so_figuras and a.repeticoes > 1:
+        base = RAIZ / "reports" / f"spec03-pico-ram-rep{a.repeticoes}-a{a.na}s{a.ns}"
+        d = json.loads(Path(f"{base}.json").read_text())
+        for f in _artefatos_rep(d["amostras"], d["agregado"], a.na, a.ns, a.repeticoes):
+            print(f"-> {f.relative_to(RAIZ)}")
+        return 0
     if a.so_figuras:
         linhas = json.loads(saida.read_text())
         for f in [_markdown(linhas, a.na, a.ns)] + _graficos(linhas, a.na, a.ns):
@@ -322,10 +328,19 @@ def _repetir(na: int, ns: int, obs: Path, n: int) -> int:
     Path(f"{base}.json").write_text(json.dumps(
         {"celula": f"a{na}s{ns}", "repeticoes": n, "agregado": agg,
          "amostras": amostras}, indent=2))
+    print(f"\n-> {Path(str(base) + '.json').relative_to(RAIZ)}")
+    for f in _artefatos_rep(amostras, agg, na, ns, n):
+        print(f"-> {f.relative_to(RAIZ)}")
+    return 0
+
+
+def _artefatos_rep(amostras: dict, agg: dict, na: int, ns: int, n: int) -> list[Path]:
+    """Relatório e box plot das N medições — escritos do JSON, nada transcrito."""
+    import datetime
+    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}"
 
     def linha(cels):
         return "| " + " | ".join(str(c) for c in cels) + " |"
-    import datetime
     L = [f"# Pico de RAM e latência — {na}d/{ns}s, {n} medições por modelo", "",
          f"Gerado por `scripts/spec03_latencia_memoria.py --repeticoes {n}` em "
          f"{datetime.date.today().isoformat()}. Cada medição é um **processo novo** "
@@ -342,10 +357,61 @@ def _repetir(na: int, ns: int, obs: Path, n: int) -> int:
                             f"**{e['media']/div:,.2f} ± {e['desvio']/div:,.2f}**",
                             f"{e['min']/div:,.2f}–{e['max']/div:,.2f}", g["n"]]))
         L.append("")
-    Path(f"{base}.md").write_text("\n".join(L))
-    print(f"\n-> {Path(str(base) + '.json').relative_to(RAIZ)}")
-    print(f"-> {Path(str(base) + '.md').relative_to(RAIZ)}")
-    return 0
+    L += [f"![box plot das {n} medições]({base.name}.png)", ""]
+    md = Path(f"{base}.md"); md.write_text("\n".join(L))
+    saidas = [md]
+    try:
+        saidas.append(_boxplot_rep(amostras, na, ns, n, Path(f"{base}.png")))
+    except ImportError:
+        print("  [boxplot] matplotlib ausente — pulei. Rode: uv sync --group dev")
+    return saidas
+
+
+def _boxplot_rep(amostras: dict, na: int, ns: int, n: int, saida: Path) -> Path:
+    """Box plot por modelo das N medições: pico total, acréscimo do modelo e
+    latência mediana. Caixa = quartis, bigodes 1,5×IQR, pontos = TODAS as
+    amostras (jitter), para que a dispersão real e os outliers fiquem visíveis.
+    O pico total vai em log — o PyTorch põe o MADDPG uma ordem de grandeza acima."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    ordem = [m for m in ("wnn-T16", "wnn-T32", "maddpg") if m in amostras]
+    cores = [CORES.get(m, "#888") for m in ordem]
+    paineis = (("pico_total_kb", 1024, "peak RSS of the process (MB, log)", True),
+               ("pico_modelo_kb", 1024, "model increment to the peak (MB)", False),
+               ("mediana_us", 1, "latency per decision, median (µs)", False))
+    rng = np.random.default_rng(0)
+    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.4))
+    for ax, (campo, div, rot, log) in zip(axes, paineis):
+        dados = [np.array([r[campo] for r in amostras[m]], float) / div for m in ordem]
+        bp = ax.boxplot(dados, widths=0.5, patch_artist=True, showfliers=False,
+                        medianprops={"color": "#222", "lw": 1.4},
+                        whiskerprops={"color": "#555"}, capprops={"color": "#555"})
+        for caixa, c in zip(bp["boxes"], cores):
+            caixa.set(facecolor=c, alpha=0.35, edgecolor=c)
+        for i, (d, c) in enumerate(zip(dados, cores), start=1):
+            ax.scatter(i + rng.uniform(-0.16, 0.16, len(d)), d, s=9, color=c,
+                       alpha=0.55, zorder=3, linewidths=0)
+            ax.annotate(f"{d.mean():,.1f} ± {d.std(ddof=1):,.1f}",
+                        (i, d.max()), ha="center", va="bottom", fontsize=8,
+                        xytext=(0, 4), textcoords="offset points")
+        ax.set_xticks(range(1, len(ordem) + 1), ordem)
+        ax.set_ylabel(rot)
+        if log:
+            ax.set_yscale("log")
+            ax.set_ylim(min(d.min() for d in dados) * 0.6, max(d.max() for d in dados) * 2.5)
+        else:
+            ax.margins(y=0.25)
+        ax.spines[["top", "right"]].set_visible(False)
+    fig.suptitle(f"{n} measurements per model, one fresh process each — "
+                 f"{na} drone{'s' if na > 1 else ''} · {ns} sensors\n"
+                 "box = quartiles, whiskers 1.5×IQR, dots = all samples; "
+                 "label = mean ± sd", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(saida, dpi=160); plt.close(fig)
+    return saida
 
 
 def _markdown(linhas: list[dict], na: int, ns: int) -> Path:

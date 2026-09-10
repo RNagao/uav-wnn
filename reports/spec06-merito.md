@@ -79,6 +79,8 @@ preguiçosa do torch na primeira execução da máquina. **Para citar números, 
 a média das 100.** O p99 de latência é a única coluna com dispersão real
 (15–27 µs de desvio): é cauda de contenção, como o protocolo espera.
 
+![box plot das 100 medições por modelo: pico total (log), acréscimo do modelo e latência mediana](spec03-pico-ram-rep100-a2s24.png)
+
 ## T2 — Tempo de inferência
 
 **Por ciclos (independente de hardware, RNF-12) — a figura defensável:**

@@ -49,3 +49,5 @@ Gerado por `scripts/spec03_latencia_memoria.py --repeticoes 100` em 2026-09-10. 
 | wnn-T16 (NumPy) | **74.92 ± 14.72** | 52.04–158.77 | 100 |
 | wnn-T32 (NumPy) | **82.67 ± 14.81** | 59.05–136.57 | 100 |
 | maddpg (PyTorch) | **167.37 ± 27.15** | 128.18–334.70 | 100 |
+
+![box plot das 100 medições](spec03-pico-ram-rep100-a2s24.png)
