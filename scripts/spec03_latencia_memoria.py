@@ -202,6 +202,10 @@ def main() -> int:
     ap.add_argument("--obs", type=Path, default=None, help=argparse.SUPPRESS)
     ap.add_argument("--so-figuras", action="store_true",
                     help="não mede: regenera relatório e PNGs do JSON já gravado")
+    ap.add_argument("--repeticoes", type=int, default=1,
+                    help="N > 1: roda cada filho N vezes (processo novo a cada vez) e "
+                         "grava média/desvio por modelo em spec03-pico-ram-repN-*.json/.md; "
+                         "o artefato canônico (N=1) não é tocado")
     a = ap.parse_args()
 
     saida = RAIZ / "reports" / f"spec03-latencia-memoria-a{a.na}s{a.ns}.json"
@@ -226,6 +230,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="spec03-obs-") as tmp:
         obs = Path(tmp) / f"obs-a{a.na}s{a.ns}.npy"
         np.save(obs, _observacao(cfg))
+        if a.repeticoes > 1:
+            return _repetir(a.na, a.ns, obs, a.repeticoes)
         linhas = []
         for alvo in ("T16", "T32", "maddpg"):
             try:
@@ -261,6 +267,84 @@ def main() -> int:
     print(f"\n-> {saida.relative_to(RAIZ)}")
     for f in [_markdown(linhas, a.na, a.ns)] + _graficos(linhas, a.na, a.ns):
         print(f"-> {f.relative_to(RAIZ)}")
+    return 0
+
+
+CAMPOS_REP = (("pico_total_kb", "pico total", 1024, "MB"),
+              ("pico_arcabouco_kb", "arcabouço", 1024, "MB"),
+              ("pico_modelo_kb", "acréscimo do modelo", 1024, "MB"),
+              ("rss_apos_carga_kb", "RSS pós-carga", 1024, "MB"),
+              ("mediana_us", "latência mediana", 1, "µs"),
+              ("p99_us", "latência p99", 1, "µs"))
+
+
+def _repetir(na: int, ns: int, obs: Path, n: int) -> int:
+    """N medições independentes por modelo — um processo NOVO a cada uma.
+
+    Repetir dentro do mesmo processo não mede nada: o `VmHWM` é monotônico, e a
+    segunda leitura seria igual à primeira. Cada repetição paga o import inteiro
+    (torch ≈ 3 s) — é o preço de ter N amostras do pico de verdade. A agregação é
+    média e desvio-padrão amostral (ddof=1), com mínimo e máximo para a cauda.
+    """
+    import numpy as np
+    amostras: dict[str, list[dict]] = {}
+    for i in range(n):
+        for alvo in ("T16", "T32", "maddpg"):
+            try:
+                r = _rodar_filho(alvo, na, ns, obs)
+            except RuntimeError as e:
+                print(f"  rep {i + 1} {alvo}: {e}", file=sys.stderr)
+                continue
+            if r.get("ausente"):
+                continue
+            amostras.setdefault(r["modelo"], []).append(r)
+        print(f"  rep {i + 1}/{n} concluída", file=sys.stderr, flush=True)
+
+    agg = {}
+    for modelo, rs in amostras.items():
+        agg[modelo] = {"n": len(rs), "arcabouco": rs[0]["arcabouco"]}
+        for campo, *_ in CAMPOS_REP:
+            v = np.array([r[campo] for r in rs], dtype=float)
+            agg[modelo][campo] = {"media": float(v.mean()),
+                                  "desvio": float(v.std(ddof=1)) if len(v) > 1 else 0.0,
+                                  "min": float(v.min()), "max": float(v.max())}
+
+    print(f"\n=== célula {na}d/{ns}s · {n} medições por modelo · um processo novo "
+          f"por medição · média ± desvio (min–max) ===\n")
+    for campo, rot, div, un in CAMPOS_REP:
+        print(f"  {rot}:")
+        for modelo, g in agg.items():
+            e = g[campo]
+            print(f"    {modelo:<9} {e['media']/div:>9,.2f} ± {e['desvio']/div:>6,.2f} {un}"
+                  f"   ({e['min']/div:,.2f}–{e['max']/div:,.2f})   n={g['n']}")
+
+    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}"
+    Path(f"{base}.json").write_text(json.dumps(
+        {"celula": f"a{na}s{ns}", "repeticoes": n, "agregado": agg,
+         "amostras": amostras}, indent=2))
+
+    def linha(cels):
+        return "| " + " | ".join(str(c) for c in cels) + " |"
+    import datetime
+    L = [f"# Pico de RAM e latência — {na}d/{ns}s, {n} medições por modelo", "",
+         f"Gerado por `scripts/spec03_latencia_memoria.py --repeticoes {n}` em "
+         f"{datetime.date.today().isoformat()}. Cada medição é um **processo novo** "
+         f"(o `VmHWM` é monotônico; repetir no mesmo processo não mede nada), com a "
+         f"mesma observação pré-calculada no pai e o protocolo de latência da SPEC-03 "
+         f"(menor mediana de {BLOCOS}×{REPS_BLOCO}). Média ± desvio-padrão amostral; "
+         f"entre parênteses, mínimo–máximo.", ""]
+    for campo, rot, div, un in CAMPOS_REP:
+        L += [f"## {rot} ({un})", "",
+              linha(["modelo", "média ± desvio", "min–max", "n"]), linha(["---"] * 4)]
+        for modelo, g in agg.items():
+            e = g[campo]
+            L.append(linha([f"{modelo} ({g['arcabouco']})",
+                            f"**{e['media']/div:,.2f} ± {e['desvio']/div:,.2f}**",
+                            f"{e['min']/div:,.2f}–{e['max']/div:,.2f}", g["n"]]))
+        L.append("")
+    Path(f"{base}.md").write_text("\n".join(L))
+    print(f"\n-> {Path(str(base) + '.json').relative_to(RAIZ)}")
+    print(f"-> {Path(str(base) + '.md').relative_to(RAIZ)}")
     return 0
 
 

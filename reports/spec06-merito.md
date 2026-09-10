@@ -56,6 +56,29 @@ mostra). São duas leituras, e as duas ficam na tabela: **pico total** é o que 
 dispositivo precisa ter de RAM com este código; **acréscimo do modelo** é o que a
 rede custa descontada a biblioteca. Nenhuma das duas é bytes de artefato.
 
+### Variabilidade — 100 processos por modelo
+
+A tabela acima é **uma** medição (o artefato canônico). Para dimensionar a dispersão
+entre processos, `--repeticoes 100` roda cada filho 100 vezes, com um processo novo
+por medição (`reports/spec03-pico-ram-rep100-a2s24.md`). Média ± desvio-padrão
+amostral, mínimo–máximo entre parênteses:
+
+| modelo | pico total | arcabouço | acréscimo do modelo | latência mediana |
+|---|---|---|---|---|
+| WNN T=16 (NumPy) | 45,9 ± 0,1 MB (45,6–46,1) | 31,3 ± 0,1 MB | 14,7 ± 0,1 MB | 22,6 ± 0,3 µs |
+| WNN T=32 (NumPy) | 53,3 ± 0,2 MB (53,0–53,6) | 31,3 ± 0,1 MB | 22,0 ± 0,1 MB | 25,2 ± 0,5 µs |
+| MADDPG (PyTorch) | 506,0 ± 0,1 MB (505,8–506,2) | 496,0 ± 0,1 MB | 10,0 ± 0,0 MB | 49,1 ± 0,8 µs |
+
+O pico é **estável entre processos** (desvio abaixo de 0,2 MB em todos), e as
+conclusões não mudam: processo da WNN ~0,09× o do MADDPG; acréscimo do modelo maior
+na WNN (T=32) e comparável (T=16) ao do MADDPG. Duas leituras da medição única ficam
+fora da faixa das 100 — o arcabouço do MADDPG (508 contra 496 MB) e o acréscimo dele
+(3,1 contra 10,0 MB): a soma é a mesma (~511 contra ~506 MB), mas a fronteira
+imports/load caiu em outro ponto naquele processo, provavelmente por inicialização
+preguiçosa do torch na primeira execução da máquina. **Para citar números, prefira
+a média das 100.** O p99 de latência é a única coluna com dispersão real
+(15–27 µs de desvio): é cauda de contenção, como o protocolo espera.
+
 ## T2 — Tempo de inferência
 
 **Por ciclos (independente de hardware, RNF-12) — a figura defensável:**
