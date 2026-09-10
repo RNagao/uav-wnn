@@ -95,3 +95,27 @@ def test_degrau4_filtra_e_so_ele_registra():
     rmse = float(np.sqrt(np.mean(np.sum(erro**2, axis=1))))
     # o filtro tem de bater a medida crua (σ·√2 ≈ 14,1 m)
     assert rmse < sigma * np.sqrt(2), f"KF ({rmse:.1f} m) deveria filtrar abaixo do cru ({sigma*np.sqrt(2):.1f} m)"
+
+
+@pytest.mark.parametrize("degrau", [1, 4])
+def test_vizinho_recebe_a_posicao_divulgada_nao_a_verdadeira(degrau):
+    """O drone `j` transmite a `i` a MESMA posição que usa para si (medida crua
+    no degrau 1, estimativa no 4), não a verdade do simulador.
+
+    Com Na = 2 a entrada de vizinho de `i` é `(p_i − p_j + S)/(2S)` e a de `j` é
+    `(p_j − p_i + S)/(2S)`; se ambos usam as posições divulgadas, a soma é
+    exatamente 1 em cada coordenada. Se `i` visse a verdade de `j` (o
+    comportamento antigo), a soma carregaria `(z_j − p_j) + (z_i − p_i)` e não
+    fecharia. O teste corre alguns passos para cobrir o filtro já iniciado.
+    """
+    cfg = LAMENZA_003(2, 12, phase="eval")
+    random.seed(13); np.random.seed(13)
+    amb = criar_ambiente_ruidoso(cfg, degrau=degrau, config_ruido=ConfigRuido(sigma_gps=10.0))
+    obs, _ = amb.reset()
+    n_viz = cfg.num_drones - 1  # state_num_closest_drones
+    for _ in range(5):
+        viz0, viz1 = obs["drone0"][: 2 * n_viz], obs["drone1"][: 2 * n_viz]
+        assert np.allclose(viz0 + viz1, 1.0), (
+            f"degrau {degrau}: vizinhos deveriam ver posições divulgadas "
+            f"simétricas; soma = {viz0 + viz1}")
+        obs, *_ = amb.step({a: np.array([0.25, 1.0]) for a in amb.agents})
