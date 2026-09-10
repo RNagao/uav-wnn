@@ -1,14 +1,18 @@
-"""Custo dos três modelos: memória, operações e tempo de inferência.
+"""Custo dos três modelos: operações e tempo de inferência, no mesmo laço.
 
 Mede os TRÊS na mesma execução e com o mesmo protocolo. Juntar números de
-origens diferentes — T1 de um relatório, latência de outro — é como a razão de
-tamanho acabou comparando checkpoints com orçamentos de treino distintos.
+origens diferentes é como a razão de custo acabou comparando checkpoints com
+orçamentos de treino distintos.
 
-TRÊS EIXOS, e eles não concordam:
+DOIS EIXOS, e eles não concordam:
 
-    T1 memória    quanto ocupa            → o MADDPG ganha
     T3 operações  quanto calcula          → a WNN ganha por 4 ordens
     T2 latência   quanto demora           → depende do que se mede
+
+A MEMÓRIA NÃO É MEDIDA AQUI. A figura de memória do projeto é o pico de RSS
+(`VmHWM`) do processo que carrega o modelo e decide, e o pico é monotônico —
+num laço intercalado, depois de importar o torch nenhum modelo mostra pico
+próprio. Ela vive em `spec03_latencia_memoria.py` (um processo por modelo).
 
 O T2 tem duas leituras. Em CICLOS (independente de hardware) a WNN ganha; em
 wall-clock ela perde, porque compara NumPy com PyTorch — arcabouços, não
@@ -20,7 +24,6 @@ algoritmos. As duas ficam na tabela, rotuladas.
 from __future__ import annotations
 
 import argparse
-import gc
 import json
 import sys
 import time
@@ -34,19 +37,11 @@ CELULAS = ((1, 12), (2, 24))
 REPS = 3000
 
 
-def rss_mb() -> float:
-    linha = [l for l in open("/proc/self/status") if l.startswith("VmRSS")][0]
-    return int(linha.split()[1]) / 1024
-
-
-def bytes_em_disco(d: Path) -> int:
-    return sum(f.stat().st_size for f in d.iterdir() if f.is_file())
 
 
 def medir_wnn(rot: str, na: int, ns: int) -> dict | None:
     from spec06_campanha_wnn import montar
 
-    from uavwnn.custo.memoria import custo_ntuple_de_rede
     from uavwnn.custo.operacoes import CICLOS, ciclos, operacoes_ntuple
     from uavwnn.refenv import LAMENZA_003, make_env, prune_logging_handlers
 
@@ -56,15 +51,11 @@ def medir_wnn(rot: str, na: int, ns: int) -> dict | None:
         return None
     cfg = LAMENZA_003(na, ns, phase="eval")
 
-    gc.collect(); antes = rss_mb()
     pol, ap = montar("ntupla_dissertacao", cfg, ck, plana=True)
-    gc.collect(); depois = rss_mb()
 
     n_ram, n_tup = ap.ator.n_ram, ap.ator.tamanho_tupla
     occ = ap.ator.n_entradas
     d_obs = cfg.observation_size
-    cm = custo_ntuple_de_rede(ap.ator, variante="ordenado", limiares_por_dim=T,
-                              n_dims=d_obs, rotulo=rot)
     op = operacoes_ntuple(n_ram=n_ram, tamanho_tupla=n_tup, n_cabecas=3,
                           n_dims=d_obs, n_niveis=T)
 
@@ -82,8 +73,7 @@ def medir_wnn(rot: str, na: int, ns: int) -> dict | None:
     except Exception:                                    # pragma: no cover
         pass
     return {"modelo": rot, "na": na, "ns": ns,
-            "params": int(occ), "t1_kb": cm.persistente / 1024,
-            "disco_kb": bytes_em_disco(ck) / 1024, "rss_mb": depois - antes,
+            "params": int(occ),
             "mult_fp": op.mult_fp, "soma_fp": op.soma_fp,
             "lookups": op.lookups, "soma_int": op.soma_int,
             "ciclos": {hw: ciclos(op, hw) for hw in CICLOS},
@@ -95,7 +85,6 @@ def medir_maddpg(na: int, ns: int) -> dict | None:
     from spec02_baseline_maddpg import checkpoints, operacoes_ator, tamanho
     from spec02_maddpg_rollout import carregar_ator
 
-    from uavwnn.custo.memoria import custo_mlp
     from uavwnn.custo.operacoes import CICLOS, ciclos, operacoes_mlp
     from uavwnn.refenv import LAMENZA_003
 
@@ -105,12 +94,9 @@ def medir_maddpg(na: int, ns: int) -> dict | None:
     cfg = LAMENZA_003(na, ns, phase="eval")
     d = cfg.observation_size
 
-    gc.collect(); antes = rss_mb()
     pol = carregar_ator(disp[(na, ns)], d)
-    gc.collect(); depois = rss_mb()
 
     cst = tamanho(disp[(na, ns)])
-    cm = custo_mlp([d, 256, 256, 2], rotulo="maddpg")
     op = operacoes_mlp([d, 256, 256, 2])
 
     import torch
@@ -122,9 +108,7 @@ def medir_maddpg(na: int, ns: int) -> dict | None:
         for i in range(REPS):
             t0 = time.perf_counter_ns(); pol.rede(x); t[i] = time.perf_counter_ns() - t0
     return {"modelo": "maddpg", "na": na, "ns": ns,
-            "params": cst["params_ator"], "t1_kb": cm.persistente / 1024,
-            "disco_kb": disp[(na, ns)].stat().st_size / 1024,
-            "rss_mb": depois - antes,
+            "params": cst["params_ator"],
             "mult_fp": op.mult_fp, "soma_fp": op.soma_fp,
             "lookups": 0, "soma_int": 0,
             "ciclos": {hw: ciclos(op, hw) for hw in CICLOS},
@@ -147,12 +131,11 @@ def main() -> int:
     p = print
     def cel(r):
         return f"{r['na']}d/{r['ns']}s"
-    p("\n=== T1 — MEMÓRIA ===\n")
-    p(f"  {'célula':>9} {'modelo':<9}{'params':>10}{'T1 (KB)':>10}"
-      f"{'disco (KB)':>12}{'RSS (MB)':>10}")
+    p("\n=== MEMÓRIA: não medida aqui — pico de RAM por processo em "
+      "spec03_latencia_memoria.py ===\n")
+    p(f"  {'célula':>9} {'modelo':<9}{'params':>10}")
     for r in linhas:
-        p(f"  {cel(r):>9} {r['modelo']:<9}"
-          f"{r['params']:>10,}{r['t1_kb']:>10.0f}{r['disco_kb']:>12.0f}{r['rss_mb']:>10.1f}")
+        p(f"  {cel(r):>9} {r['modelo']:<9}{r['params']:>10,}")
 
     p("\n=== T3 — OPERAÇÕES POR DECISÃO ===\n")
     p(f"  {'célula':>9} {'modelo':<9}{'mult. fp':>11}{'soma fp':>10}"

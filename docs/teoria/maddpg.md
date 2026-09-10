@@ -311,7 +311,7 @@ E a alegação central do trabalho é sobre **multiplicações**:
 |---|---|---|
 | mult. fp por decisão | **72 964** | **4** (do amostrador) |
 | no aproximador | 72 960 | **0** |
-| memória (T1) | 287 KB | 975–1 073 KB |
+| pico de RAM do processo (T1, medido, a2s24) | 511 MB (PyTorch; ator acresce 3,1 MB) | 51–53 MB (NumPy; ator acresce 19–22 MB) |
 
 Se o baseline fosse uma CNN, a comparação seria contra algo que ninguém rodaria
 num microcontrolador, e o resultado perderia sentido prático. O baseline ser

@@ -3,10 +3,7 @@
     "modelo": "wnn-T16",
     "na": 1,
     "ns": 12,
-    "params": 10965,
-    "t1_kb": 152.412109375,
-    "disco_kb": 144.03125,
-    "rss_mb": 9.8125,
+    "params": 12844,
     "mult_fp": 4,
     "soma_fp": 104,
     "lookups": 102,
@@ -16,17 +13,14 @@
       "Cortex-M4F (com FPU)": 2694,
       "Cortex-M0 (SEM FPU)": 12578
     },
-    "us_med": 70.543,
-    "us_p99": 126.70469999999999
+    "us_med": 22.895,
+    "us_p99": 97.41928999999999
   },
   {
     "modelo": "wnn-T32",
     "na": 1,
     "ns": 12,
-    "params": 23440,
-    "t1_kb": 325.43359375,
-    "disco_kb": 304.7138671875,
-    "rss_mb": 3.0078125,
+    "params": 88961,
     "mult_fp": 4,
     "soma_fp": 203,
     "lookups": 201,
@@ -36,17 +30,14 @@
       "Cortex-M4F (com FPU)": 4777,
       "Cortex-M0 (SEM FPU)": 19809
     },
-    "us_med": 73.2885,
-    "us_p99": 108.10105
+    "us_med": 26.115,
+    "us_p99": 115.73236999999975
   },
   {
     "modelo": "maddpg",
     "na": 2,
     "ns": 24,
     "params": 73474,
-    "t1_kb": 287.0078125,
-    "disco_kb": 1438.13671875,
-    "rss_mb": 456.84375,
     "mult_fp": 72964,
     "soma_fp": 73476,
     "lookups": 0,
@@ -56,17 +47,14 @@
       "Cortex-M4F (com FPU)": 440332,
       "Cortex-M0 (SEM FPU)": 9153172
     },
-    "us_med": 34.2705,
-    "us_p99": 57.16136999999999
+    "us_med": 54.18,
+    "us_p99": 171.13872999999998
   },
   {
     "modelo": "wnn-T16",
     "na": 2,
     "ns": 24,
-    "params": 21472,
-    "t1_kb": 296.2421875,
-    "disco_kb": 276.3544921875,
-    "rss_mb": 2.1796875,
+    "params": 22453,
     "mult_fp": 4,
     "soma_fp": 110,
     "lookups": 108,
@@ -76,17 +64,14 @@
       "Cortex-M4F (com FPU)": 2828,
       "Cortex-M0 (SEM FPU)": 13024
     },
-    "us_med": 83.6215,
-    "us_p99": 128.0675599999999
+    "us_med": 24.411,
+    "us_p99": 124.8023399999998
   },
   {
     "modelo": "wnn-T32",
     "na": 2,
     "ns": 24,
-    "params": 38900,
-    "t1_kb": 537.1875,
-    "disco_kb": 499.8955078125,
-    "rss_mb": 2.4296875,
+    "params": 41476,
     "mult_fp": 4,
     "soma_fp": 218,
     "lookups": 216,
@@ -96,7 +81,7 @@
       "Cortex-M4F (com FPU)": 5096,
       "Cortex-M0 (SEM FPU)": 20908
     },
-    "us_med": 88.6215,
-    "us_p99": 175.27612999999965
+    "us_med": 27.9605,
+    "us_p99": 146.61215999999885
   }
 ]

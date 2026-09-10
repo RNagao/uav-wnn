@@ -6,6 +6,14 @@ pelo harness da SPEC-03. A diferença é grande, e a causa não está na rede.
 Complementa [`../reports/spec06-memoria-wnn.md`](../reports/spec06-memoria-wnn.md),
 que trata do tamanho do artefato; aqui é a memória residente.
 
+> **Nota (2026-09-10).** O "T1 modelado" citado abaixo — bytes de artefato por
+> fórmula (`persistente`/`ordenado`) — deixou de ser figura de mérito do projeto.
+> A comparação de memória entre modelos passou a ser o **pico de RSS medido**
+> (`VmHWM`, um processo por modelo): `scripts/spec03_latencia_memoria.py` e
+> `reports/spec06-merito.md`. Esta investigação continua válida como a razão de a
+> `LUTPlana` existir; os números de RSS aqui são de um modelo cheio (ator +
+> crítico), não do deploy.
+
 ---
 
 ## 1. A medição que abriu a investigação
@@ -106,14 +114,10 @@ a escolha é livre — mas quem quiser bit-a-bit tem a opção.
 
 ## 5. O que isto NÃO resolve
 
-**O T1 publicado não muda.** Ele já reporta a variante `ordenado`, que é
-exatamente esta estrutura: 1 778 KB modelados contra 2 026 KB medidos — a
-diferença são as chaves em `int32` em vez do `uint16` que o modelo assume, e o
-vetor de deslocamentos.
-
-**A desvantagem contra o MADDPG continua.** O ator dele são 287 KB de pesos
-densos; o nosso são ~2 MB de tabela esparsa. A razão estrutural — a WNN guarda
-5,3× mais números — não muda com layout.
+**O layout não muda o que a rede guarda.** A `LUTPlana` é a variante `ordenado`
+implementada de verdade; ela muda o overhead por entrada, não o número de entradas
+— e no pico de RAM medido do deploy (`reports/spec06-merito.md`) o que domina é o
+transiente do load (dicionários → LUT), não a tabela final.
 
 **O treino não pode usar isto.** A LUT plana é **imutável**: inserir uma chave
 nova exigiria reordenar o array. O `dict` existe porque o treino escreve em
