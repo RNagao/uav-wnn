@@ -357,13 +357,15 @@ def figuras(m: dict, saida: Path) -> None:
     #    uma ordem de grandeza acima das WNN.
     if com_ram:
         fig, ax = plt.subplots(figsize=(8, 5))
-        rot = [f"MADDPG\nNa={na}, Ns={ns}"]
-        rams = [mad["ram"]]
-        cor = [TEAL]
-        for nome, w in m["wnn"].items():
+        # Mesma ordem da figura de latência: WNN T16, WNN T32, MADDPG.
+        rot, rams, cor = [], [], []
+        for nome, w in sorted(m["wnn"].items(), key=lambda kv: kv[1]["resolucao"]):
             rot.append(f"WNN T={w['resolucao']}\nNa={na}, Ns={ns}")
             rams.append(w["ram"])
             cor.append(AMBAR)
+        rot.append(f"MADDPG\nNa={na}, Ns={ns}")
+        rams.append(mad["ram"])
+        cor.append(TEAL)
         com_rep = all("pico_total_media_kb" in r for r in rams)
         tot = [_pico(r) / 1024 for r in rams]
         err = [r.get("pico_total_desvio_kb", 0.0) / 1024 for r in rams]
@@ -382,7 +384,7 @@ def figuras(m: dict, saida: Path) -> None:
                else "one process per model")
         ax.set_title(f"Peak RAM to load and run the actor, same cell {cel}: "
                      f"WNN / MADDPG = {razoes}\n"
-                     f"WNN in {rams[-1].get('arcabouco', 'NumPy')}, MADDPG in "
+                     f"WNN in {rams[0].get('arcabouco', 'NumPy')}, MADDPG in "
                      f"{mad['ram'].get('arcabouco', 'PyTorch')} · {sub}", fontsize=10)
         fig.tight_layout(); fig.savefig(saida / "t1_pico_ram.png", dpi=110); plt.close(fig)
         n_fig += 1
