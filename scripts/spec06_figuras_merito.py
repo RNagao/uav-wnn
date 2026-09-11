@@ -291,7 +291,6 @@ def figuras(m: dict, saida: Path) -> None:
     cel = m["celula"]["rotulo"]
     na, ns = m["celula"]["na"], m["celula"]["ns"]
     _, mad = _unico_maddpg(m)
-    ref = _wnn_referencia(m)
     n_fig = 0
     com_ram = bool(mad["ram"]) and all(w["ram"] for w in m["wnn"].values())
 
@@ -377,24 +376,6 @@ def figuras(m: dict, saida: Path) -> None:
         print("  [figuras] sem medição de pico de RAM da célula — t1_pico_ram.png e "
               "mapa_merito.png não gerados")
 
-    # 4. T2 — ciclos por decisão, por classe de hardware (log)
-    if "t2_ciclos" in m and ref:
-        fig, ax = plt.subplots(figsize=(8.5, 5))
-        hws = list(m["t2_ciclos"].keys())
-        x = np.arange(len(hws)); w = 0.38
-        ax.bar(x - w / 2, [m["t2_ciclos"][h]["wnn"] for h in hws], w,
-               color=AMBAR, label=f"WNN {m['t2_referencia_wnn']}")
-        ax.bar(x + w / 2, [m["t2_ciclos"][h]["maddpg"] for h in hws], w,
-               color=TEAL, label=f"MADDPG 256×256 ({cel})")
-        ax.set_yscale("log"); ax.set_xticks(x)
-        ax.set_xticklabels([h.split(" (")[0] for h in hws])
-        ax.set_ylabel("cycles per decision (log)")
-        pior = max(m["t2_ciclos"].values(), key=lambda c: c["ganho_wnn"])
-        ax.set_title("Inference cost — modeled cycles per decision: WNN wins, "
-                     f"up to {pior['ganho_wnn']:.0f}× without an FPU", fontsize=10)
-        ax.legend(fontsize=8); fig.tight_layout()
-        fig.savefig(saida / "t2_ciclos.png", dpi=110); plt.close(fig)
-        n_fig += 1
     print(f"[figuras] {n_fig} imagens em {saida}/")
 
 

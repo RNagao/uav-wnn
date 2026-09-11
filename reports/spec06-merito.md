@@ -250,7 +250,7 @@ ciclo-a-ciclo.
   `spec03-latencia-a2s24.png` e `spec03-pico-ram-a2s24.png`.
 - `reports/spec06-merito.json` — números por modelo (T1 pico de RAM no campo `ram`,
   T2 ciclos, latência medida, e o perfil de operações no campo `operacoes`).
-- `reports/img/spec06-merito/` — `t1_pico_ram.png`, `t2_ciclos.png`,
+- `reports/img/spec06-merito/` — `t1_pico_ram.png`,
   `latencia_empirica.png`, `mapa_merito.png`.
 - Modelos: `models/deploy/T{16,32}/a2s24` (o artefato que voa, mesma célula do
   MADDPG).
