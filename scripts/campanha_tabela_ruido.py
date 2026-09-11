@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from pathlib import Path
 
@@ -102,8 +103,14 @@ def coletar(rotulo: str, regime: str, ns_list: list[int], pasta: Path, na: int):
     return s, t, presentes, faltando
 
 
-def _fmt_sr(r: dict) -> str:
-    return f"{r['media']*100:.2f}\\% $\\pm$ {r['desvio']*100:.2f}"
+def _fmt_sr(r: dict, casas: int = 2) -> str:
+    media, desvio = r["media"] * 100, r["desvio"] * 100
+    # "100.00% ± 0.03" é contraditório: se alguma corrida falhou (desvio > 0), a média
+    # é < 100 e o arredondamento normal não pode mascarar isso. Nesse caso trunca para
+    # baixo (99.99833 -> 99.99), mantendo a média exibida coerente com o desvio.
+    if desvio > 0 and round(media, casas) >= 100.0:
+        media = math.floor(media * 10**casas) / 10**casas
+    return f"{media:.{casas}f}\\% $\\pm$ {desvio:.{casas}f}"
 
 
 def _fmt_ct(r: dict) -> str:
