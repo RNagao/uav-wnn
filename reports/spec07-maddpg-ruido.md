@@ -188,7 +188,7 @@ tempo real** (uma decisão a cada 2 s), que é o prazo que o deploy precisa cump
 | figura | KF+controle | referência | fração |
 |---|---|---|---|
 | **T2** latência/decisão (MEDIDA) | **~20 µs** (ciclo do KF, protótipo NumPy) | orçamento de 2 s | **~0,001 %** |
-| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | 3,1 MB (acréscimo do ator MADDPG ao pico de RAM, medido, a2s24) | ~0,0006 % |
+| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | ~10 MB (acréscimo do ator MADDPG ao pico de RAM, média de 100 processos, a2s24) | ~0,0002 % |
 
 Trocamos a figura antiga (que contava multiplicações fp por decisão) pela
 **latência empírica medida** — contar multiplicação subestima o KF por construção

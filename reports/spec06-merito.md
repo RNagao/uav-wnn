@@ -41,45 +41,25 @@ ator + termômetro que de fato voam, a MESMA fonte da latência medida (SPEC-03)
 Pico = `VmHWM` do processo ao fim do laço de inferência; **arcabouço** = pico depois
 dos imports e antes de qualquer peso; **acréscimo do modelo** = pico total − arcabouço.
 
-| modelo (arcabouço) | arcabouço | **pico total** | acréscimo do modelo | RSS pós-carga |
-|---|---|---|---|---|
-| **WNN T=16 (2/24), deploy** (NumPy) | 32,1 MB | **50,7 MB** | 18,6 MB | 40,4 MB |
-| **WNN T=32 (2/24), deploy** (NumPy) | 30,9 MB | **53,0 MB** | 22,1 MB | 40,5 MB |
-| MADDPG (Na=2, a2s24) (PyTorch) | 508,0 MB | **511,1 MB** | 3,1 MB | 504,5 MB |
+A figura usa **só o pico total**, como média ± desvio-padrão amostral de **100
+processos novos por modelo** (`--repeticoes 100`, `reports/spec03-pico-ram-rep100-a2s24.md`;
+mínimo–máximo entre parênteses):
 
-**O processo da WNN tem pico ~10× menor — e o motivo é o arcabouço.** O MADDPG
-paga ~508 MB só para importar o PyTorch; o ator em si acresce 3,1 MB ao pico. A WNN
-em NumPy parte de ~31 MB e o modelo acresce **18,6–22,1 MB** — mais que o MADDPG,
-porque o load constrói a rede de dicionários antes de achatá-la na `LUTPlana`
-(transiente que o pico captura e o RSS pós-carga, ~9 MB acima do arcabouço, não
-mostra). São duas leituras, e as duas ficam na tabela: **pico total** é o que o
-dispositivo precisa ter de RAM com este código; **acréscimo do modelo** é o que a
-rede custa descontada a biblioteca. Nenhuma das duas é bytes de artefato.
+| modelo (arcabouço) | **pico total** (n=100) | latência mediana (n=100) |
+|---|---|---|
+| **WNN T=16 (2/24), deploy** (NumPy) | **45,93 ± 0,11 MB** (45,57–46,14) | 22,6 ± 0,3 µs |
+| **WNN T=32 (2/24), deploy** (NumPy) | **53,26 ± 0,15 MB** (52,97–53,60) | 25,2 ± 0,5 µs |
+| MADDPG (Na=2, a2s24) (PyTorch) | **505,98 ± 0,06 MB** (505,84–506,16) | 49,1 ± 0,8 µs |
 
-### Variabilidade — 100 processos por modelo
+**O processo da WNN tem pico ~0,09–0,11× o do MADDPG, e é estável**: desvio abaixo
+de 0,2 MB nos três modelos entre processos. O motivo da diferença é o arcabouço — o
+MADDPG paga ~496 MB só para importar o PyTorch, contra ~31 MB de NumPy na WNN; a
+decomposição em pico do arcabouço e acréscimo do modelo (a WNN acresce mais, 15–22 MB
+contra 10 MB, porque o load constrói dicionários antes da `LUTPlana`) fica no
+relatório da SPEC-03 (`reports/spec03-latencia-memoria-a2s24.md` e o agregado das
+100). Nenhum desses números é bytes de artefato.
 
-A tabela acima é **uma** medição (o artefato canônico). Para dimensionar a dispersão
-entre processos, `--repeticoes 100` roda cada filho 100 vezes, com um processo novo
-por medição (`reports/spec03-pico-ram-rep100-a2s24.md`). Média ± desvio-padrão
-amostral, mínimo–máximo entre parênteses:
-
-| modelo | pico total | arcabouço | acréscimo do modelo | latência mediana |
-|---|---|---|---|---|
-| WNN T=16 (NumPy) | 45,9 ± 0,1 MB (45,6–46,1) | 31,3 ± 0,1 MB | 14,7 ± 0,1 MB | 22,6 ± 0,3 µs |
-| WNN T=32 (NumPy) | 53,3 ± 0,2 MB (53,0–53,6) | 31,3 ± 0,1 MB | 22,0 ± 0,1 MB | 25,2 ± 0,5 µs |
-| MADDPG (PyTorch) | 506,0 ± 0,1 MB (505,8–506,2) | 496,0 ± 0,1 MB | 10,0 ± 0,0 MB | 49,1 ± 0,8 µs |
-
-O pico é **estável entre processos** (desvio abaixo de 0,2 MB em todos), e as
-conclusões não mudam: processo da WNN ~0,09× o do MADDPG; acréscimo do modelo maior
-na WNN (T=32) e comparável (T=16) ao do MADDPG. Duas leituras da medição única ficam
-fora da faixa das 100 — o arcabouço do MADDPG (508 contra 496 MB) e o acréscimo dele
-(3,1 contra 10,0 MB): a soma é a mesma (~511 contra ~506 MB), mas a fronteira
-imports/load caiu em outro ponto naquele processo, provavelmente por inicialização
-preguiçosa do torch na primeira execução da máquina. **Para citar números, prefira
-a média das 100.** O p99 de latência é a única coluna com dispersão real
-(15–27 µs de desvio): é cauda de contenção, como o protocolo espera.
-
-![box plot das 100 medições por modelo: pico total (log), acréscimo do modelo e latência mediana](spec03-pico-ram-rep100-a2s24.png)
+![box plot das 100 medições por modelo: pico total (log) e latência mediana](spec03-pico-ram-rep100-a2s24.png)
 
 ## T2 — Tempo de inferência
 
@@ -170,17 +150,16 @@ da grade. A comparação head-to-head de desempenho nas células do artigo é a
 
 | eixo | vencedor | margem (mesma célula a2s24) |
 |---|---|---|
-| **Pico de RAM (T1, processo)** | **WNN** | 51–53 MB × 511 MB (~0,10×) — quase todo o pico do MADDPG é PyTorch |
-| **Pico de RAM (T1, acréscimo do modelo)** | MADDPG | 3,1 MB × 18,6–22,1 MB — o load da WNN é o transiente |
+| **Pico de RAM (T1, processo, n=100)** | **WNN** | 45,9 / 53,3 MB × 506,0 MB (~0,1×) — quase todo o pico do MADDPG é PyTorch |
 | **Inferência (T2, ciclos)** | **WNN** | 31× (x86) a **438× (Cortex-M0)** |
 | **Inferência (T2, latência medida)** | **WNN** | **~2,2×** no relógio (NumPy × PyTorch) |
 
 O perfil da WNN é o de um alvo **sem FPU** (MCU): ganha em aritmética — nos ciclos
-modelados e na latência empírica medida. Em RAM, o veredito depende do que se
-conta: o **processo** da WNN cabe em ~50 MB contra ~0,5 GB do MADDPG em PyTorch,
-mas isso é sobretudo o preço do arcabouço (RNF-11: arcabouços diferentes);
-descontado o arcabouço, a rede sem peso acresce mais ao pico (~20 MB contra 3 MB),
-porque o load em Python constrói dicionários antes da LUT plana. A figura de
+modelados e na latência empírica medida. Em RAM, o **processo** da WNN cabe em
+~46–53 MB contra ~506 MB do MADDPG em PyTorch, com desvio abaixo de 0,2 MB em 100
+processos — mas isso é sobretudo o preço do arcabouço (RNF-11: arcabouços
+diferentes); descontado o arcabouço, a rede sem peso acresce mais ao pico (15–22 MB
+contra 10 MB), porque o load em Python constrói dicionários antes da LUT plana. A figura de
 mérito certa não é "quem é menor", e sim **qual recurso é o gargalo no hardware
 alvo** — e num MCU sem FPU, onde o MADDPG estoura em ciclos, a rede sem peso tem
 uma vantagem estrutural real.
@@ -199,7 +178,10 @@ Do artefato da SPEC-03 (`scripts/spec03_latencia_memoria.py`), na célula a2s24:
   um pico próprio; e um drone carrega UM modelo;
 - **três leituras do `VmHWM`**: base (interpretador), **arcabouço** (após os
   imports: NumPy; ou NumPy + PyTorch), **total** (ao fim do laço de inferência, com
-  o modelo carregado). **Acréscimo do modelo** = total − arcabouço;
+  o modelo carregado). A figura de mérito usa **só o total**; a decomposição fica
+  no relatório da SPEC-03;
+- **100 repetições** (`--repeticoes 100`): um processo novo por medição; média,
+  desvio-padrão amostral, mínimo e máximo por modelo, e o box plot;
 - **RSS pós-carga**: `VmRSS` estável após `malloc_trim` — o que fica, não o pico;
 - **o simulador fica fora**: a observação é calculada no processo pai e gravada em
   `.npy`; construir o ambiente (~15 MB) entraria no pico do filho.
@@ -256,7 +238,8 @@ ciclo-a-ciclo.
   MADDPG).
 
 ```bash
-uv run --group baseline python scripts/spec03_latencia_memoria.py   # mede (a2s24)
+uv run --group baseline python scripts/spec03_latencia_memoria.py                   # mede (a2s24)
+uv run --group baseline python scripts/spec03_latencia_memoria.py --repeticoes 100  # 100 processos/modelo
 uv run python scripts/spec06_figuras_merito.py                      # célula padrão a2s24
 uv run python scripts/spec06_figuras_merito.py --na 4 --ns 24       # outra célula → sufixo -a4s24
 ```

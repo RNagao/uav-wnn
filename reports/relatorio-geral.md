@@ -67,7 +67,7 @@ de **deploy** (`models/deploy`), a mesma fonte da latência medida.
 
 | eixo | WNN (a2s24, Na=2, deploy) | MADDPG (256×256, Na=2) | vencedor |
 |---|---|---|---|
-| **T1 pico de RAM (processo, medido)** | 51–53 MB (NumPy; modelo acresce 19–22 MB) | 511 MB (PyTorch; modelo acresce 3,1 MB) | **WNN** no processo (~0,10×) — quase todo o pico do MADDPG é arcabouço |
+| **T1 pico de RAM (processo, medido, 100 processos)** | 45,9 ± 0,1 / 53,3 ± 0,2 MB (NumPy) | 506,0 ± 0,1 MB (PyTorch) | **WNN** no processo (~0,1×) — quase todo o pico do MADDPG é arcabouço |
 | **T2 inferência (ciclos)** | 4,8 k (x86) · 21 k (M0) | 147 k (x86) · 9,15 M (M0) | **WNN** — 31× (x86) a **438× (Cortex-M0 sem FPU)** |
 | **T2 inferência (latência medida)** | 22–25 µs (a2s24, NumPy) | 49 µs (PyTorch) | **WNN** — ~2× no relógio |
 
@@ -90,9 +90,9 @@ calculada: ver `spec06-merito.md` (seção *Metodologia*).
 **Conclusão:** a rede sem peso **ganha em inferência** — nos ciclos e no relógio
 medido —, com vantagem que explode em hardware **sem FPU**. Em memória a figura é
 o **pico de RAM medido** do processo (a comparação por bytes de artefato foi
-retirada): o processo da WNN cabe em ~50 MB contra ~0,5 GB do MADDPG em PyTorch,
-mas quase todo esse pico é arcabouço — descontado, o ator MADDPG acresce 3 MB e a
-WNN ~20 MB (o load monta dicionários antes da LUT plana). É o lado de custo de H1,
+retirada): o processo da WNN cabe em ~46–53 MB contra ~506 MB do MADDPG em PyTorch (média de
+100 processos, desvio < 0,2 MB), mas quase todo esse pico é arcabouço — descontado,
+o ator MADDPG acresce 10 MB e a WNN 15–22 MB (o load monta dicionários antes da LUT plana). É o lado de custo de H1,
 e é o resultado mais sólido do trabalho até aqui (independe de a política ser ótima).
 
 ---

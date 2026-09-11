@@ -18,7 +18,10 @@
         "pico_arcabouco_kb": 32848,
         "pico_modelo_kb": 19072,
         "rss_apos_carga_kb": 41408,
-        "arcabouco": "NumPy"
+        "arcabouco": "NumPy",
+        "pico_total_media_kb": 47031.64,
+        "pico_total_desvio_kb": 109.18407402273475,
+        "n_rep": 100
       },
       "ciclos_ref": 2516,
       "operacoes": {
@@ -47,7 +50,10 @@
         "pico_arcabouco_kb": 31648,
         "pico_modelo_kb": 22604,
         "rss_apos_carga_kb": 41472,
-        "arcabouco": "NumPy"
+        "arcabouco": "NumPy",
+        "pico_total_media_kb": 54538.32,
+        "pico_total_desvio_kb": 150.96530339214647,
+        "n_rep": 100
       },
       "ciclos_ref": 4784,
       "operacoes": {
@@ -72,7 +78,10 @@
         "pico_arcabouco_kb": 520212,
         "pico_modelo_kb": 3132,
         "rss_apos_carga_kb": 516628,
-        "arcabouco": "PyTorch"
+        "arcabouco": "PyTorch",
+        "pico_total_media_kb": 518119.12,
+        "pico_total_desvio_kb": 62.068271306927045,
+        "n_rep": 100
       },
       "params": 73474,
       "ciclos_ref": 147152,
@@ -98,6 +107,7 @@
       }
     }
   },
+  "repeticoes": 100,
   "t2_ciclos": {
     "x86-64 (com FPU e SIMD)": {
       "wnn": 4784,

@@ -45,13 +45,13 @@ Para o orçamento de 50 M passos de Lamenza, contra 7 dias de GPU por célula no
 
 A figura de memória do projeto é o **pico de RSS** (`VmHWM`) do processo que carrega o modelo e decide — um processo por modelo, mesma observação, célula a2s24 (`scripts/spec03_latencia_memoria.py`). A comparação por **memória persistente** (bytes do artefato, por fórmula) foi retirada: respondia "quanto ocupa em flash", não "quanta RAM precisa ter para rodar".
 
-| modelo (arcabouço) | pico total | acréscimo do modelo | latência (mediana) |
-|---|---|---|---|
-| **WNN T=16 deploy** (NumPy) | **51 MB** | 18,6 MB | **22 µs** |
-| **WNN T=32 deploy** (NumPy) | **53 MB** | 22,1 MB | **25 µs** |
-| MADDPG 256×256 (PyTorch) | 511 MB | 3,1 MB | 49 µs |
+| modelo (arcabouço) | pico total (média ± dp, 100 processos) | latência mediana |
+|---|---|---|
+| **WNN T=16 deploy** (NumPy) | **45,9 ± 0,1 MB** | **22,6 ± 0,3 µs** |
+| **WNN T=32 deploy** (NumPy) | **53,3 ± 0,2 MB** | **25,2 ± 0,5 µs** |
+| MADDPG 256×256 (PyTorch) | 506,0 ± 0,1 MB | 49,1 ± 0,8 µs |
 
-O processo da WNN tem pico ~10× menor, mas quase todo o pico do MADDPG é o PyTorch; descontado o arcabouço, a rede sem peso acresce mais (o load constrói dicionários antes da LUT plana). Em computação a WNN ganha: **zero multiplicações em ponto flutuante no aproximador**, ~2× no relógio e vantagem de ciclos **condicional à classe de alvo** — 31× em x86, 86× em Cortex-M4F, **438× em Cortex-M0 sem FPU**. Ver [`reports/spec06-merito.md`](reports/spec06-merito.md).
+O processo da WNN tem pico ~10× menor, mas quase todo o pico do MADDPG é o PyTorch (~496 MB só de imports); descontado o arcabouço, a rede sem peso acresce mais (o load constrói dicionários antes da LUT plana). Em computação a WNN ganha: **zero multiplicações em ponto flutuante no aproximador**, ~2× no relógio e vantagem de ciclos **condicional à classe de alvo** — 31× em x86, 86× em Cortex-M4F, **438× em Cortex-M0 sem FPU**. Ver [`reports/spec06-merito.md`](reports/spec06-merito.md).
 
 *(Ressalva RNF-11: arcabouços diferentes dos dois lados — NumPy × PyTorch — dominam tanto o pico quanto a latência.)*
 

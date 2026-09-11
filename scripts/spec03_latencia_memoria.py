@@ -43,6 +43,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import subprocess
 import sys
 import tempfile
@@ -368,8 +369,7 @@ def _artefatos_rep(amostras: dict, agg: dict, na: int, ns: int, n: int) -> list[
 
 
 def _boxplot_rep(amostras: dict, na: int, ns: int, n: int, saida: Path) -> Path:
-    """Box plot por modelo das N medições: pico total, acréscimo do modelo e
-    latência mediana. Caixa = quartis, bigodes 1,5×IQR, pontos = TODAS as
+    """Box plot por modelo das N medições: pico total e latência mediana. Caixa = quartis, bigodes 1,5×IQR, pontos = TODAS as
     amostras (jitter), para que a dispersão real e os outliers fiquem visíveis.
     O pico total vai em log — o PyTorch põe o MADDPG uma ordem de grandeza acima."""
     import matplotlib
@@ -379,11 +379,10 @@ def _boxplot_rep(amostras: dict, na: int, ns: int, n: int, saida: Path) -> Path:
 
     ordem = [m for m in ("wnn-T16", "wnn-T32", "maddpg") if m in amostras]
     cores = [CORES.get(m, "#888") for m in ordem]
-    paineis = (("pico_total_kb", 1024, "peak RSS of the process (MB, log)", True),
-               ("pico_modelo_kb", 1024, "model increment to the peak (MB)", False),
+    paineis = (("pico_total_kb", 1024, "peak RSS of the process — VmHWM (MB, log)", True),
                ("mediana_us", 1, "latency per decision, median (µs)", False))
     rng = np.random.default_rng(0)
-    fig, axes = plt.subplots(1, 3, figsize=(12.5, 4.4))
+    fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.4))
     for ax, (campo, div, rot, log) in zip(axes, paineis):
         dados = [np.array([r[campo] for r in amostras[m]], float) / div for m in ordem]
         bp = ax.boxplot(dados, widths=0.5, patch_artist=True, showfliers=False,
@@ -487,6 +486,24 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
 CORES = {"wnn-T16": "#2a9d8f", "wnn-T32": "#457b9d", "maddpg": "#e76f51"}
 
 
+def _agregado_rep(na: int, ns: int):
+    """Maior agregado de repetições da célula, se houver: `(agregado, N)`.
+
+    Procura `reports/spec03-pico-ram-rep*-a{na}s{ns}.json` e fica com o maior N. As
+    figuras usam a média ± desvio do pico total de lá; sem o arquivo, a medição única.
+    """
+    melhor = None
+    for f in (RAIZ / "reports").glob(f"spec03-pico-ram-rep*-a{na}s{ns}.json"):
+        m = re.search(r"rep(\d+)-", f.name)
+        n = int(m.group(1)) if m else 0
+        if melhor is None or n > melhor[0]:
+            melhor = (n, f)
+    if melhor is None:
+        return None
+    d = json.loads(melhor[1].read_text())
+    return d["agregado"], d["repeticoes"]
+
+
 def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     """Dois PNGs: os tempos medidos e o pico de RAM por processo.
 
@@ -525,32 +542,32 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     f = RAIZ / "reports" / f"spec03-latencia-a{na}s{ns}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
 
-    # -- pico de RAM: arcabouço (hachurado) ao lado do pico total, em log --
-    #    Empilhar não funciona em log: a fatia do arcabouço vira uma linha no pé
-    #    da barra. Lado a lado, as duas leituras ficam comparáveis entre modelos.
-    import numpy as np
-    fig, ax = plt.subplots(figsize=(6.8, 3.9))
-    arc = [r["pico_arcabouco_kb"] / 1024 for r in linhas]
-    tot = [r["pico_total_kb"] / 1024 for r in linhas]
-    x = np.arange(len(nomes)); lg = 0.36
-    ax.bar(x - lg / 2, arc, lg, color=cores, alpha=0.35, hatch="//",
-           edgecolor=cores, label="framework peak (imports, no weights)")
-    ax.bar(x + lg / 2, tot, lg, color=cores,
-           label="total peak (model loaded + inference)")
-    for i, (a_, t, r) in enumerate(zip(arc, tot, linhas)):
-        ax.annotate(f"{a_:,.0f}", (i - lg / 2, a_), ha="center", va="bottom",
-                    fontsize=8, xytext=(0, 2), textcoords="offset points")
-        ax.annotate(f"{t:,.0f} MB\n+{r['pico_modelo_kb']/1024:,.1f} MB model",
-                    (i + lg / 2, t), ha="center", va="bottom", fontsize=8,
-                    weight="bold", xytext=(0, 2), textcoords="offset points")
+    # -- pico de RAM: SÓ o pico total, em log; média ± desvio das repetições se houver --
+    #    O pico do arcabouço e o acréscimo do modelo ficam na tabela do relatório; a
+    #    figura responde a uma pergunta só: quanta RAM o processo precisou, no máximo.
+    fig, ax = plt.subplots(figsize=(6.4, 3.8))
+    rep = _agregado_rep(na, ns)
+    agg = rep[0] if rep else {}
+    tot, err = [], []
+    for r in linhas:
+        e = agg.get(r["modelo"], {}).get("pico_total_kb")
+        tot.append((e["media"] if e else r["pico_total_kb"]) / 1024)
+        err.append((e["desvio"] if e else 0.0) / 1024)
+    com_rep = rep is not None and all(agg.get(r["modelo"]) for r in linhas)
+    barras = ax.bar(nomes, tot, color=cores, width=0.55,
+                    yerr=err if com_rep else None, capsize=4, ecolor="#333")
+    for b, t, e in zip(barras, tot, err):
+        rot_v = f"{t:,.1f} ± {e:,.1f} MB" if com_rep else f"{t:,.1f} MB"
+        ax.annotate(rot_v, (b.get_x() + b.get_width() / 2, t + e), ha="center",
+                    va="bottom", fontsize=9, weight="bold", xytext=(0, 3),
+                    textcoords="offset points")
     ax.set_yscale("log")
     ax.set_ylim(10, max(tot) * 4)
-    ax.set_xticks(x, nomes)
-    ax.set_ylabel("peak RSS of the process (MB, log)")
+    ax.set_ylabel("peak RSS of the process — VmHWM (MB, log)")
+    sub = (f"mean ± sd over {rep[1]} fresh processes per model" if com_rep
+           else "one process per model")
     ax.set_title(f"Peak RAM to load and run the actor — {rot}\n"
-                 "VmHWM · one process per model · observation precomputed "
-                 "outside the child", fontsize=10)
-    ax.legend(frameon=False, fontsize=8.5, loc="upper left")
+                 f"{sub} · observation precomputed outside the child", fontsize=10)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     f = RAIZ / "reports" / f"spec03-pico-ram-a{na}s{ns}.png"

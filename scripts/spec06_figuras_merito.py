@@ -96,10 +96,41 @@ def _medicao(na: int, ns: int) -> dict[str, dict]:
     return {r["modelo"]: r for r in json.loads(art.read_text())}
 
 
-def _ram(med: dict | None) -> dict:
+def _agregado_rep(na: int, ns: int) -> tuple[dict, int] | None:
+    """Maior agregado de repetições da célula (`spec03-pico-ram-rep*-a{na}s{ns}.json`).
+
+    É de onde saem a média e o desvio do pico total: N processos novos por modelo.
+    Sem o arquivo, a tabela e as figuras usam a medição única.
+    """
+    import re
+    melhor = None
+    for f in Path("reports").glob(f"spec03-pico-ram-rep*-{rotulo_celula(na, ns)}.json"):
+        m = re.search(r"rep(\d+)-", f.name)
+        n = int(m.group(1)) if m else 0
+        if melhor is None or n > melhor[0]:
+            melhor = (n, f)
+    if melhor is None:
+        return None
+    d = json.loads(melhor[1].read_text())
+    return d["agregado"], d["repeticoes"]
+
+
+def _ram(med: dict | None, rep: dict | None = None) -> dict:
+    """Pico de RAM do modelo: a medição única mais, se houver, média ± desvio das
+    repetições (`pico_total_media_kb`, `pico_total_desvio_kb`, `n_rep`)."""
     if not med:
         return {}
-    return {k: med[k] for k in CHAVES_RAM if k in med}
+    r = {k: med[k] for k in CHAVES_RAM if k in med}
+    if rep and "pico_total_kb" in rep:
+        r["pico_total_media_kb"] = rep["pico_total_kb"]["media"]
+        r["pico_total_desvio_kb"] = rep["pico_total_kb"]["desvio"]
+        r["n_rep"] = rep["n"]
+    return r
+
+
+def _pico(ram: dict) -> float:
+    """O pico total a citar: média das repetições se houver, senão a medição única."""
+    return ram.get("pico_total_media_kb", ram["pico_total_kb"])
 
 
 def _perfil_ops(op) -> dict:
@@ -125,8 +156,10 @@ def coletar(na: int, ns: int, resolucoes: tuple[int, ...]) -> dict:
     cfg = LAMENZA_003(na, ns, phase="eval")
     d_obs = cfg.observation_size
     medido = _medicao(na, ns)
+    rep = _agregado_rep(na, ns)
+    agg = rep[0] if rep else {}
     m: dict = {"celula": {"na": na, "ns": ns, "rotulo": cel, "d_obs": d_obs},
-               "wnn": {}, "maddpg": {}}
+               "wnn": {}, "maddpg": {}, "repeticoes": rep[1] if rep else None}
 
     for t in resolucoes:
         nome = f"T={t} ({cel})"
@@ -146,7 +179,7 @@ def coletar(na: int, ns: int, resolucoes: tuple[int, ...]) -> dict:
             "n_ram": int(ap.ator.n_ram),
             "entradas_ocupadas": int(ap.ator.entradas_ocupadas()),
             # T1 — pico de RAM MEDIDO (SPEC-03), não bytes de artefato.
-            "ram": _ram(medido.get(f"wnn-T{t}")),
+            "ram": _ram(medido.get(f"wnn-T{t}"), agg.get(f"wnn-T{t}")),
             # Computação em CICLOS: a WNN quase não multiplica, então contar
             # multiplicação a subestimava por construção. Ciclos somam TODAS as
             # operações (lookups, somas int) e é o que o mapa de mérito usa.
@@ -157,7 +190,7 @@ def coletar(na: int, ns: int, resolucoes: tuple[int, ...]) -> dict:
 
     camadas = [d_obs, *MADDPG_OCULTAS, MADDPG_SAIDA]
     om = operacoes_mlp(camadas)
-    m["maddpg"][cel] = {"ram": _ram(medido.get("maddpg")),
+    m["maddpg"][cel] = {"ram": _ram(medido.get("maddpg"), agg.get("maddpg")),
                         "params": sum(a * b + b for a, b in zip(camadas[:-1], camadas[1:])),
                         "ciclos_ref": ciclos(om, HW_MAPA), "D": d_obs,
                         "camadas": camadas, "operacoes": _perfil_ops(om)}
@@ -208,15 +241,17 @@ def tabela(m: dict) -> None:
     cel = m["celula"]["rotulo"]
     print(f"Figuras de mérito — pico de RAM (T1) e inferência (T2), célula {cel} "
           f"(Na={m['celula']['na']}, Ns={m['celula']['ns']}, D={m['celula']['d_obs']})\n")
-    print(f"{'modelo':>22} {'pico total':>11} {'arcabouço':>10} {'modelo':>9} "
-          f"{'entradas':>10} {'treino':>8}")
+    n_rep = m.get("repeticoes")
+    col = f"pico total (média ± dp, n={n_rep})" if n_rep else "pico total"
+    print(f"{'modelo':>22} {col:>32} {'entradas':>10} {'treino':>8}")
     _, mad = _unico_maddpg(m)
 
     def linha_ram(rot, ram, n, treino, extra=""):
-        if ram:
-            print(f"{rot:>22} {_mb(ram['pico_total_kb']):>11} "
-                  f"{_mb(ram['pico_arcabouco_kb']):>10} {_mb(ram['pico_modelo_kb']):>9} "
-                  f"{n:>10,} {treino:>8}{extra}")
+        if ram and "pico_total_media_kb" in ram:
+            v = f"{ram['pico_total_media_kb']/1024:,.2f} ± {ram['pico_total_desvio_kb']/1024:,.2f} MB"
+            print(f"{rot:>22} {v:>32} {n:>10,} {treino:>8}{extra}")
+        elif ram:
+            print(f"{rot:>22} {_mb(ram['pico_total_kb']):>32} {n:>10,} {treino:>8}{extra}")
         else:
             print(f"{rot:>22} {'— (sem medição)':>32} {n:>10,} {treino:>8}{extra}")
 
@@ -232,15 +267,13 @@ def tabela(m: dict) -> None:
         for nome, w in m["wnn"].items():
             if not w["ram"]:
                 continue
-            r = w["ram"]["pico_total_kb"] / mad["ram"]["pico_total_kb"]
-            rm = w["ram"]["pico_modelo_kb"] / max(mad["ram"]["pico_modelo_kb"], 1)
-            print(f"  WNN {nome}: pico {_mb(w['ram']['pico_total_kb'])} = {r:.2f}× o "
-                  f"processo do MADDPG ({_mb(mad['ram']['pico_total_kb'])}); descontado "
-                  f"o arcabouço, o modelo acresce {_mb(w['ram']['pico_modelo_kb'])} "
-                  f"contra {_mb(mad['ram']['pico_modelo_kb'])} ({rm:.1f}×)")
+            r = _pico(w["ram"]) / _pico(mad["ram"])
+            print(f"  WNN {nome}: pico {_mb(_pico(w['ram']))} = {r:.2f}× o "
+                  f"processo do MADDPG ({_mb(_pico(mad['ram']))})")
         print(f"  arcabouço: WNN em {next(iter(m['wnn'].values()))['ram'].get('arcabouco', '?')}, "
               f"MADDPG em {mad['ram'].get('arcabouco', '?')} — o pico do MADDPG é quase "
-              "todo biblioteca (RNF-11: arcabouços diferentes)")
+              "todo biblioteca (RNF-11: arcabouços diferentes); a decomposição "
+              "arcabouço/modelo fica no relatório da SPEC-03")
         orcamentos = {w["passos_treino"] for w in m["wnn"].values()}
         if any(p and p < 50_000_000 for p in orcamentos):
             print("  ATENÇÃO: WNN desta célula treinada com menos passos que o MADDPG "
@@ -319,9 +352,9 @@ def figuras(m: dict, saida: Path) -> None:
         n_fig += 1
 
     # 2. T1 — pico de RAM MEDIDO (MB, log), MESMA célula para todas as barras.
-    #    Barras agrupadas: pico do arcabouço (hachurado) ao lado do pico total —
-    #    empilhar em log esconde a fatia menor. Log porque o PyTorch põe o
-    #    processo do MADDPG uma ordem de grandeza acima das WNN.
+    #    SÓ o pico total: uma barra por modelo, média ± desvio das repetições quando
+    #    o agregado da célula existe. Log porque o PyTorch põe o processo do MADDPG
+    #    uma ordem de grandeza acima das WNN.
     if com_ram:
         fig, ax = plt.subplots(figsize=(8, 5))
         rot = [f"MADDPG\nNa={na}, Ns={ns}"]
@@ -331,29 +364,26 @@ def figuras(m: dict, saida: Path) -> None:
             rot.append(f"WNN T={w['resolucao']}\nNa={na}, Ns={ns}")
             rams.append(w["ram"])
             cor.append(AMBAR)
-        x = np.arange(len(rot)); lg = 0.36
-        arc = [r["pico_arcabouco_kb"] / 1024 for r in rams]
-        tot = [r["pico_total_kb"] / 1024 for r in rams]
-        ax.bar(x - lg / 2, arc, lg, color=cor, alpha=0.35, hatch="//", edgecolor=cor,
-               label="framework peak (imports, no weights)")
-        ax.bar(x + lg / 2, tot, lg, color=cor, label="total peak (model loaded + inference)")
-        for i, (a_, t, r) in enumerate(zip(arc, tot, rams)):
-            ax.annotate(f"{a_:,.0f}", (i - lg / 2, a_), ha="center", va="bottom",
-                        fontsize=8.5, xytext=(0, 2), textcoords="offset points")
-            ax.annotate(f"{t:,.0f} MB\n+{r['pico_modelo_kb']/1024:,.1f} MB model",
-                        (i + lg / 2, t), ha="center", va="bottom", fontsize=9,
-                        weight="bold", xytext=(0, 2), textcoords="offset points")
+        com_rep = all("pico_total_media_kb" in r for r in rams)
+        tot = [_pico(r) / 1024 for r in rams]
+        err = [r.get("pico_total_desvio_kb", 0.0) / 1024 for r in rams]
+        barras = ax.bar(rot, tot, color=cor, width=0.55,
+                        yerr=err if com_rep else None, capsize=5, ecolor="#333")
+        for b, t, e in zip(barras, tot, err):
+            txt = f"{t:,.1f} ± {e:,.1f} MB" if com_rep else f"{t:,.1f} MB"
+            ax.annotate(txt, (b.get_x() + b.get_width() / 2, t + e), ha="center",
+                        va="bottom", fontsize=10, weight="bold", xytext=(0, 3),
+                        textcoords="offset points")
         ax.set_yscale("log"); ax.set_ylim(10, max(tot) * 4)
-        ax.set_xticks(x, rot)
         ax.set_ylabel("peak RSS of the process — VmHWM (MB, log)")
-        razoes = " · ".join(f"T={w['resolucao']} {w['ram']['pico_total_kb']/mad['ram']['pico_total_kb']:.2f}×"
+        razoes = " · ".join(f"T={w['resolucao']} {_pico(w['ram'])/_pico(mad['ram']):.2f}×"
                             for w in m["wnn"].values())
+        sub = (f"mean ± sd over {m['repeticoes']} fresh processes per model" if com_rep
+               else "one process per model")
         ax.set_title(f"Peak RAM to load and run the actor, same cell {cel}: "
                      f"WNN / MADDPG = {razoes}\n"
                      f"WNN in {rams[-1].get('arcabouco', 'NumPy')}, MADDPG in "
-                     f"{mad['ram'].get('arcabouco', 'PyTorch')} · one process per model",
-                     fontsize=10)
-        ax.legend(frameon=False, fontsize=8.5, loc="upper left")
+                     f"{mad['ram'].get('arcabouco', 'PyTorch')} · {sub}", fontsize=10)
         fig.tight_layout(); fig.savefig(saida / "t1_pico_ram.png", dpi=110); plt.close(fig)
         n_fig += 1
 
@@ -361,9 +391,9 @@ def figuras(m: dict, saida: Path) -> None:
         hw_curto = HW_MAPA.split(" (")[0]
         fig, ax = plt.subplots(figsize=(8, 5.5))
         for nome, w in m["wnn"].items():
-            ax.scatter(w["ciclos_ref"], w["ram"]["pico_total_kb"] / 1024, s=140,
+            ax.scatter(w["ciclos_ref"], _pico(w["ram"]) / 1024, s=140,
                        color=AMBAR, zorder=3, label=f"WNN {nome}")
-        ax.scatter(mad["ciclos_ref"], mad["ram"]["pico_total_kb"] / 1024, s=120,
+        ax.scatter(mad["ciclos_ref"], _pico(mad["ram"]) / 1024, s=120,
                    color=TEAL, marker="^", zorder=3, label=f"MADDPG ({cel})")
         ax.set_xscale("log"); ax.set_yscale("log")
         ax.set_xlabel(f"computation — cycles per decision ({hw_curto}, log)")
