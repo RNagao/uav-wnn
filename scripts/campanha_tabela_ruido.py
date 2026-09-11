@@ -10,6 +10,8 @@ por linha, `taxa_sucesso` e `completion_time_medio`).
     modelo  ->  CSV `reports/campanha/{rotulo}-a{na}s{ns}-sigma{σ}-{sem-kf|com-kf}.csv`
                 (na=2 por padrão; use `--na` para outra célula)
     MADDPG  ->  maddpg      | T16 -> wnn-T16 | T32 -> wnn-T32
+    clean   ->  `{rotulo}-a{na}s{ns}-limpo.csv` (σ=0, sem ruído, sem KF) — a linha de
+                referência de cada modelo, para comparar com os cenários de ruído
     no KF   ->  sem-kf (degrau 1, medida crua)
     with KF ->  com-kf (degrau 4, KF+controle)
 
@@ -24,6 +26,7 @@ marcadas `parcial`; células sem nenhum CSV saem como `pendente`.
     uv run python scripts/campanha_tabela_ruido.py                 # tabela + LaTeX
     uv run python scripts/campanha_tabela_ruido.py --ns 24         # só Ns=24
     uv run python scripts/campanha_tabela_ruido.py --sigmas 10 25  # só σ 10 e 25
+    uv run python scripts/campanha_tabela_ruido.py --sem-clean     # omite a linha clean
 """
 
 from __future__ import annotations
@@ -71,11 +74,23 @@ def _coluna(linhas: list[dict[str, str]], candidatas) -> np.ndarray:
     return np.asarray(vals, float)
 
 
-def coletar(rotulo: str, sigma: int, reg: str, ns_list: list[int], pasta: Path, na: int):
-    """Concatena as corridas dos Ns pedidos para (modelo, σ, KF)."""
+REGIME_LIMPO = "limpo"
+
+
+def regime_ruido(sigma: int, reg: str) -> str:
+    """Sufixo do arquivo de uma célula com ruído: `sigma{σ}-{sem-kf|com-kf}`."""
+    return f"sigma{sigma}-{reg}"
+
+
+def coletar(rotulo: str, regime: str, ns_list: list[int], pasta: Path, na: int):
+    """Concatena as corridas dos Ns pedidos para (modelo, regime).
+
+    `regime` é o sufixo do arquivo: `limpo` para o cenário clean (sem ruído) ou
+    `sigma{σ}-{sem-kf|com-kf}` (ver `regime_ruido`) para os cenários de ruído.
+    """
     suc, tmp, presentes, faltando = [], [], [], []
     for ns in ns_list:
-        linhas = _ler(pasta / f"{rotulo}-a{na}s{ns}-sigma{sigma}-{reg}.csv")
+        linhas = _ler(pasta / f"{rotulo}-a{na}s{ns}-{regime}.csv")
         if not linhas:
             faltando.append(ns)
             continue
@@ -105,28 +120,39 @@ def main(argv=None) -> int:
     ap.add_argument("--dir", type=Path, default=PASTA_PADRAO)
     ap.add_argument("--runs-esperados", type=int, default=100,
                     help="runs/célula esperados; abaixo disso marca 'parcial' (padrão: 100)")
+    ap.add_argument("--sem-clean", action="store_true",
+                    help="omite a linha 'clean' (σ=0, arquivos -limpo.csv) de cada modelo")
     a = ap.parse_args(argv)
 
     esperado = a.runs_esperados * len(a.ns)
     console, latex = [], []
 
+    def celula(rotulo: str, regime: str, rot_console: str, rot_latex: str) -> None:
+        s, t, _pres, falta = coletar(rotulo, regime, a.ns, a.dir, a.na)
+        if s.size == 0:
+            sr_cell = ct_cell = "\\textit{pendente}"
+            nota = "pendente (sem CSV)"
+        else:
+            rs, rt = resumo(s), resumo(t)
+            sr_cell, ct_cell = _fmt_sr(rs), _fmt_ct(rt)
+            nota = (f"n={s.size}"
+                    + (f" PARCIAL (falta Ns {falta})" if falta else "")
+                    + (" PARCIAL" if (s.size < esperado and not falta) else ""))
+        console.append((rot_console, sr_cell, ct_cell, nota))
+        latex.append(f"{rot_latex} & {sr_cell} & {ct_cell}\\\\")
+
+    # clean (σ=0, sem ruído): a referência de cada modelo, antes dos cenários de ruído
+    if not a.sem_clean:
+        for mod_rot, rotulo in MODELOS:
+            celula(rotulo, REGIME_LIMPO, f"{mod_rot} clean", f"{mod_rot} (clean)")
+        latex.append("\\hline")
+
     for kf_rot, reg in KF:
         for mod_rot, rotulo in MODELOS:
             for sigma in a.sigmas:
-                s, t, pres, falta = coletar(rotulo, sigma, reg, a.ns, a.dir, a.na)
-                if s.size == 0:
-                    sr_cell = ct_cell = "\\textit{pendente}"
-                    nota = "pendente (sem CSV)"
-                else:
-                    rs, rt = resumo(s), resumo(t)
-                    sr_cell, ct_cell = _fmt_sr(rs), _fmt_ct(rt)
-                    parcial = s.size < esperado or falta
-                    nota = (f"n={s.size}"
-                            + (f" PARCIAL (falta Ns {falta})" if falta else "")
-                            + (" PARCIAL" if (s.size < esperado and not falta) else ""))
-                console.append((f"{mod_rot} σ={sigma} {kf_rot}", sr_cell, ct_cell, nota))
-                latex.append(f"{mod_rot} ($\\mathit{{\\sigma}}$={sigma}, {kf_rot}) "
-                             f"& {sr_cell} & {ct_cell}\\\\")
+                celula(rotulo, regime_ruido(sigma, reg),
+                       f"{mod_rot} σ={sigma} {kf_rot}",
+                       f"{mod_rot} ($\\mathit{{\\sigma}}$={sigma}, {kf_rot})")
 
     # ---- console: legível, com o n de cada célula ----
     print(f"agregando Ns={a.ns}  (esperado {esperado} corridas/célula)\n")
