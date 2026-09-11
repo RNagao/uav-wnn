@@ -1,40 +1,28 @@
 {
+  "celula": {
+    "na": 2,
+    "ns": 24,
+    "rotulo": "a2s24",
+    "d_obs": 27
+  },
   "wnn": {
-    "T=32 (2/24)": {
-      "persistente_kb": 572.40625,
-      "variante_principal": "ordenado",
-      "persistente_kb_por_variante": {
-        "ordenado": 572.40625,
-        "hash": 1071.7890625,
-        "denso": 3461.0703125
-      },
-      "residente_kb": 572.81640625,
-      "entradas_ocupadas": 41476,
-      "ciclos_ref": 4784,
-      "operacoes": {
-        "mult_fp": 4,
-        "soma_fp": 218,
-        "div_fp": 3,
-        "transcendental_fp": 5,
-        "lookups": 216,
-        "soma_int": 864,
-        "op_bits": 1728,
-        "comparacoes": 864,
-        "flops_mult": 4,
-        "flops_total": 230,
-        "nao_flop": 2808
-      }
-    },
-    "T=16 (2/24)": {
-      "persistente_kb": 309.654296875,
-      "variante_principal": "ordenado",
-      "persistente_kb_por_variante": {
-        "ordenado": 309.654296875,
-        "hash": 595.9296875,
-        "denso": 1730.5390625
-      },
-      "residente_kb": 309.87109375,
+    "T=16 (a2s24)": {
+      "resolucao": 16,
+      "caminho": "models/deploy/T16/a2s24",
+      "passos_treino": 50000000,
+      "podado": true,
+      "n_ram": 36,
       "entradas_ocupadas": 22453,
+      "ram": {
+        "pico_total_kb": 51920,
+        "pico_arcabouco_kb": 32848,
+        "pico_modelo_kb": 19072,
+        "rss_apos_carga_kb": 41408,
+        "arcabouco": "NumPy",
+        "pico_total_media_kb": 47031.64,
+        "pico_total_desvio_kb": 109.18407402273475,
+        "n_rep": 100
+      },
       "ciclos_ref": 2516,
       "operacoes": {
         "mult_fp": 4,
@@ -49,13 +37,61 @@
         "flops_total": 122,
         "nao_flop": 1404
       }
+    },
+    "T=32 (a2s24)": {
+      "resolucao": 32,
+      "caminho": "models/deploy/T32/a2s24",
+      "passos_treino": 50000000,
+      "podado": true,
+      "n_ram": 72,
+      "entradas_ocupadas": 41476,
+      "ram": {
+        "pico_total_kb": 54252,
+        "pico_arcabouco_kb": 31648,
+        "pico_modelo_kb": 22604,
+        "rss_apos_carga_kb": 41472,
+        "arcabouco": "NumPy",
+        "pico_total_media_kb": 54538.32,
+        "pico_total_desvio_kb": 150.96530339214647,
+        "n_rep": 100
+      },
+      "ciclos_ref": 4784,
+      "operacoes": {
+        "mult_fp": 4,
+        "soma_fp": 218,
+        "div_fp": 3,
+        "transcendental_fp": 5,
+        "lookups": 216,
+        "soma_int": 864,
+        "op_bits": 1728,
+        "comparacoes": 864,
+        "flops_mult": 4,
+        "flops_total": 230,
+        "nao_flop": 2808
+      }
     }
   },
   "maddpg": {
-    "Na=2": {
-      "persistente_kb": 287.0078125,
+    "a2s24": {
+      "ram": {
+        "pico_total_kb": 523344,
+        "pico_arcabouco_kb": 520212,
+        "pico_modelo_kb": 3132,
+        "rss_apos_carga_kb": 516628,
+        "arcabouco": "PyTorch",
+        "pico_total_media_kb": 518119.12,
+        "pico_total_desvio_kb": 62.068271306927045,
+        "n_rep": 100
+      },
+      "params": 73474,
       "ciclos_ref": 147152,
       "D": 27,
+      "camadas": [
+        27,
+        256,
+        256,
+        2
+      ],
       "operacoes": {
         "mult_fp": 72964,
         "soma_fp": 73476,
@@ -71,6 +107,7 @@
       }
     }
   },
+  "repeticoes": 100,
   "t2_ciclos": {
     "x86-64 (com FPU e SIMD)": {
       "wnn": 4784,
@@ -88,20 +125,21 @@
       "ganho_wnn": 437.7832408647408
     }
   },
+  "t2_referencia_wnn": "T=32 (a2s24)",
   "latencia_us": {
     "celula": "a2s24",
     "por_modelo": {
       "wnn-T16": {
-        "mediana_us": 118.0475,
-        "p99_us": 323.20321
+        "mediana_us": 22.0655,
+        "p99_us": 78.30181000000013
       },
       "wnn-T32": {
-        "mediana_us": 120.8155,
-        "p99_us": 196.75953000000018
+        "mediana_us": 24.707,
+        "p99_us": 65.50348000000002
       },
       "maddpg": {
-        "mediana_us": 235.66649999999998,
-        "p99_us": 343.6464500000001
+        "mediana_us": 48.6355,
+        "p99_us": 213.68395000000012
       }
     }
   }

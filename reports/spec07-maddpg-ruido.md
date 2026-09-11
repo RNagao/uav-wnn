@@ -187,21 +187,21 @@ tempo real** (uma decisão a cada 2 s), que é o prazo que o deploy precisa cump
 
 | figura | KF+controle | referência | fração |
 |---|---|---|---|
-| **T2** latência/decisão (MEDIDA) | **~100 µs** (ciclo do KF, protótipo NumPy) | orçamento de 2 s | **~0,005 %** |
-| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | 291 KB (ator MADDPG) | 0,007 % |
+| **T2** latência/decisão (MEDIDA) | **~20 µs** (ciclo do KF, protótipo NumPy) | orçamento de 2 s | **~0,001 %** |
+| **T1** memória residente/drone | **20 bytes** (x̂ 2 + P sim. 3, fp32) | ~10 MB (acréscimo do ator MADDPG ao pico de RAM, média de 100 processos, a2s24) | ~0,0002 % |
 
 Trocamos a figura antiga (que contava multiplicações fp por decisão) pela
 **latência empírica medida** — contar multiplicação subestima o KF por construção
-(ele mal multiplica), e o relógio é o custo real. O ciclo do KF leva ~100 µs no
+(ele mal multiplica), e o relógio é o custo real. O ciclo do KF leva ~20 µs no
 protótipo NumPy (dominado por overhead de dispatch em matrizes 2×2, não pelo
-algoritmo de ~50 flops); da MESMA ordem que uma decisão do ator MADDPG (~236 µs,
+algoritmo de ~50 flops); da MESMA ordem que uma decisão do ator MADDPG (~49 µs,
 SPEC-03/a2s24) e **~4 ordens de grandeza abaixo** do prazo de 2 s. O ponto que a
 RNF-05 pede que se declare: o filtro **não é grátis**, mas é uma **constante pequena
 e fixa, independente da capacidade do modelo** — e, sendo comum a qualquer política
 co-implantada, **cancela** na comparação de H1 (tanto a WNN quanto o MADDPG
 precisariam exatamente do mesmo filtro).
 
-![Barras em escala log: o ciclo do KF (~100 µs) e uma decisão do ator MADDPG (~236 µs, referência de escala) contra o orçamento de decisão de 2 s, quatro ordens de grandeza acima — o filtro é desprezível contra o prazo de tempo real](img/spec07-maddpg/latencia_kf.png)
+![Barras em escala log: o ciclo do KF (~20 µs) e uma decisão do ator MADDPG (~49 µs, referência de escala) contra o orçamento de decisão de 2 s, quatro ordens de grandeza acima — o filtro é desprezível contra o prazo de tempo real](img/spec07-maddpg/latencia_kf.png)
 
 ## Ressalvas
 

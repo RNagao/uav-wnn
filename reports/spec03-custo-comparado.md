@@ -12,7 +12,6 @@ Reprodução: `uv run --group baseline python scripts/spec03_custo_comparado.py`
 
 | eixo | quem ganha | por quanto |
 |---|---|---|
-| **T1 memória** | MADDPG | 1,9× (287 KB contra 537 KB) |
 | **T2 ciclos** (Cortex-M0) | **WNN** | **1 913×** |
 | **T2 latência medida** (após via rápida) | **WNN** | **2,3×** (ver §4) |
 
@@ -23,27 +22,13 @@ empírica medida** (§4). A tabela de operações do §2 permanece só como perf
 
 ---
 
-## 1. T1 — memória
+## 1. T1 — memória: medida à parte, como pico de RAM
 
-| célula | modelo | params | T1 (KB) | disco (KB) | RSS (MB) |
-|---|---|---|---|---|---|
-| 1d/12s | wnn-T16 | 10 965 | **152** | 144 | 2,2 |
-| 1d/12s | wnn-T32 | 23 440 | 325 | 305 | 3,0 |
-| 2d/24s | **maddpg** | 73 474 | **287** | 1 438 ¹ | 494 ² |
-| 2d/24s | wnn-T16 | 21 472 | 296 | 276 | 2,2 |
-| 2d/24s | wnn-T32 | 38 900 | 537 | 500 | 2,4 |
-
-**¹ O arquivo do MADDPG traz ator E crítico.** 287 KB + 1 146 KB. A coluna T1
-conta só o ator, dos dois lados; o disco não, porque o `.cleanrl_model` é uma
-tupla `(ator, crítico)` e não se separa sem reescrevê-lo.
-
-**² Os 494 MB do MADDPG são o PyTorch, não o modelo.** Medi: importar `torch`
-custa 494 MB de RSS antes de qualquer peso ser carregado. É custo real de quem
-implanta com PyTorch — mas é arcabouço, não rede, e comparar com os 2,2 MB da
-WNN (NumPy) mediria bibliotecas.
-
-**Na célula comum, o T=16 empata com o MADDPG** — 296 KB contra 287 KB. Chegou
-lá com a poda de 70 % e o export `float32`/`uint16`; sem eles seriam ~2 MB.
+A comparação de **memória persistente** (bytes de artefato por fórmula) que esta
+seção trazia foi **retirada do projeto**. A figura de memória é o **pico de RSS
+medido** (`VmHWM`) do processo que carrega o modelo e decide — um processo por
+modelo, porque o pico é monotônico e o laço intercalado deste script não consegue
+medi-lo. Ver `scripts/spec03_latencia_memoria.py` e `reports/spec06-merito.md`.
 
 ---
 
@@ -194,63 +179,18 @@ Cortex-M0 sem FPU é o que uma implementação em C entregaria.
 
 ## 5. Leitura
 
-**A WNN não é "mais barata"; ela troca eixos.** Ganha em computação — em **ciclos**
-(31–703× conforme o hardware, §3) e na **latência medida** após a via rápida (2,3×,
-§4) — e perde ou empata em memória. O relógio dependeu de quem implementou: a versão
-NumPy inicial parecia perder, mas o gargalo era o nosso decodificador, não o método.
+**A WNN troca eixos.** Ganha em computação — em **ciclos** (31–703× conforme o
+hardware, §3) e na **latência medida** após a via rápida (2,3×, §4). O relógio
+dependeu de quem implementou: a versão NumPy inicial parecia perder, mas o gargalo
+era o nosso decodificador, não o método. A memória é medida à parte, como pico de
+RAM do processo (§1).
 
-**A poda mudou o quadro do T1.** Antes dela a WNN era 3,4–6,3× o MADDPG; com ela
-o `T=16` chega a 296 KB contra 287 KB — **empate**. O que era a fraqueza clara do
-método virou paridade.
-
-**O alvo importa — e depois da via rápida, menos ainda.** Em x86 o MADDPG ganha
-só em memória (287 KB × 296 KB, empate prático); em tempo a WNN faz 33,9 µs
-contra 76,4 µs.
-Num Cortex-M0 sem FPU a conta inverte: 13 mil ciclos contra 9,2 milhões, e 296 KB
-contra 287 KB de memória — a WNN passa a ser a única das duas que roda.
-
-## Por que a MLP compete em memória, apesar de pesos e camadas
-
-A pergunta certa — checada em três frentes na célula 2d/24s (50 M):
-
-**1. A contabilidade dos dois lados confere.** MADDPG: 27→256→256→2 dá
-72 960 pesos + 514 vieses = 73 474 números × 4 B = 287 KB, batendo com os
-tensores medidos. WNN: valores + endereços + codificador, conferidos array a
-array.
-
-**2. A WNN T=16 não guarda mais números — guarda MENOS.**
-
-| | números que definem a função | endereços | bytes |
-|---|---|---|---|
-| MADDPG | 73 474 | 0 (implícito na posição) | 287 KB |
-| wnn-T16 | **67 359** | 22 453 explícitos (+14 %) | 310 KB |
-| wnn-T32 | 124 428 | 41 476 (+14 %) | 572 KB |
-
-A diferença de 8 % do T16 é quase toda o **custo do endereçamento**: numa
-tabela esparsa cada valor carrega a própria chave; numa matriz densa o
-endereço é o layout. O T32 é 2× porque guarda 1,7× mais números que a MLP —
-tabela maior, não desperdício.
-
-**3. `float16` nos valores não passa no portão comportamental.** Metade dos
-bytes (307→175 KB) custa SR 95 %→90 % e CT 66→87 s no `val` — 2,5× a
-tolerância da poda. Os 4 B por valor são informação, não folga.
-
-**A razão de fundo é o trade que define o método.** A MLP é representação
-DISTRIBUÍDA: todo peso participa de toda decisão (reuso máximo por byte), e a
-capacidade é fixada a priori — 287 KB com 6,75 M ou 50 M de passos. A n-tupla
-é representação LOCAL: cada entrada serve só às observações que caem na sua
-célula, e a ocupação cresce com a experiência (o deploy do T16 foi de 10 965
-entradas a 6,75 M para 22 453 a 50 M). Memoriza-se em tabela para não
-multiplicar — o eixo em que a WNN ganha é o de **ciclos e latência** (§3–§4: a
-consulta substitui os 73 mil MACs), e **empatar em memória (+8 %) já é o resultado
-forte**, não uma promessa quebrada.
+**O alvo importa — e depois da via rápida, menos ainda.** Em x86 a WNN faz 33,9 µs
+contra 76,4 µs. Num Cortex-M0 sem FPU a conta é 13 mil ciclos contra 9,2 milhões —
+a WNN passa a ser a única das duas que roda.
 
 ## Ressalvas
 
-- O `T1` conta **só o ator** dos dois lados; o crítico do MADDPG (1 146 KB) e o
-  da WNN não entram, porque não voam.
-- O `RSS` do MADDPG está dominado pelo import do PyTorch (494 MB) e não deve ser
-  comparado com o da WNN.
 - Os modelos WNN medidos são os de `models/deploy/` — podados a 70 % e em
   `float32`/`uint16`. É o artefato que a campanha avaliou.
 - Os `latencia_mediana_us` das 33 corridas de campanha já gravadas usam a medida

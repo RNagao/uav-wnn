@@ -41,20 +41,19 @@ Isso vale mais que qualquer teste unitário: se submodule, versão do simulador,
 
 Para o orçamento de 50 M passos de Lamenza, contra 7 dias de GPU por célula no original. O PRD estimava 8–30 h; o real é menor, com folga. E a célula cara em horas de treino é **`Na = 1`**, não `Na = 8` — o contador de passos é `passos × Na`. Ou seja, a Etapa 1 é a mais cara do projeto. Ver [`reports/spec00-orcamento.md`](reports/spec00-orcamento.md).
 
-### O custo: a alegação de "modelo menor" não se sustenta
+### O custo: pico de RAM medido, não bytes de artefato
 
-Medido na configuração escolhida, na tarefa de clonagem, **com os dois modelos convergidos**:
+A figura de memória do projeto é o **pico de RSS** (`VmHWM`) do processo que carrega o modelo e decide — um processo por modelo, mesma observação, célula a2s24 (`scripts/spec03_latencia_memoria.py`). A comparação por **memória persistente** (bytes do artefato, por fórmula) foi retirada: respondia "quanto ocupa em flash", não "quanta RAM precisa ter para rodar".
 
-| | erro | persistente |
+| modelo (arcabouço) | pico total (média ± dp, 100 processos) | latência mediana |
 |---|---|---|
-| **MLP pareada 25-32-32-2** | **1,1°** | **7,6 KB** |
-| WNN E2/T=8/N=48 | 5,6° | 133,9 KB |
+| **WNN T=16 deploy** (NumPy) | **45,9 ± 0,1 MB** | **22,6 ± 0,3 µs** |
+| **WNN T=32 deploy** (NumPy) | **53,3 ± 0,2 MB** | **25,2 ± 0,5 µs** |
+| MADDPG 256×256 (PyTorch) | 506,0 ± 0,1 MB | 49,1 ± 0,8 µs |
 
-A MLP é 5× mais precisa e **17,5× menor**. A estimativa anterior (~12–15 KB) errou uma ordem de grandeza porque partia de um protótipo com **2 variáveis de entrada**; a observação real tem 25.
+O processo da WNN tem pico ~10× menor, mas quase todo o pico do MADDPG é o PyTorch (~496 MB só de imports); descontado o arcabouço, a rede sem peso acresce mais (o load constrói dicionários antes da LUT plana). Em computação a WNN ganha: **zero multiplicações em ponto flutuante no aproximador**, ~2× no relógio e vantagem de ciclos **condicional à classe de alvo** — 31× em x86, 86× em Cortex-M4F, **438× em Cortex-M0 sem FPU**. Ver [`reports/spec06-merito.md`](reports/spec06-merito.md).
 
-O que sobrevive, e está medido: **zero multiplicações em ponto flutuante no aproximador**, com vantagem de ciclos **condicional à classe de alvo** — 1,6× em x86, 4,1× em Cortex-M4F, **19,9× em Cortex-M0 sem FPU**. Ver [`reports/spec03-custo.md`](reports/spec03-custo.md).
-
-*(Ressalva: a comparação é sobre clonagem supervisionada. As vantagens que a literatura atribui às redes sem peso — aprendizado online, sem replay, esquecimento — não são exercitadas por regressão estacionária.)*
+*(Ressalva RNF-11: arcabouços diferentes dos dois lados — NumPy × PyTorch — dominam tanto o pico quanto a latência.)*
 
 ### O codificador binário: quantis por slot
 

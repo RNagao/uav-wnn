@@ -6,6 +6,8 @@ Consolidação das ~90 perguntas em aberto espalhadas pelo PRD e pelas 11 specs.
 >
 > **Atualização (SPEC-03).** **T1 fechada por medição, com resposta negativa** — a alegação de "modelo menor" cai e o argumento migra para a aritmética. Ver `reports/spec03-custo.md`.
 >
+> **Atualização (2026-09-10).** A comparação de **memória persistente** (bytes de artefato por fórmula) foi **retirada do projeto**. A figura de memória (T1) passou a ser o **pico de RAM medido** (`VmHWM`) do processo que carrega o modelo e decide, um processo por modelo — `scripts/spec03_latencia_memoria.py`, consumido por `spec06_figuras_merito.py`. Ver `reports/spec06-merito.md`.
+>
 > **Atualização.** Após a SPEC-00 e a revisão do modelo de ruído: **P1, P5, P6, P8, L1 e P2 fechadas** (código de referência e medição); **C5 resolvida** pelo novo modelo; **C4, T1, C1, C2, C3 seguem abertas**. Entram **P9** (parâmetros do canal do sensor) e **P10** (`σ_own`).
 
 **Leitura rápida:** das ~90, **16 têm impacto real no projeto**. Destas, **5 estão no caminho crítico** e precisam de resposta na semana 1. O resto é local, já tem recomendação embutida na spec e pode seguir com o padrão proposto.

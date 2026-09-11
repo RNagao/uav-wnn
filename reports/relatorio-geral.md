@@ -67,9 +67,9 @@ de **deploy** (`models/deploy`), a mesma fonte da latência medida.
 
 | eixo | WNN (a2s24, Na=2, deploy) | MADDPG (256×256, Na=2) | vencedor |
 |---|---|---|---|
-| **T1 tamanho** | T=32: 572 KB (41 476 entradas) · T=16: 310 KB | 287 KB | **MADDPG** (T=32 perde 2,0×; T=16 empata) |
+| **T1 pico de RAM (processo, medido, 100 processos)** | 45,9 ± 0,1 / 53,3 ± 0,2 MB (NumPy) | 506,0 ± 0,1 MB (PyTorch) | **WNN** no processo (~0,1×) — quase todo o pico do MADDPG é arcabouço |
 | **T2 inferência (ciclos)** | 4,8 k (x86) · 21 k (M0) | 147 k (x86) · 9,15 M (M0) | **WNN** — 31× (x86) a **438× (Cortex-M0 sem FPU)** |
-| **T2 inferência (latência medida)** | 118–121 µs (a2s24, NumPy) | 236 µs (PyTorch) | **WNN** — ~2× no relógio |
+| **T2 inferência (latência medida)** | 22–25 µs (a2s24, NumPy) | 49 µs (PyTorch) | **WNN** — ~2× no relógio |
 
 **Mesma célula (a2s24, Na=2)** dos dois lados — WNN de deploy e MADDPG publicado —,
 sem a ressalva de "célula diferente" de versões anteriores. Como cada figura foi
@@ -80,7 +80,7 @@ calculada: ver `spec06-merito.md` (seção *Metodologia*).
   NumPy × PyTorch. (Corrige uma versão anterior que citava 173/35 µs hardcoded
   dizendo o wall-clock invertido.) O overhead de arcabouço achata a vantagem que os
   ciclos preveem; compilada, a WNN realizaria mais dela.
-- **KF da fusão:** ~100 µs/decisão medidos (protótipo NumPy) = **~0,005 %** do
+- **KF da fusão:** ~20 µs/decisão medidos (protótipo NumPy) = **~0,001 %** do
   orçamento de tempo real de 2 s — e é **termo comum** (WNN e MADDPG usam o mesmo,
   cancela em H1). Contabilizado à parte, não cobrado de nenhuma política.
 - **Operações fp (MACs):** figura **retirada** — contar multiplicação favorece a
@@ -88,10 +88,12 @@ calculada: ver `spec06-merito.md` (seção *Metodologia*).
   computação passou a ser reportado por ciclos e pela latência empírica.
 
 **Conclusão:** a rede sem peso **ganha em inferência** — nos ciclos e no relógio
-medido —, com vantagem que explode em hardware **sem FPU**. Em memória o veredito
-depende da resolução: o T=32 paga (troca memória por computação), o T=16 de deploy
-ganha nos dois eixos. É o lado de custo de H1, e é o resultado mais sólido do
-trabalho até aqui (independe de a política ser ótima).
+medido —, com vantagem que explode em hardware **sem FPU**. Em memória a figura é
+o **pico de RAM medido** do processo (a comparação por bytes de artefato foi
+retirada): o processo da WNN cabe em ~46–53 MB contra ~506 MB do MADDPG em PyTorch (média de
+100 processos, desvio < 0,2 MB), mas quase todo esse pico é arcabouço — descontado,
+o ator MADDPG acresce 10 MB e a WNN 15–22 MB (o load monta dicionários antes da LUT plana). É o lado de custo de H1,
+e é o resultado mais sólido do trabalho até aqui (independe de a política ser ótima).
 
 ---
 

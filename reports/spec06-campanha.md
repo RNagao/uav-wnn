@@ -165,8 +165,8 @@ modelos sem aumentar o n.
 (NumPy) contra o MADDPG (PyTorch) — arcabouços diferentes — e o número do MADDPG
 usa a medida antiga/assimétrica. A comparação honesta está no `spec06-merito.md`:
 sob o protocolo da SPEC-03 (um processo por modelo, mesma observação, menor mediana
-de 8×1000), a WNN é **~2× mais rápida** que o ator MADDPG no relógio (118–121 µs ×
-236 µs, célula a2s24).
+de 8×1000), a WNN é **~2× mais rápida** que o ator MADDPG no relógio (22–25 µs ×
+49 µs, célula a2s24).
 
 ---
 

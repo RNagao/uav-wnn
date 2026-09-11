@@ -24,9 +24,7 @@ import numpy as np
 from uavwnn.fusion.kalman import FiltroKalmanControle
 from uavwnn.fusion.consistencia import faixa_chi2_individual
 
-# MADDPG, dos pesos publicados (reports/spec02-baseline-maddpg.md).
-MADDPG_ATOR_KB = {2: 287.0, 4: 291.0, 8: 299.0}   # tamanho do ator, fp32
-# Célula do artefato de latência da SPEC-03 (única com WNN deploy E MADDPG).
+# Célula do artefato de latência/pico de RAM da SPEC-03 (única com WNN deploy E MADDPG).
 CELULA_LATENCIA = (2, 24)
 # Orçamento de tempo real: uma decisão a cada 2 s (PRD §5.5). O KF é termo COMUM
 # (WNN e MADDPG usam o mesmo filtro), contabilizado à parte contra esse prazo.
@@ -55,7 +53,11 @@ def _latencia_ator_maddpg(na: int = CELULA_LATENCIA[0],
     for r in json.loads(art.read_text()):
         if r["modelo"] == "maddpg":
             return {"celula": f"a{na}s{ns}", "mediana_us": r["mediana_us"],
-                    "p99_us": r["p99_us"]}
+                    "p99_us": r["p99_us"],
+                    # T1 MEDIDO: quanto carregar e executar o ator eleva o pico
+                    # de RSS do processo acima do arcabouço (VmHWM total − imports).
+                    "pico_modelo_kb": r.get("pico_modelo_kb"),
+                    "pico_total_kb": r.get("pico_total_kb")}
     return None
 
 
@@ -126,7 +128,7 @@ def figuras_de_merito() -> dict:
     merito = {"kf_bytes_por_drone": kf_bytes_por_drone,
               "kf_latencia": kf_lat, "politica_latencia": pol,
               "intervalo_decisao_s": INTERVALO_DECISAO_S,
-              "fracao_orcamento": frac_orc, "por_Na": {}}
+              "fracao_orcamento": frac_orc}
 
     print("Figuras de mérito — o KF contabilizado à parte (termo comum a WNN e MADDPG)\n")
     print("T2 — latência empírica por decisão (MEDIDA, protocolo SPEC-03)")
@@ -139,10 +141,15 @@ def figuras_de_merito() -> dict:
               f"SPEC-03/{pol['celula']} — mesma ordem, ambas << 2 s)")
 
     print("\nT1 — memória residente")
-    for na in (2, 4, 8):
-        merito["por_Na"][na] = {
-            "fracao_bytes": kf_bytes_por_drone / (MADDPG_ATOR_KB[na] * 1024)}
     print(f"  estado do KF por drone: {kf_bytes_por_drone} bytes (x̂ 2 + P sim. 3, fp32)")
+    if pol and pol.get("pico_modelo_kb"):
+        # Referência de escala MEDIDA (SPEC-03): o acréscimo do ator MADDPG ao pico
+        # de RSS do processo — não bytes de artefato por fórmula.
+        merito["fracao_pico_ator_maddpg"] = (
+            kf_bytes_por_drone / (pol["pico_modelo_kb"] * 1024))
+        print(f"  (escala: o ator MADDPG acresce {pol['pico_modelo_kb']/1024:.1f} MB ao "
+              f"pico de RAM do processo, SPEC-03/{pol['celula']} — o KF é "
+              f"{merito['fracao_pico_ator_maddpg']:.5%} disso)")
 
     print("\nLeitura: o KF é um custo fixo e pequeno, COMUM aos dois aproximadores")
     print(f"(cancela em H1). Contra o prazo de {INTERVALO_DECISAO_S:.0f} s da decisão é "

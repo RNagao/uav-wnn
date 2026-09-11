@@ -1,27 +1,19 @@
 {
   "kf_bytes_por_drone": 20,
   "kf_latencia": {
-    "mediana_us": 104.8615,
-    "p99_us": 136.58057000000005,
+    "mediana_us": 19.621499999999997,
+    "p99_us": 55.50959000000001,
     "sigma_gps": 10.0,
     "dt": 2.0
   },
   "politica_latencia": {
     "celula": "a2s24",
-    "mediana_us": 235.66649999999998,
-    "p99_us": 343.6464500000001
+    "mediana_us": 48.6355,
+    "p99_us": 213.68395000000012,
+    "pico_modelo_kb": 3132,
+    "pico_total_kb": 523344
   },
   "intervalo_decisao_s": 2.0,
-  "fracao_orcamento": 5.243075e-05,
-  "por_Na": {
-    "2": {
-      "fracao_bytes": 6.805313588850174e-05
-    },
-    "4": {
-      "fracao_bytes": 6.711769759450172e-05
-    },
-    "8": {
-      "fracao_bytes": 6.532190635451505e-05
-    }
-  }
+  "fracao_orcamento": 9.81075e-06,
+  "fracao_pico_ator_maddpg": 6.236031289910601e-06
 }
