@@ -402,9 +402,10 @@ def main() -> int:
                          "episódios inteiros em vez de uma fração do sorteio.")
     ap.add_argument("--gate", type=Path, default=None,
                     help="atestado RF-05 DESTE modelo nesta célula (degraus 3 e 4)")
-    ap.add_argument("--treinado-em-ns", type=int, default=None,
-                    help="Ns em que a rede foi TREINADA, se diferente de --ns. "
-                         "Marca a corrida como transferência no CSV.")
+    ap.add_argument("--treinado-em-ns", default=None,
+                    help="Ns em que a rede foi TREINADA, se diferente de --ns: um "
+                         "inteiro, ou a lista do revezamento (`12-24-36`). A célula "
+                         "é transferência quando --ns não está na lista.")
     ap.add_argument("--dir-saida", type=Path, default=Path("reports/campanha"))
     a = ap.parse_args()
 
@@ -429,8 +430,11 @@ def main() -> int:
     # em Ns=12/36 sem retreino. Mas isso é TRANSFERÊNCIA, e o MADDPG tem
     # checkpoint próprio para cada uma das 9 células (joga em casa nas três).
     # Sem esta coluna a assimetria some no CSV e a tabela final mentiria.
-    treinado_ns = a.treinado_em_ns if a.treinado_em_ns is not None else a.ns
-    transf = treinado_ns != a.ns
+    # `treinado_ns` vai para o CSV como RÓTULO (`24` ou `12-24-36`): um modelo
+    # treinado revezando Ns joga em casa em qualquer Ns da lista.
+    treinado_ns = (str(a.treinado_em_ns).replace(",", "-")
+                   if a.treinado_em_ns is not None else str(a.ns))
+    transf = a.ns not in {int(v) for v in treinado_ns.split("-") if v.strip()}
     if transf:
         print(f"  TRANSFERÊNCIA: rede treinada em Ns={treinado_ns}, avaliada em "
               f"Ns={a.ns} (d_obs={cfg.observation_size} é o mesmo)", flush=True)

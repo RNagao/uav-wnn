@@ -413,3 +413,97 @@ def test_revezamento_alterna_celula_por_episodio_e_treina_cada_drone(tmp_path):
     # o segundo drone só existe nos episódios de Na=2, e registra em todos eles
     assert 0 < registrados[1] < registrados[0]
     assert ap.ator.entradas_ocupadas() > 0
+
+
+
+# --- treino longo com a config da grade e Ns revezado -------------------------
+
+
+def _treino():
+    import importlib.util
+    import pathlib
+    import sys
+
+    sys.path.insert(0, "scripts")
+    caminho = (pathlib.Path(__file__).resolve().parents[1] / "scripts"
+               / "spec06_treino_multiagente.py")
+    spec = importlib.util.spec_from_file_location("_treino", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_treino"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_config_da_grade_escolhe_o_melhor_ponto_DO_T_pedido(tmp_path):
+    """A escalada treina T=16 e T=32; o melhor ponto global só diria qual venceu.
+    O que se quer é o melhor de CADA T — e os campos têm o nome da grade."""
+    import json
+
+    t = _treino()
+    pontos = [
+        {"modelo": "ntupla_dissertacao", "id": 0, "cobertura": 0.50, "sr": 0.2,
+         "abortos": 0, "n": 3, "passo_efetivo": 8e-4, "sigma": 0.35,
+         "resolucao": 32, "tupla": 12, "passos_m": 8, "critico": 0.85},
+        {"modelo": "ntupla_dissertacao", "id": 1, "cobertura": 0.46, "sr": 0.0,
+         "abortos": 1, "n": 3, "passo_efetivo": 5e-4, "sigma": 0.20,
+         "resolucao": 16, "tupla": 24, "passos_m": 16, "critico": 0.99},
+        {"modelo": "ntupla_dissertacao", "id": 2, "cobertura": 0.40, "sr": 0.0,
+         "abortos": 0, "n": 3, "passo_efetivo": 3e-4, "sigma": 0.35,
+         "resolucao": 16, "tupla": 12, "passos_m": 8, "critico": 0.85},
+    ]
+    arq = tmp_path / "grade.json"
+    arq.write_text(json.dumps({"pontos": pontos, "celula": {"na": [2], "ns": [12, 24]}}))
+    hp16 = t.config_da_grade(arq, 16)
+    assert (hp16["passo"], hp16["sigma"], hp16["tupla"], hp16["phi"], hp16["m"]) == \
+        (5e-4, 0.20, 24, 0.99, 16)
+    assert hp16["id_grade"] == 1 and hp16["abortos_grade"] == "1/3"
+    assert t.config_da_grade(arq, 32)["id_grade"] == 0
+    assert t.config_da_grade(arq, None)["id_grade"] == 0     # melhor global
+    with pytest.raises(SystemExit):
+        t.config_da_grade(arq, 64)
+
+
+def test_rotulo_de_ns_e_o_nome_da_celula():
+    t = _treino()
+    assert t._ler_ns("24") == (24,)
+    assert t._ler_ns("12,24,36") == t._ler_ns("12-24-36") == (12, 24, 36)
+    assert t._rotulo_ns((24,)) == "24" and t._rotulo_ns((12, 24, 36)) == "12-24-36"
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_exportar_deploy import _celula
+
+    assert _celula("a2s24") == (2, (24,))
+    assert _celula("a2s12-24-36") == (2, (12, 24, 36))
+
+
+def test_hp_padrao_e_o_vencedor_da_t064():
+    """Sem flag nenhuma, o treinador tem de produzir EXATAMENTE a config publicada
+    — senão as células já treinadas deixam de ser reproduzíveis por este script."""
+    t = _treino()
+    assert t.HP_PADRAO == {"passo": 8e-4, "sigma": 0.35, "tupla": 12,
+                           "phi": 0.85, "m": 8}
+
+
+def test_fila_resolve_checkpoint_exato_unico_ou_recusa_ambiguidade(tmp_path):
+    """`a2s24` sozinha serve para Ns=12 (transferência); `a2s24` + `a2s12-24-36`
+    é ambiguidade e a fila recusa em vez de escolher por alguém."""
+    import importlib.util
+    import pathlib
+    import sys
+
+    sys.path.insert(0, "scripts")
+    caminho = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "spec06_campanha_fila.py"
+    spec = importlib.util.spec_from_file_location("_fila", caminho)
+    f = importlib.util.module_from_spec(spec)
+    sys.modules["_fila"] = f            # o `@dataclass` procura o módulo aqui
+    spec.loader.exec_module(f)
+
+    (tmp_path / "T16" / "a2s24").mkdir(parents=True)
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 12) == tmp_path / "T16" / "a2s24"
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 24) == tmp_path / "T16" / "a2s24"
+    assert "sem modelo" in f._checkpoint_wnn(tmp_path, 16, 4, 12)
+    (tmp_path / "T16" / "a2s12-24-36").mkdir()
+    assert "ambíguo" in f._checkpoint_wnn(tmp_path, 16, 2, 12)
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 24) == tmp_path / "T16" / "a2s24"  # exata
+    assert f._treinado_em(tmp_path / "T16" / "a2s12-24-36") == "12-24-36"
+    assert f._treinado_em(tmp_path / "T16" / "a2s24") == "24"

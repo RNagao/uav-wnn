@@ -86,7 +86,8 @@ encolheria sem que nada acusasse.
 | arquivo | responsabilidade |
 |---|---|
 | `spec06_busca.py` | grade de hiperparâmetros e corrida longa (`--modo grade\|aleatoria\|longa`). `--na 1,2,4` e/ou `--ns 12,24` treinam cada ponto com uma rede só, revezando a célula `(Na, Ns)` por episódio sobre o produto das listas, e validam/testam em cada célula. Paraleliza por processo, retoma do cache, grava `melhor`/`final`/`deploy` |
-| `spec06_treino_multiagente.py` | célula `Na > 1`. **Parameter sharing**: uma rede, `Na` trajetórias de AC. Normaliza a recompensa por `Na` |
+| `spec06_treino_multiagente.py` | célula `Na > 1`. **Parameter sharing**: uma rede, `Na` trajetórias de AC. Normaliza a recompensa por `Na`. `--config-de <json da grade>` usa o melhor ponto da grade daquele `Na` para o `T` pedido; `--ns 12,24,36` reveza o Ns por episódio (célula `a2s12-24-36`) |
+| `spec06_campanha_fila.py` | fila da campanha com escolha livre de modelos × células × regimes (`--modelos`, `--celulas 2:12,24,36`); manifesto por lançamento com o checkpoint usado, e recusa reaproveitar CSV de outro checkpoint |
 
 ### Montagem — traduz configuração em objetos
 
