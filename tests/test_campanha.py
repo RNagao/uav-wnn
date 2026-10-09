@@ -322,3 +322,90 @@ def test_a_faixa_padronizada_e_a_dos_autores():
     from uavwnn.campanha import FAIXA_PADRONIZADA
 
     assert FAIXA_PADRONIZADA == (-1.5, 1.5)
+
+
+
+# --- revezamento de Na na busca (spec06_busca.py --na 1,2,4) -----------------
+
+
+def test_celulas_revezadas_tem_a_mesma_largura_de_observacao(tmp_path):
+    """Uma rede só vê vários `Na` se a observação tiver a MESMA largura em todos:
+    `state_num_closest_drones = max(Na) − 1` em cada célula. Com um `Na` só, a
+    largura é a de Lamenza (`2·(Na−1) + 2·12 + 1`), para não mudar a grade antiga."""
+    b = _busca()
+    cel = b._celulas("1b", (1, 2, 4), 12, raiz_bancos=tmp_path)
+    larguras = {na: c["cfg_tr"].observation_size for na, c in cel.items()}
+    assert larguras == {1: 31, 2: 31, 4: 31}          # 2·3 + 2·12 + 1
+    assert all(c["cfg_tr"].state_num_closest_drones == 3 for c in cel.values())
+    so_um = b._celulas("1b", (1,), 12, raiz_bancos=tmp_path)
+    assert so_um[1]["cfg_tr"].observation_size == 25
+    assert so_um[1]["cfg_tr"].state_num_closest_drones == 0
+
+
+def test_cfgs_recusa_menos_vizinhos_que_na_menos_um():
+    """O `environment.py` escreve `Na − 1` vizinhos nos slots; menos slots que isso
+    estoura a atribuição lá dentro. Melhor falhar aqui, com mensagem."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_treinar import _cfgs
+
+    with pytest.raises(ValueError, match="n_vizinhos"):
+        _cfgs("1b", 4, 12, n_vizinhos=1)
+
+
+def test_registro_de_na_preserva_o_hash_da_grade_antiga():
+    """`Na = 1` grava o ESCALAR `1`, como as 720 corridas existentes; só a lista
+    aparece com revezamento. E `_nas_de` lê os dois, mais o registro antigo sem
+    campo."""
+    b = _busca()
+    assert b._na_registro((1,)) == 1
+    assert b._na_registro((1, 2, 4)) == [1, 2, 4]
+    assert b._nas_de({"na": 1}) == (1,)
+    assert b._nas_de({"na": [1, 2, 4]}) == (1, 2, 4)
+    assert b._nas_de({}) == (1,)
+
+
+def test_revezamento_alterna_na_por_episodio_e_treina_cada_drone(tmp_path):
+    """Round-robin sobre `(1, 2)`: o episódio `k` roda com `nas[k mod 2]` drones, e
+    cada drone fecha a sua própria transição — o laço single-agente registrava uma
+    só por passo e treinava apenas o último drone."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_treinar import RECOMPENSAS, REPLICAS
+    from uavwnn.agents import AtorCriticoContinuo
+    from uavwnn.agents.politica_continua import NormalProjetada
+    from uavwnn.campanha import PapeisDeSemente
+
+    b = _busca()
+    nas = (1, 2)
+    cel = b._celulas("1b", nas, 12, raiz_bancos=tmp_path)
+    amostra = {"passo_efetivo": 5e-4, "sigma": 0.35, "resolucao": 8, "tupla": 8,
+               "passos_m": 4, "idx_critico": 1, "normalizar": False}
+    sem = PapeisDeSemente(seed_train=0)
+    corpus = np.concatenate([b.corpus_de_observacoes(c["cfg_tr"], n_episodios=1)
+                             for c in cel.values()])
+    ap, _termo, pol, _det = b._montar("ntupla_dissertacao", cel[1]["cfg_tr"], sem,
+                                      amostra, corpus=corpus)
+    acs = [pol, AtorCriticoContinuo(aproximador=ap, codificar=pol.codificar,
+                                    politica=NormalProjetada(0.35, None), passos=4,
+                                    id="a1", treinando=True)]
+    registrados = {0: 0, 1: 0}
+    for i, ac in enumerate(acs):
+        orig = ac.registrar
+
+        def _reg(r, _o=orig, _i=i):
+            registrados[_i] += 1
+            return _o(r)
+        ac.registrar = _reg
+
+    r = REPLICAS["1b"]
+    info = b.rodar_episodios_revezando(
+        cel, nas, acs, RECOMPENSAS[r["recompensa"]], sem.rng_cenarios_treino(),
+        orcamento=120, escala=r["escala_recompensa"])
+    assert info["passos"] >= 120
+    por_na = info["episodios_por_na"]
+    assert por_na[1] >= 1 and por_na[2] >= 1
+    assert abs(por_na[1] - por_na[2]) <= 1          # round-robin
+    # o segundo drone só existe nos episódios de Na=2, e registra em todos eles
+    assert 0 < registrados[1] < registrados[0]
+    assert ap.ator.entradas_ocupadas() > 0

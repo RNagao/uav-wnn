@@ -155,19 +155,31 @@ validado. Dois defeitos que se compunham em instabilidade construída.
 `n = 12` em todos os seis melhores pontos das duas famílias; nenhum usa 24."""
 
 
-def _cfgs(replica: str, na: int, ns: int) -> tuple[EnvConfig, EnvConfig]:
+def _cfgs(replica: str, na: int, ns: int,
+          n_vizinhos: int | None = None) -> tuple[EnvConfig, EnvConfig]:
     """`(treino, avaliação)`. As duas fases diferem e a diferença muda a métrica.
 
     Treino usa `end_when_all_collected=False` — o `--no-end-when-all-collected` do
     `benchmark.py`, que dá os 30,5 s de experiência pós-conclusão medidos em
     `spec06_bancos.py`. Avaliação usa `True`, que é o protocolo do
     `visualize_performance.py` que gerou a fig. 7.3.
+
+    `n_vizinhos` fixa `state_num_closest_drones` em vez do `Na − 1` de Lamenza.
+    Existe para o revezamento de `Na` do `spec06_busca.py`: uma rede só vê vários
+    `Na` se a observação tiver a MESMA largura em todos, e isso exige fixar os
+    slots de vizinhos no maior `Na` da lista. Tem de ser `>= Na − 1`, senão o
+    `environment.py` tenta escrever `Na − 1` vizinhos em menos slots.
     """
     r = REPLICAS[replica]
     base = {"num_drones": na, "num_sensors": ns,
             "max_episode_length": r["horizonte"]}
     if r["cegos"]:
         base["state_num_closest_drones"] = 0
+    elif n_vizinhos is not None:
+        if n_vizinhos < na - 1:
+            raise ValueError(f"n_vizinhos={n_vizinhos} < Na−1={na - 1}: o "
+                             f"environment.py não cabe {na - 1} vizinhos aí")
+        base["state_num_closest_drones"] = int(n_vizinhos)
     treino = EnvConfig(**{**LAMENZA_003(na, ns, "train").kwargs(), **base})
     aval = EnvConfig(**{**LAMENZA_003(na, ns, "eval").kwargs(), **base})
     return treino, aval

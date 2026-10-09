@@ -1,4 +1,4 @@
-"""Grade de hiperparâmetros da rede da DISSERTAÇÃO — `Na = 1`, sem ruído.
+"""Grade de hiperparâmetros da rede da DISSERTAÇÃO — `Na` fixo ou REVEZADO, sem ruído.
 
 Algoritmo 4.4 (§4.3): gradiente funcional no ator, regressão com esquecimento no
 crítico. Três modos:
@@ -6,6 +6,27 @@ crítico. Três modos:
     grade       fatorial completo num dos níveis de `GRADE`
     aleatoria   sorteio sobre todos os eixos, para orçamento pequeno
     longa       lista explícita de pontos, para corridas de orçamento grande
+
+`Na` É PARÂMETRO, E PODE SER UMA LISTA
+
+`--na 1` (padrão) é a grade de sempre. `--na 1,2,4` treina CADA ponto com uma rede
+só, revezando o número de drones a cada episódio (round-robin na ordem dada), e
+valida e testa em cada `Na` da lista — a métrica de seleção é a MÉDIA da cobertura
+entre as células. Três consequências, todas declaradas:
+
+    observação     `state_num_closest_drones = max(Na) − 1` em TODAS as células,
+                   senão a rede não tem como ler os dois tamanhos. É o padrão de
+                   Lamenza só para o maior `Na`; nos menores os slots que sobram
+                   chegam com `−1`, o mesmo padding dos sensores.
+    treino         uma trajetória de ator-crítico POR DRONE compartilhando a rede,
+                   e recompensa de time dividida por `Na` — o laço (e o motivo) do
+                   `spec06_treino_multiagente.py`. O laço single-agente registrava
+                   uma transição por passo e treinava só o último drone.
+    protocolo      Lamenza treina uma rede por célula `(Na, Ns)`. Uma rede para
+                   várias é experimento à parte, não substituto da campanha
+                   comparável, e vai no relatório como tal.
+
+    uv run python scripts/spec06_busca.py --na 1,2,4 --ns 12 --niveis reduzido
 
 O BRAÇO `anbubus` SAIU DAQUI, e a razão é de método
 
@@ -51,6 +72,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
+import random
 import sys
 import time
 from pathlib import Path
@@ -62,6 +84,7 @@ from spec06_treinar import REPLICAS, _cfgs, _ctx, avaliar, corpus_de_observacoes
     rodar_episodios_de_treino  # noqa: E402
 from uavwnn.agents import APROXIMADORES  # noqa: E402
 from uavwnn.agents.ac_continuo import AtorCriticoContinuo  # noqa: E402
+from uavwnn.agents.base import Observacao  # noqa: E402
 from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
 from uavwnn.campanha import (  # noqa: E402
     FAIXA_PADRONIZADA,
@@ -73,6 +96,7 @@ from uavwnn.campanha import (  # noqa: E402
 )
 from uavwnn.campanha.treino import ParadaAntecipada  # noqa: E402
 from uavwnn.encoding import TermometroQuantil  # noqa: E402
+from uavwnn.refenv import make_env  # noqa: E402
 from uavwnn.refenv.runner import EnvConfig  # noqa: E402
 
 # --- o espaço de busca ------------------------------------------------------
@@ -302,10 +326,17 @@ def amostrar(n: int, seed: int = 20260921) -> list[dict]:
     return fora
 
 
-def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
-    """Instancia o modelo, convertendo a taxa para a convenção da família."""
+def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict,
+            corpus: np.ndarray | None = None):
+    """Instancia o modelo, convertendo a taxa para a convenção da família.
+
+    `corpus` pronto é para o revezamento de `Na`: o termômetro quantil tem de ver
+    observações de TODAS as células, senão os limiares ficam calibrados num `Na` e
+    os outros caem fora de faixa.
+    """
     d_obs = cfg.observation_size
-    corpus = corpus_de_observacoes(cfg)
+    if corpus is None:
+        corpus = corpus_de_observacoes(cfg)
     normaliza = bool(amostra.get("normalizar", False))
     if normaliza:
         # Pipeline do `anbubus`: normalização móvel + faixa FIXA. O normalizador é
@@ -357,29 +388,150 @@ def _montar(aprox: str, cfg: EnvConfig, sem: PapeisDeSemente, amostra: dict):
                             "normalizador": nz}
 
 
+def _celulas(replica: str, nas: tuple[int, ...], ns: int, raiz_bancos=None) -> dict:
+    """Uma célula `(Na, Ns)` por valor de `Na`, todas com a MESMA largura de observação.
+
+    `state_num_closest_drones = max(Na) − 1` em todas: é o que deixa uma única rede
+    ver qualquer `Na` da lista. Para o maior `Na` é exatamente o padrão de Lamenza
+    (`Na − 1`); para os menores, os slots que sobram chegam com `−1` do
+    `environment.py` — o mesmo padding dos sensores, que `Observacao.decodificar`
+    já trata. Com um só `Na` nada muda: `max(Na) − 1 = Na − 1`.
+    """
+    n_viz = max(nas) - 1
+    out = {}
+    for na in nas:
+        cfg_tr, cfg_av = _cfgs(replica, na, ns, n_vizinhos=n_viz)
+        out[na] = {"cfg_tr": cfg_tr, "cfg_av": cfg_av,
+                   "ctx_tr": _ctx(cfg_tr), "ctx_av": _ctx(cfg_av),
+                   "bancos": carregar_bancos(na, ns, raiz=raiz_bancos)}
+    larguras = {c["cfg_tr"].observation_size for c in out.values()}
+    assert len(larguras) == 1, f"larguras de observação diferentes: {larguras}"
+    return out
+
+
+def rodar_episodios_revezando(celulas: dict, nas: tuple[int, ...], acs: list,
+                              recompensa, rng_cen, orcamento: int,
+                              escala: float = 1.0, ep0: int = 0) -> dict:
+    """Treina até gastar `orcamento` passos, REVEZANDO `Na` a cada episódio.
+
+    Round-robin sobre `nas` a partir do episódio `ep0`: com `(1, 2, 4)` o episódio
+    `k` roda com `nas[k mod 3]` drones. Uma rede, `max(Na)` trajetórias de
+    ator-crítico — uma por drone, como no `spec06_treino_multiagente.py` —, e o
+    episódio com `Na` drones usa as `Na` primeiras.
+
+    A recompensa de time é dividida por `Na`, pelo motivo medido lá: sem isso o
+    sinal total na rede compartilhada escala com `Na`, os retornos inflam e o δ
+    estoura o `c_max`. É escalar positivo, não muda a política ótima. Com `Na = 1`
+    este laço é o `rodar_episodios_de_treino` de sempre.
+    """
+    passos, ep = 0, ep0
+    retornos: list[float] = []
+    por_na = {na: 0 for na in nas}
+    while passos < orcamento:
+        na = nas[ep % len(nas)]
+        c = celulas[na]
+        cfg, ctx = c["cfg_tr"], c["ctx_tr"]
+        passos_max = int(cfg.max_episode_length / cfg.algorithm_iteration_interval) + 2
+        s = int(rng_cen.integers(2_000_000_000, 4_000_000_000))
+        env = make_env(cfg)
+        random.seed(s)
+        np.random.seed(s)
+        obs, _ = env.reset()
+        agentes = list(env.agents)
+        assert len(agentes) == na <= len(acs)
+        for i in range(na):
+            # Mantém o gerador entre episódios (como o laço single-agente); o
+            # deslocamento por drone é o do treinador multiagente.
+            acs[i].reset(ctx, acs[i]._rng or np.random.default_rng(s + 7919 * i))
+        antes, total = 0, 0.0
+        for _ in range(passos_max):
+            acoes = {a: acs[i].act(Observacao.decodificar(obs[a], ctx)).como_array()
+                     for i, a in enumerate(agentes)}
+            obs, _, term, trunc, _ = env.step(acoes)
+            colhidos = int(env.sensors_collected)
+            r_time = escala * recompensa(colhidos, antes, cfg.num_sensors)
+            antes = colhidos
+            total += r_time
+            for i in range(na):                      # CADA drone fecha sua transição
+                acs[i].registrar(r_time / na)
+            passos += 1                              # passo de AMBIENTE
+            if any(term.values()) or any(trunc.values()):
+                break
+            for i, a in enumerate(agentes):
+                acs[i].passo_intermediario(Observacao.decodificar(obs[a], ctx))
+            if passos >= orcamento:
+                break
+        for i in range(na):
+            acs[i].fim_de_episodio()
+        por_na[na] += 1
+        ep += 1
+        retornos.append(total)
+        try:
+            env.close()
+        except Exception:  # pragma: no cover
+            pass
+    return {"passos": passos, "episodios": ep - ep0, "episodios_por_na": por_na,
+            "recompensa_media": float(np.mean(retornos))}
+
+
+def _na_registro(nas: tuple[int, ...]):
+    """`1` para a grade de um drone, `[1, 2, 4]` para o revezamento.
+
+    O escalar preserva o `config_hash` (e as pastas) das 720 corridas já feitas
+    com `Na = 1`; a lista só aparece quando o experimento é outro."""
+    return nas[0] if len(nas) == 1 else list(nas)
+
+
+def _nas_de(rec: dict) -> tuple[int, ...]:
+    """Inverso de `_na_registro`; registros antigos, sem o campo, eram `Na = 1`."""
+    v = rec.get("na", 1)
+    return tuple(v) if isinstance(v, list) else (int(v),)
+
+
 def uma(args: tuple) -> dict:
-    aprox, amostra, seed_train, replica, b, n_val, n_test, raiz = args
+    aprox, amostra, seed_train, replica, b, n_val, n_test, raiz, nas, ns = args
+    nas = tuple(nas)
     r = REPLICAS[replica]
-    cfg_tr, cfg_av = _cfgs(replica, 1, 12)
-    bancos = carregar_bancos(1, 12)
-    val, test = bancos.val.sementes[:n_val], bancos.test.sementes[:n_test]
-    ctx_tr, ctx_av = _ctx(cfg_tr), _ctx(cfg_av)
+    celulas = _celulas(replica, nas, ns)
+    cfg_ref = celulas[nas[0]]["cfg_tr"]          # a largura é a mesma em todas
+    cfg_av_ref = celulas[nas[0]]["cfg_av"]
+    val = {na: c["bancos"].val.sementes[:n_val] for na, c in celulas.items()}
+    test = {na: c["bancos"].test.sementes[:n_test] for na, c in celulas.items()}
     sem = PapeisDeSemente(seed_train=seed_train)
+    base = {"aproximador": aprox, **amostra, "seed_train": seed_train,
+            "b_sweep": b, "na": _na_registro(nas), "ns": ns}
 
     try:
-        ap, termo, pol, det = _montar(aprox, cfg_tr, sem, amostra)
+        corpus = np.concatenate([corpus_de_observacoes(c["cfg_tr"])
+                                 for c in celulas.values()])
+        ap, termo, pol, det = _montar(aprox, cfg_ref, sem, amostra, corpus=corpus)
         nz = det.pop("normalizador", None)
     except Exception as e:
-        return {"aproximador": aprox, **amostra, "seed_train": seed_train,
-                "abortou": f"montagem: {type(e).__name__}: {e}", "cobertura": 0.0,
-                "sr": 0.0, "ct_cens": float(cfg_av.max_episode_length),
-                "val_cobertura": 0.0, "passos": 0, "parede_s": 0.0,
-                "b_sweep": b}
+        return {**base, "abortou": f"montagem: {type(e).__name__}: {e}",
+                "cobertura": 0.0, "sr": 0.0,
+                "ct_cens": float(cfg_av_ref.max_episode_length),
+                "val_cobertura": 0.0, "passos": 0, "parede_s": 0.0}
+
+    # Uma trajetória de ator-crítico POR DRONE, todas sobre o MESMO aproximador e
+    # o mesmo codificador. `pol` é a primeira (e a única, com `Na = 1`); é ela que
+    # avalia, porque o ator é compartilhado e a avaliação é determinística.
+    acs = [pol] + [AtorCriticoContinuo(
+        aproximador=ap, codificar=pol.codificar,
+        politica=NormalProjetada(amostra["sigma"], None),
+        passos=amostra["passos_m"], id=f"busca_{aprox}_a{i}", treinando=True)
+        for i in range(1, max(nas))]
 
     cfg_corrida = {"busca": True, "replica": replica, "aproximador": aprox,
-                   "na": 1, "ns": 12, "b_sweep": b, **amostra, **det}
+                   "na": _na_registro(nas), "ns": ns, "b_sweep": b,
+                   **amostra, **det}
+    if len(nas) > 1:
+        cfg_corrida["n_vizinhos_obs"] = max(nas) - 1
+        cfg_corrida["bancos_por_na"] = {
+            str(na): {"val": c["bancos"].val.hash, "test": c["bancos"].test.hash}
+            for na, c in celulas.items()}
     corrida = Corrida(experimento=f"spec06-busca-{replica}", config=cfg_corrida,
-                      sementes=sem, bancos=bancos, raiz=Path(raiz))
+                      sementes=sem, bancos=celulas[nas[0]]["bancos"],
+                      raiz=Path(raiz))
     corrida.preparar()
 
     def salvar_checkpoint(rotulo: str) -> None:
@@ -397,6 +549,29 @@ def uma(args: tuple) -> dict:
         if nz is not None:
             nz.salvar(dest / "normalizador.npz")
 
+    def avaliar_todas(sementes_por_na: dict) -> dict:
+        """Avalia em CADA `Na` da lista; o agregado é a MÉDIA entre células.
+
+        Média simples, e não ponderada por episódios: cada célula é um problema, e
+        a seleção não deve pender para o `Na` que por acaso tem mais sementes."""
+        por_na = {}
+        for na, c in celulas.items():
+            m = avaliar(c["cfg_av"], pol, c["ctx_av"], sementes_por_na[na])
+            for linha in m["por_episodio"]:
+                linha["na"] = na
+            por_na[na] = m
+        if len(nas) == 1:
+            return por_na[nas[0]]
+        agg = {k: float(np.mean([m[k] for m in por_na.values()]))
+               for k in ("sr", "ct_cens", "cobertura", "recompensa_media")}
+        succ = [m["ct_succ"] for m in por_na.values() if not np.isnan(m["ct_succ"])]
+        agg["ct_succ"] = float(np.mean(succ)) if succ else float("nan")
+        agg["por_episodio"] = [l for m in por_na.values() for l in m["por_episodio"]]
+        agg["por_na"] = {str(na): {k: m[k] for k in
+                                   ("sr", "ct_cens", "ct_succ", "cobertura")}
+                         for na, m in por_na.items()}
+        return agg
+
     rng_cen = sem.rng_cenarios_treino()
     recompensa = RECOMPENSAS[r["recompensa"]]
     # `// 40` e não `// 20`: com 20 avaliações a guarda de MINIMO_AVALIACOES=20
@@ -404,17 +579,21 @@ def uma(args: tuple) -> dict:
     # orçamento já tivesse acabado. Medido na primeira grade: nenhuma corrida parou.
     intervalo = max(1, b // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
-    melhor, passos, abortou = 0.0, 0, None
+    melhor, passos, ep, abortou = 0.0, 0, 0, None
+    ep_por_na = {na: 0 for na in nas}
     t0 = time.perf_counter()
     try:
         while passos < b:
-            info = rodar_episodios_de_treino(
-                cfg_tr, pol, ctx_tr, recompensa, rng_cen,
-                min(intervalo, b - passos), r["escala_recompensa"])
+            info = rodar_episodios_revezando(
+                celulas, nas, acs, recompensa, rng_cen,
+                min(intervalo, b - passos), r["escala_recompensa"], ep0=ep)
             passos += int(info["passos"])
+            ep += int(info["episodios"])
+            for na, k in info["episodios_por_na"].items():
+                ep_por_na[na] += k
             if nz is not None:
                 nz.congelar()
-            m = avaliar(cfg_av, pol, ctx_av, val)
+            m = avaliar_todas(val)
             if nz is not None:
                 nz.descongelar()
             if m["cobertura"] > melhor:
@@ -448,12 +627,17 @@ def uma(args: tuple) -> dict:
     # Poda pós-treino padrão — SÓ em corrida de orçamento real: um ponto de
     # grade a 200 mil passos não vira artefato de implantação, e a verificação
     # (100 episódios de val) custaria mais que o ponto inteiro.
+    #
+    # No revezamento o deploy é verificado no MAIOR `Na`: o `deploy_pos_treino`
+    # monta o ambiente com os `Na − 1` vizinhos de Lamenza, e só nesse `Na` isso
+    # coincide com a largura fixa em que a rede foi treinada.
     if b >= 1_000_000:
         try:
             from spec06_exportar_deploy import deploy_pos_treino
+            na_dep = max(nas)
             dep = deploy_pos_treino(corrida.dir / "checkpoints" / "final",
-                                    cfg_av.num_drones, cfg_av.num_sensors,
-                                    sementes=bancos.val.sementes[:100])
+                                    na_dep, ns,
+                                    sementes=celulas[na_dep]["bancos"].val.sementes[:100])
             print(f"  deploy podado ({dep.get('poda', 0):.0%}): "
                   f"{dep['deploy_kb']:.0f} KB · SR {dep['sr_cheio']:.1%}"
                   f"→{dep['sr_podado']:.1%} (val)"
@@ -491,19 +675,19 @@ def uma(args: tuple) -> dict:
             # que está em memória, que é o comportamento anterior.
             print(f"  aviso: não reli o checkpoint melhor ({e}); avaliando o final",
                   flush=True)
-    final = avaliar(cfg_av, pol, ctx_av, test)
+    final = avaliar_todas(test)
     corrida.gravar_eval_test(final["por_episodio"])
-    return {"aproximador": aprox, **amostra, **det, "seed_train": seed_train,
-            "b_sweep": b,
-            "passos": passos, "val_cobertura": float(melhor),
+    extra = {"por_na": final["por_na"], "episodios_por_na":
+             {str(k): v for k, v in ep_por_na.items()}} if len(nas) > 1 else {}
+    return {**base, **det,
+            "passos": passos, "episodios": ep, "val_cobertura": float(melhor),
             "cobertura": final["cobertura"], "sr": final["sr"],
-            "ct_cens": final["ct_cens"], "ct_succ": final["ct_succ"],
+            "ct_cens": final["ct_cens"], "ct_succ": final["ct_succ"], **extra,
             "abortou": abortou, "parede_s": time.perf_counter() - t0,
             "dir": str(corrida.dir),
             "checkpoint_mb": round(sum(
                 f.stat().st_size for f in (corrida.dir / "checkpoints").rglob("*")
                 if f.is_file()) / 1e6, 3)}
-
 
 PONTOS_LONGA = [
     # --- dissertação: os 3 melhores por média de 3 sementes, todos sem aborto ---
@@ -577,10 +761,11 @@ def _chave(rec: dict, eixos) -> tuple:
             tuple(sorted((k, rec[k]) for k in eixos)))
 
 
-def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
+def _retomar(progresso, tarefas, b_sweep: int, nas: tuple[int, ...] = (1,),
+             ns: int = 12) -> tuple[list[dict], str]:
     """Lê o progresso existente e devolve só o que serve para ESTA grade.
 
-    Três filtros, e cada um evita um jeito diferente de contaminar o resultado:
+    Quatro filtros, e cada um evita um jeito diferente de contaminar o resultado:
 
     1. **Orçamento.** Um registro treinado por outro `b_sweep` é outra corrida —
        o `config_hash` da §4.7 já separa as pastas por isso. Registros sem o campo
@@ -591,6 +776,9 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
        sobrou de outra e não entra no relatório final.
     3. **Duplicidade.** Se o arquivo tem a mesma corrida duas vezes (retomada de
        retomada), vale a última.
+    4. **Célula.** Um registro treinado com outra lista de `Na` ou outro `Ns` é
+       outra rede, mesmo nos mesmos eixos. Registros sem o campo `na` são da
+       versão que só fazia `Na = 1`, e é assim que são lidos.
 
     Corridas ABORTADAS contam como concluídas e **não** são refeitas: o aborto é
     determinação, não falha de infraestrutura — mesma semente, mesmo ponto, mesmo
@@ -600,7 +788,7 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
                     t[1].keys() & _EIXOS)
              for t in tarefas}
     bons, notas = {}, []
-    sem_campo = fora_orc = alheios = 0
+    sem_campo = fora_orc = alheios = outra_cel = 0
     for linha in progresso.read_text().splitlines():
         if not linha.strip():
             continue
@@ -614,6 +802,9 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
         if x["b_sweep"] != b_sweep:
             fora_orc += 1
             continue
+        if _nas_de(x) != tuple(nas) or int(x.get("ns", 12)) != ns:
+            outra_cel += 1
+            continue
         k = _chave(x, x.keys() & _EIXOS)
         if k not in alvos:
             alheios += 1
@@ -625,6 +816,8 @@ def _retomar(progresso, tarefas, b_sweep: int) -> tuple[list[dict], str]:
         notas.append(f"{fora_orc} de outro orçamento descartadas")
     if alheios:
         notas.append(f"{alheios} de outra grade descartadas")
+    if outra_cel:
+        notas.append(f"{outra_cel} de outra célula (Na/Ns) descartadas")
     return list(bons.values()), " · ".join(notas)
 
 
@@ -643,6 +836,12 @@ def main() -> int:
                     help="cardinalidade da grade fatorial — ver o custo impresso")
     ap.add_argument("--amostras", type=int, default=24,
                     help="só no modo `aleatoria`: sorteios COMPARTILHADOS")
+    ap.add_argument("--na", default="1",
+                    help="número de drones, ou LISTA separada por vírgula "
+                         "(`1,2,4`): cada ponto treina UMA rede revezando os "
+                         "valores por episódio, e valida/testa em cada um — ver "
+                         "o cabeçalho")
+    ap.add_argument("--ns", type=int, default=12)
     ap.add_argument("--sementes", type=int, default=3)
     ap.add_argument("--b-sweep", type=int, default=400_000)
     ap.add_argument("--n-val", type=int, default=20)
@@ -656,6 +855,11 @@ def main() -> int:
                          "existente, em vez de truncá-lo e refazer tudo")
     a = ap.parse_args()
 
+    # Deduplica PRESERVANDO a ordem: ela é a ordem do revezamento.
+    nas = tuple(dict.fromkeys(int(v) for v in a.na.split(",") if v.strip()))
+    if not nas or min(nas) < 1:
+        ap.error(f"--na inválido: {a.na!r}")
+
     modelos = a.modelos.split(",")
     if a.modo == "longa":
         # Pontos explícitos, um por modelo — NÃO é produto cartesiano, porque os
@@ -664,7 +868,7 @@ def main() -> int:
         tarefas = [(mod, {"id": i, "passo_efetivo": pe, "sigma": sg,
                           "resolucao": T, "tupla": n, "passos_m": 8,
                           "idx_critico": ic, "normalizar": False},
-                    sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
+                    sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz, nas, a.ns)
                    for i, (mod, pe, sg, T, n, ic) in enumerate(PONTOS_LONGA)
                    for sd in range(a.sementes)]
     elif a.modo == "grade":
@@ -677,7 +881,8 @@ def main() -> int:
     # medido: 15 corridas concluídas, 15 da mesma rede. `chunksize` não resolve:
     # ele muda o lote, não a ordem.
     if amostras is not None:
-        tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz)
+        tarefas = [(m, s, sd, a.replica, a.b_sweep, a.n_val, a.n_test, a.raiz,
+                    nas, a.ns)
                    for s in amostras for sd in range(a.sementes) for m in modelos]
     # EMBARALHA com semente fixa, e a razão foi medida.
     #
@@ -699,7 +904,10 @@ def main() -> int:
            if a.modo == "longa"
            else f"grade fatorial COMPLETA ({a.niveis})" if a.modo == "grade"
            else f"busca aleatória ({a.amostras} sorteios)")
-    print(f"{rot} · réplica {a.replica} · Na=1 Ns=12 · sem ruído")
+    na_txt = (f"Na={nas[0]}" if len(nas) == 1 else
+              f"Na={'/'.join(map(str, nas))} (revezando por episódio, "
+              f"{max(nas) - 1} vizinhos na observação)")
+    print(f"{rot} · réplica {a.replica} · {na_txt} Ns={a.ns} · sem ruído")
     if a.modo == "longa":
         print(f"{len(PONTOS_LONGA)} pontos ESPECÍFICOS por modelo × {a.sementes} "
               f"sementes = {len(tarefas)} corridas")
@@ -722,8 +930,11 @@ def main() -> int:
     #
     # A constante anterior (6,5 min/corrida a 200 mil passos) subestimava por 2× e
     # ignorava `n_val`/`n_test` por completo.
-    MS_POR_PASSO, PASSOS_POR_EP = 1.80, 76
-    _passos = a.b_sweep + 40 * a.n_val * PASSOS_POR_EP + a.n_test * PASSOS_POR_EP
+    #
+    # Com revezamento, cada passo de ambiente custa `Na` decisões — a média da
+    # lista no treino, e a avaliação roda uma vez por célula.
+    MS_POR_PASSO, PASSOS_POR_EP = 1.80 * float(np.mean(nas)), 76
+    _passos = (a.b_sweep + (40 * a.n_val + a.n_test) * PASSOS_POR_EP * len(nas))
     _lotes = -(-len(tarefas) // a.processos)     # ondas de `processos` corridas
     est = _lotes * _passos * MS_POR_PASSO / 1000 / 3600
     print(f"estimativa: ~{est:.1f} h de parede")
@@ -736,7 +947,7 @@ def main() -> int:
     progresso.parent.mkdir(parents=True, exist_ok=True)
     res = []
     if a.retomar and progresso.exists():
-        res, desc = _retomar(progresso, tarefas, a.b_sweep)
+        res, desc = _retomar(progresso, tarefas, a.b_sweep, nas, a.ns)
         feitas = {_chave(x, x.keys() & _EIXOS) for x in res}
         antes = len(tarefas)
         tarefas = [t for t in tarefas
@@ -827,10 +1038,19 @@ def main() -> int:
         # `phi` nem `razao_critico`, porque o modelo nunca chegou a existir.
         crit = a0.get("phi", a0.get("razao_critico"))
         crit_txt = "—" if crit is None else f"{crit:g}"
+        # Média entre sementes POR célula, quando há revezamento.
+        por_na = {}
+        for x in g:
+            for na, v in (x.get("por_na") or {}).items():
+                por_na.setdefault(na, []).append(v)
+        por_na = {na: {k: float(np.mean([v[k] for v in vs]))
+                       for k in ("cobertura", "sr", "ct_cens")}
+                  for na, vs in por_na.items()}
         linhas.append({"modelo": m, "id": i, "cobertura": cob, "sr": sr,
                        "abortos": ab, "n": len(g), **{k: a0[k] for k in
                        ("passo_efetivo", "sigma", "resolucao", "tupla", "passos_m")},
-                       "critico": crit, "n_ram": a0.get("n_ram")})
+                       "critico": crit, "n_ram": a0.get("n_ram"),
+                       **({"por_na": por_na} if por_na else {})})
         print(f"{m:>18} {i:>3} {a0['passo_efetivo']:>8.1e} {a0['sigma']:>5.2f} "
               f"{a0['resolucao']:>4} {a0['tupla']:>3} {a0['passos_m']:>3} "
               f"{crit_txt:>6} {a0.get('n_ram') or 0:>4} {cob:>6.1%} {sr:>5.1%} "
@@ -848,8 +1068,14 @@ def main() -> int:
               f"crítico {b_crit} · N {b['n_ram'] or 0}")
         print(f"      -> cobertura {b['cobertura']:.1%}, SR {b['sr']:.1%}, "
               f"abortos {b['abortos']}/{b['n']}")
+        if b.get("por_na"):
+            print("      por Na: " + " · ".join(
+                f"Na={na} cob {v['cobertura']:.1%} SR {v['sr']:.1%}"
+                for na, v in b["por_na"].items()))
 
-    art = {"config": vars(a), "espaco": {
+    art = {"config": vars(a), "celula": {"na": list(nas), "ns": a.ns,
+                                          "revezamento": len(nas) > 1},
+           "espaco": {
         "passo_efetivo": list(PASSO_EFETIVO), "sigma": list(SIGMA),
         "resolucao": list(RESOLUCAO), "tupla": list(TUPLA),
         "passos_m": list(PASSOS_M), "phi": list(PHI),

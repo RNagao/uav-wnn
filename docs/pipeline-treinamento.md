@@ -85,7 +85,7 @@ encolheria sem que nada acusasse.
 
 | arquivo | responsabilidade |
 |---|---|
-| `spec06_busca.py` | grade de hiperparâmetros e corrida longa (`--modo grade\|aleatoria\|longa`). Paraleliza por processo, retoma do cache, grava `melhor`/`final`/`deploy` |
+| `spec06_busca.py` | grade de hiperparâmetros e corrida longa (`--modo grade\|aleatoria\|longa`). `--na 1,2,4` treina cada ponto com uma rede só, revezando o número de drones por episódio, e valida/testa em cada `Na`. Paraleliza por processo, retoma do cache, grava `melhor`/`final`/`deploy` |
 | `spec06_treino_multiagente.py` | célula `Na > 1`. **Parameter sharing**: uma rede, `Na` trajetórias de AC. Normaliza a recompensa por `Na` |
 
 ### Montagem — traduz configuração em objetos
