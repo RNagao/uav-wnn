@@ -325,7 +325,7 @@ def test_a_faixa_padronizada_e_a_dos_autores():
 
 
 
-# --- revezamento de Na na busca (spec06_busca.py --na 1,2,4) -----------------
+# --- revezamento de célula na busca (spec06_busca.py --na 1,2,4 --ns 12,24) --
 
 
 def test_celulas_revezadas_tem_a_mesma_largura_de_observacao(tmp_path):
@@ -333,13 +333,16 @@ def test_celulas_revezadas_tem_a_mesma_largura_de_observacao(tmp_path):
     `state_num_closest_drones = max(Na) − 1` em cada célula. Com um `Na` só, a
     largura é a de Lamenza (`2·(Na−1) + 2·12 + 1`), para não mudar a grade antiga."""
     b = _busca()
-    cel = b._celulas("1b", (1, 2, 4), 12, raiz_bancos=tmp_path)
-    larguras = {na: c["cfg_tr"].observation_size for na, c in cel.items()}
-    assert larguras == {1: 31, 2: 31, 4: 31}          # 2·3 + 2·12 + 1
+    cel = b._celulas("1b", (1, 2, 4), (12, 24), raiz_bancos=tmp_path)
+    # ordem do revezamento: Na por fora, Ns por dentro
+    assert list(cel) == [(1, 12), (1, 24), (2, 12), (2, 24), (4, 12), (4, 24)]
+    larguras = {k: c["cfg_tr"].observation_size for k, c in cel.items()}
+    assert set(larguras.values()) == {31}             # 2·3 + 2·12 + 1, para todo Ns
     assert all(c["cfg_tr"].state_num_closest_drones == 3 for c in cel.values())
-    so_um = b._celulas("1b", (1,), 12, raiz_bancos=tmp_path)
-    assert so_um[1]["cfg_tr"].observation_size == 25
-    assert so_um[1]["cfg_tr"].state_num_closest_drones == 0
+    assert cel[(2, 24)]["cfg_tr"].num_sensors == 24
+    so_um = b._celulas("1b", (1,), (12,), raiz_bancos=tmp_path)
+    assert so_um[(1, 12)]["cfg_tr"].observation_size == 25
+    assert so_um[(1, 12)]["cfg_tr"].state_num_closest_drones == 0
 
 
 def test_cfgs_recusa_menos_vizinhos_que_na_menos_um():
@@ -353,22 +356,24 @@ def test_cfgs_recusa_menos_vizinhos_que_na_menos_um():
         _cfgs("1b", 4, 12, n_vizinhos=1)
 
 
-def test_registro_de_na_preserva_o_hash_da_grade_antiga():
-    """`Na = 1` grava o ESCALAR `1`, como as 720 corridas existentes; só a lista
-    aparece com revezamento. E `_nas_de` lê os dois, mais o registro antigo sem
-    campo."""
+def test_registro_de_celula_preserva_o_hash_da_grade_antiga():
+    """`Na = 1` e `Ns = 12` gravam o ESCALAR, como as 720 corridas existentes; só a
+    lista aparece com revezamento. E `_lista_de` lê os dois, mais o registro antigo
+    sem campo."""
     b = _busca()
-    assert b._na_registro((1,)) == 1
-    assert b._na_registro((1, 2, 4)) == [1, 2, 4]
-    assert b._nas_de({"na": 1}) == (1,)
-    assert b._nas_de({"na": [1, 2, 4]}) == (1, 2, 4)
-    assert b._nas_de({}) == (1,)
+    assert b._registro((1,)) == 1
+    assert b._registro((1, 2, 4)) == [1, 2, 4]
+    assert b._lista_de({"na": 1}, "na", 1) == (1,)
+    assert b._lista_de({"na": [1, 2, 4]}, "na", 1) == (1, 2, 4)
+    assert b._lista_de({}, "na", 1) == (1,)
+    assert b._lista_de({"ns": [12, 24]}, "ns", 12) == (12, 24)
+    assert b._lista_de({}, "ns", 12) == (12,)
 
 
-def test_revezamento_alterna_na_por_episodio_e_treina_cada_drone(tmp_path):
-    """Round-robin sobre `(1, 2)`: o episódio `k` roda com `nas[k mod 2]` drones, e
-    cada drone fecha a sua própria transição — o laço single-agente registrava uma
-    só por passo e treinava apenas o último drone."""
+def test_revezamento_alterna_celula_por_episodio_e_treina_cada_drone(tmp_path):
+    """Round-robin sobre `(1, 2) × (12, 24)`: quatro células, o episódio `k` roda a
+    `k mod 4`-ésima, e cada drone fecha a sua própria transição — o laço
+    single-agente registrava uma só por passo e treinava apenas o último drone."""
     import sys
     sys.path.insert(0, "scripts")
     from spec06_treinar import RECOMPENSAS, REPLICAS
@@ -377,15 +382,14 @@ def test_revezamento_alterna_na_por_episodio_e_treina_cada_drone(tmp_path):
     from uavwnn.campanha import PapeisDeSemente
 
     b = _busca()
-    nas = (1, 2)
-    cel = b._celulas("1b", nas, 12, raiz_bancos=tmp_path)
+    cel = b._celulas("1b", (1, 2), (12, 24), raiz_bancos=tmp_path)
     amostra = {"passo_efetivo": 5e-4, "sigma": 0.35, "resolucao": 8, "tupla": 8,
                "passos_m": 4, "idx_critico": 1, "normalizar": False}
     sem = PapeisDeSemente(seed_train=0)
     corpus = np.concatenate([b.corpus_de_observacoes(c["cfg_tr"], n_episodios=1)
                              for c in cel.values()])
-    ap, _termo, pol, _det = b._montar("ntupla_dissertacao", cel[1]["cfg_tr"], sem,
-                                      amostra, corpus=corpus)
+    ap, _termo, pol, _det = b._montar("ntupla_dissertacao", cel[(1, 12)]["cfg_tr"],
+                                      sem, amostra, corpus=corpus)
     acs = [pol, AtorCriticoContinuo(aproximador=ap, codificar=pol.codificar,
                                     politica=NormalProjetada(0.35, None), passos=4,
                                     id="a1", treinando=True)]
@@ -400,12 +404,12 @@ def test_revezamento_alterna_na_por_episodio_e_treina_cada_drone(tmp_path):
 
     r = REPLICAS["1b"]
     info = b.rodar_episodios_revezando(
-        cel, nas, acs, RECOMPENSAS[r["recompensa"]], sem.rng_cenarios_treino(),
-        orcamento=120, escala=r["escala_recompensa"])
-    assert info["passos"] >= 120
-    por_na = info["episodios_por_na"]
-    assert por_na[1] >= 1 and por_na[2] >= 1
-    assert abs(por_na[1] - por_na[2]) <= 1          # round-robin
+        cel, acs, RECOMPENSAS[r["recompensa"]], sem.rng_cenarios_treino(),
+        orcamento=300, escala=r["escala_recompensa"])
+    assert info["passos"] >= 300
+    por = info["episodios_por_celula"]
+    assert set(por) == set(cel) and min(por.values()) >= 1
+    assert max(por.values()) - min(por.values()) <= 1      # round-robin
     # o segundo drone só existe nos episódios de Na=2, e registra em todos eles
     assert 0 < registrados[1] < registrados[0]
     assert ap.ator.entradas_ocupadas() > 0

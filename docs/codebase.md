@@ -106,7 +106,7 @@ O que torna a medição comparável entre corridas.
 ### 1. Treino WNN — Algoritmo 4.4
 
 ```
-spec06_busca.py  (--modo grade|aleatoria|longa; --na 1 ou lista revezada 1,2,4)
+spec06_busca.py  (--modo grade|aleatoria|longa; --na/--ns escalares ou listas revezadas, ex. --na 1,2,4 --ns 12,24)
 spec06_treino_multiagente.py  (Na > 1, parameter sharing)
         └─> spec06_treinar.py  ─> refenv · encoding · agents · campanha · wnn
                                 └─> runs/…/checkpoints/{melhor,final,deploy}
