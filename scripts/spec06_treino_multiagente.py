@@ -19,6 +19,17 @@ MLP-AC).
 
     uv run python scripts/spec06_treino_multiagente.py --na 2 --ns 24 --smoke
     uv run python scripts/spec06_treino_multiagente.py --na 2 --ns 24 --b-max 10000000
+
+UMA GRADE POR `Na`, E O `Ns` REVEZADO
+
+Quando a configuração vem de uma grade própria daquele `Na` (`spec06_busca.py
+--na 2 --ns 12,24,36`), o treino longo deve rodar no MESMO regime em que ela foi
+selecionada: `--config-de` lê o melhor ponto da grade para o `T` pedido, e `--ns`
+em lista reveza o número de sensores por episódio com uma rede só.
+
+    uv run python scripts/spec06_treino_multiagente.py --na 2 --ns 12,24,36 \
+        --resolucao 16 --config-de reports/spec06-busca-a2s12-24-36.json \
+        --b-max 50000000 --saida runs/spec06-50M/T16-a2s12-24-36
 """
 
 from __future__ import annotations
@@ -55,8 +66,54 @@ como o conjunto único de hiperparâmetros do Lamenza exige."""
 SEED_TREINO_BASE = 2_000_000
 
 
+HP_PADRAO = {"passo": PASSO, "sigma": SIGMA, "tupla": N_TUPLA, "phi": PHI, "m": M}
+"""Os hiperparâmetros que a grade varre, com o vencedor da T-06.4 como padrão.
+
+Viraram parâmetro (`--passo`, `--sigma`, `--tupla`, `--phi`, `--m`, ou de uma vez
+`--config-de <json da grade>`) porque a escalada passou a ter UMA grade por `Na`:
+o modelo de `Na = 2` treina com o vencedor da grade de `Na = 2`, não com o de
+`Na = 1`. Os padrões continuam os de sempre, então nenhuma corrida já feita muda."""
+
+
+def _rotulo_ns(nss: tuple[int, ...]) -> str:
+    """`24` para um Ns só, `12-24-36` para o revezamento — é o sufixo da célula."""
+    return "-".join(str(n) for n in nss)
+
+
+def _ler_ns(txt: str) -> tuple[int, ...]:
+    """`"24"`, `"12,24,36"` ou `"12-24-36"` -> `(12, 24, 36)`, sem repetição, na ordem."""
+    return tuple(dict.fromkeys(int(v) for v in str(txt).replace("-", ",").split(",")
+                               if v.strip()))
+
+
+def config_da_grade(arquivo: Path, t_res: int | None = None,
+                    modelo: str = "ntupla_dissertacao") -> dict:
+    """O melhor ponto do artefato de `spec06_busca.py`, restrito a `T = t_res`.
+
+    Restringe a `T` porque a escalada treina os DOIS — `T = 16` e `T = 32` — e o
+    melhor ponto global da grade só diria qual dos dois venceu; o que se quer é
+    o melhor DE CADA UM. `cobertura` é a métrica de seleção da grade (média entre
+    sementes e, com revezamento, entre células).
+    """
+    art = json.loads(Path(arquivo).read_text())
+    pontos = [p for p in art["pontos"] if p["modelo"] == modelo
+              and (t_res is None or int(p["resolucao"]) == int(t_res))]
+    if not pontos:
+        raise SystemExit(f"{arquivo}: nenhum ponto de {modelo}"
+                         + (f" com T={t_res}" if t_res else ""))
+    p = max(pontos, key=lambda x: x["cobertura"])
+    return {"passo": float(p["passo_efetivo"]), "sigma": float(p["sigma"]),
+            "tupla": int(p["tupla"]), "phi": float(p["critico"]),
+            "m": int(p["passos_m"]), "resolucao": int(p["resolucao"]),
+            "cobertura_grade": float(p["cobertura"]), "sr_grade": float(p["sr"]),
+            "abortos_grade": f"{p['abortos']}/{p['n']}", "id_grade": p["id"],
+            "grade": str(arquivo),
+            "celula_grade": art.get("celula")}
+
+
 def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None,
-              c_max: float | None = 0.5):
+              c_max: float | None = 0.5, hp: dict | None = None,
+              corpus=None):
     """Rede compartilhada + `na` trajetórias de AC (uma por drone).
 
     Se ``retomar`` for um dir de checkpoint, carrega ator/crítico/termômetro dali
@@ -67,7 +124,11 @@ def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None,
     são estado treinado, e montar a rede com um `T` diferente do que gerou os
     endereços daria uma rede que lê as LUTs nos lugares errados — o mesmo defeito
     que o `carregar` do `RedeGradienteFuncional` corrige para o mapeamento.
+
+    `hp` são os hiperparâmetros da grade (ver `HP_PADRAO`); `corpus` pronto é para
+    o revezamento de `Ns`, em que o termômetro tem de ver todas as células.
     """
+    hp = {**HP_PADRAO, **(hp or {})}
     d_obs = cfg.observation_size
     if retomar is not None:
         termo = TermometroQuantil.carregar(Path(retomar) / "termometro.npz")
@@ -77,10 +138,12 @@ def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None,
                   f"ignorado: os limiares são estado treinado)", flush=True)
         t_res = gravado
     else:
-        termo = TermometroQuantil(t_res).ajustar(corpus_de_observacoes(cfg))
+        termo = TermometroQuantil(t_res).ajustar(
+            corpus if corpus is not None else corpus_de_observacoes(cfg))
     ap = APROXIMADORES["ntupla_dissertacao"](
-        n_bits=termo.n_bits, tamanho_tupla=N_TUPLA, phi=PHI, taxa_ator=PASSO,
-        seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs, limiares_por_dim=t_res)
+        n_bits=termo.n_bits, tamanho_tupla=hp["tupla"], phi=hp["phi"],
+        taxa_ator=hp["passo"], seed=0, d_saida=D_SAIDA, n_dims_codificador=d_obs,
+        limiares_por_dim=t_res)
     if retomar is not None:
         rp = Path(retomar)
         ap.ator = type(ap.ator).carregar(next(rp.glob("*ator.npz")))
@@ -103,8 +166,10 @@ def construir(cfg, na: int, t_res: int = T_RES, retomar: Path | None = None,
         return _t.codificar(np.asarray(v, float)[None, :])[0]
 
     acs = [AtorCriticoContinuo(
-        aproximador=ap, codificar=codificar, politica=NormalProjetada(SIGMA, None),
-        passos=M, desconto=GAMMA, id=f"wnn_a{i}", treinando=True) for i in range(na)]
+        aproximador=ap, codificar=codificar,
+        politica=NormalProjetada(hp["sigma"], None),
+        passos=hp["m"], desconto=GAMMA, id=f"wnn_a{i}", treinando=True)
+        for i in range(na)]
     return ap, termo, acs
 
 
@@ -140,11 +205,29 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
             "cobertura": float(np.mean(cov)), "n": len(cts)}
 
 
-def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
-            progresso_cada: int, t_res: int = T_RES,
+def avaliar_celulas(celulas: dict, ap, termo, sementes_por_ns: dict) -> dict:
+    """`avaliar_multi` em cada `Ns`; o agregado é a MÉDIA entre células.
+
+    Média simples, não ponderada por episódios: cada `Ns` é um problema, e a
+    seleção de checkpoint não deve pender para o que tem mais sementes. Com um
+    `Ns` só é o `avaliar_multi` de sempre, sem `por_ns`.
+    """
+    por = {ns: avaliar_multi(c["cfg_av"], ap, termo, c["ctx_av"],
+                             sementes_por_ns[ns]) for ns, c in celulas.items()}
+    if len(por) == 1:
+        return next(iter(por.values()))
+    agg = {k: float(np.mean([m[k] for m in por.values()]))
+           for k in ("sr", "ct_cens", "cobertura")}
+    agg["n"] = sum(m["n"] for m in por.values())
+    agg["por_ns"] = {str(ns): m for ns, m in por.items()}
+    return agg
+
+
+def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
+            saida: Path, progresso_cada: int, t_res: int = T_RES,
             retomar: Path | None = None, sem_parada: bool = False,
             passos_previos: int | None = None, val_n: int = 20,
-            c_max: float | None = 0.5) -> dict:
+            c_max: float | None = 0.5, hp: dict | None = None) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -152,31 +235,57 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     disparou). Com `sem_parada` a curva de avaliação continua sendo gravada até o
     fim, que é o que permite responder se os passos além do platô da cobertura
     ainda compram `SR` — a métrica que não satura.
+
+    `nss` em lista REVEZA o número de sensores a cada episódio (round-robin, na
+    ordem dada), com uma rede só: `Ns` não muda a largura da observação — entram
+    sempre os 12 sensores mais próximos — e a recompensa da eq. 5-6 já é
+    normalizada por `Ns`. A validação roda em cada `Ns` e o checkpoint `melhor` é
+    pela média. É o mesmo revezamento do `spec06_busca.py`, para que o treino
+    longo aconteça no regime em que a configuração foi selecionada.
     """
-    cfg_tr, cfg_av = _cfgs(replica, na, ns)
-    ctx = _ctx(cfg_tr)
+    nss = (nss,) if isinstance(nss, int) else tuple(nss)
+    hp = {**HP_PADRAO, **(hp or {})}
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
-    ap, termo, acs = construir(cfg_tr, na, t_res, retomar, c_max=c_max)
-    t_res = termo.n_bits // cfg_tr.observation_size     # o efetivo, após retomar
+    celulas = {}
+    for ns in nss:
+        cfg_tr, cfg_av = _cfgs(replica, na, ns)
+        celulas[ns] = {"cfg_tr": cfg_tr, "cfg_av": cfg_av, "ctx": _ctx(cfg_tr),
+                       "ctx_av": _ctx(cfg_av), "bancos": carregar_bancos(na, ns)}
+    primeira = celulas[nss[0]]
+    corpus = (None if retomar is not None or len(nss) == 1 else
+              np.concatenate([corpus_de_observacoes(c["cfg_tr"])
+                              for c in celulas.values()]))
+    ap, termo, acs = construir(primeira["cfg_tr"], na, t_res, retomar, c_max=c_max,
+                               hp=hp, corpus=corpus)
+    t_res = termo.n_bits // primeira["cfg_tr"].observation_size   # após retomar
     if retomar is not None:
         print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)",
               flush=True)
-    print(f"multiagente · Na={na} Ns={ns} · T={t_res} · N={ap.ator.n_ram} RAMs · "
-          f"B={termo.n_bits} bits · {na} trajetórias compartilhando a rede",
-          flush=True)
+    rot_ns = _rotulo_ns(nss)
+    print(f"multiagente · Na={na} Ns={rot_ns}"
+          f"{' (revezando por episódio)' if len(nss) > 1 else ''} · T={t_res} · "
+          f"N={ap.ator.n_ram} RAMs · B={termo.n_bits} bits · {na} trajetórias "
+          f"compartilhando a rede · passo {hp['passo']:g} σ {hp['sigma']:g} "
+          f"n {hp['tupla']} φ {hp['phi']:g} m {hp['m']}", flush=True)
 
-    passos_max = int(cfg_tr.max_episode_length / cfg_tr.algorithm_iteration_interval) + 2
     handlers = list(__import__("logging").getLogger().handlers)
-    ctx_av = _ctx(cfg_av)
-    val = carregar_bancos(na, ns).val.sementes[:val_n]
+    val = {ns: c["bancos"].val.sementes[:val_n] for ns, c in celulas.items()}
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
     avisou_plato = False
     saida.mkdir(parents=True, exist_ok=True)
     melhor_dir = saida / "checkpoints" / "melhor"
     ultimo_dir = saida / "checkpoints" / "ultimo"
+    config = {"na": na, "ns": nss[0] if len(nss) == 1 else list(nss),
+              "passo": hp["passo"], "sigma": hp["sigma"], "T": t_res,
+              "n": hp["tupla"], "phi": hp["phi"], "m": hp["m"], "gamma": GAMMA,
+              "replica": replica, "parameter_sharing": True,
+              "recompensa_por_na": True,
+              "retomado_de": str(retomar) if retomar else None,
+              "critico": "descentralizado (Alg. 4.4)",
+              **{k: v for k, v in hp.items() if k not in HP_PADRAO}}
 
     def _salvar(dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -184,6 +293,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
         termo.salvar(dest / "termometro.npz")
 
     passos, ep, melhor = 0, 0, -1.0
+    ep_por_ns = {ns: 0 for ns in nss}
     if retomar is not None:
         # o `procedencia.json` fica na raiz da corrida, não em `checkpoints/final`
         base_ret = Path(retomar)
@@ -207,6 +317,11 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     ultimo_prog = ultimo_eval = passos_iniciais = passos
     t0 = time.perf_counter()
     while passos < b_max:
+        ns = nss[ep % len(nss)]                       # revezamento por episódio
+        c = celulas[ns]
+        cfg_tr, ctx = c["cfg_tr"], c["ctx"]
+        passos_max = int(cfg_tr.max_episode_length
+                         / cfg_tr.algorithm_iteration_interval) + 2
         s = SEED_TREINO_BASE + ep
         random.seed(s); np.random.seed(s)
         env = make_env(cfg_tr); obs, _ = env.reset()
@@ -239,6 +354,7 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
         for ac in acs:
             ac.fim_de_episodio()
         ep += 1
+        ep_por_ns[ns] += 1
         try:
             env.close()
         except Exception:  # pragma: no cover
@@ -251,12 +367,15 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
         # early-stop: avaliação periódica no val + checkpoint de melhor validação
         if passos - ultimo_eval >= intervalo:
             ultimo_eval = passos
-            m = avaliar_multi(cfg_av, ap, termo, ctx_av, val)
+            m = avaliar_celulas(celulas, ap, termo, val)
             eh_melhor = m["cobertura"] > melhor
             if eh_melhor:
                 melhor = m["cobertura"]; _salvar(melhor_dir)
+            por_ns_txt = ("  " + " ".join(f"s{k}:{v['cobertura']:.2f}" for k, v in
+                                          m["por_ns"].items())
+                          if "por_ns" in m else "")
             print(f"   eval @ {passos:,}: cob {m['cobertura']:.3f} · sr {m['sr']:.3f}"
-                  f" · CT {m['ct_cens']:.1f} s"
+                  f" · CT {m['ct_cens']:.1f} s{por_ns_txt}"
                   f"{'  (melhor)' if eh_melhor else ''}", flush=True)
             # A curva também em JSONL: o log é prosa, e uma corrida de 31 h
             # precisa ser plotável sem reparsear texto. `ocupadas` entra porque é
@@ -265,12 +384,13 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
             (ultimo_dir / "procedencia.json").write_text(json.dumps({
                 "passos": passos, "episodios": ep,
                 "melhor_val_cobertura": melhor,
-                "config": {"na": na, "ns": ns, "T": t_res},
+                "config": config,
                 "parcial": True, "fonte": "spec06_treino_multiagente.py"}, indent=2))
             with (saida / "metrics.jsonl").open("a") as fh:
                 fh.write(json.dumps({
                     "passo": passos, "episodios": ep, "cobertura": m["cobertura"],
                     "sr": m["sr"], "ct_cens": m["ct_cens"], "n_val": m["n"],
+                    **({"por_ns": m["por_ns"]} if "por_ns" in m else {}),
                     "ocupadas": sum(len(x) for x in ap.ator.memoria),
                     "parede_s": round(time.perf_counter() - t0, 1),
                     "melhor": bool(eh_melhor)}) + "\n")
@@ -290,32 +410,32 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     ap.ator = type(ap.ator).carregar(next(melhor_dir.glob("*ator.npz")))
     ap.critico = type(ap.critico).carregar(next(melhor_dir.glob("*critico.npz")))
     termo_m = TermometroQuantil.carregar(melhor_dir / "termometro.npz")
-    bancos = carregar_bancos(na, ns)
-    n_test = min(100, len(bancos.test.sementes))
-    metr = avaliar_multi(cfg_av, ap, termo_m, ctx_av, bancos.test.sementes[:n_test])
+    test = {ns: c["bancos"].test.sementes[:min(100, len(c["bancos"].test.sementes))]
+            for ns, c in celulas.items()}
+    metr = avaliar_celulas(celulas, ap, termo_m, test)
     proc = {"ator": {"n_saidas": D_SAIDA}, "resolucao": t_res,
-            "config": {"na": na, "ns": ns, "passo": PASSO, "sigma": SIGMA,
-                       "T": t_res, "n": N_TUPLA, "phi": PHI, "m": M, "gamma": GAMMA,
-                       "replica": replica, "parameter_sharing": True,
-                       "recompensa_por_na": True,
-                       "retomado_de": str(retomar) if retomar else None,
-                       "critico": "descentralizado (Alg. 4.4)"},
-            "passos": passos, "episodios": ep, "melhor_val_cobertura": melhor,
+            "config": config,
+            "passos": passos, "episodios": ep,
+            **({"episodios_por_ns": {str(k): v for k, v in ep_por_ns.items()}}
+               if len(nss) > 1 else {}),
+            "melhor_val_cobertura": melhor,
             "metrica_test": metr, "fonte": "spec06_treino_multiagente.py"}
     # Poda pós-treino PADRÃO: `checkpoints/deploy` podado e verificado no VAL.
     # Nunca falha o treino — um erro aqui perde o artefato de deploy, não a
-    # corrida — e nunca toca `final`/`melhor`.
+    # corrida — e nunca toca `final`/`melhor`. Com revezamento, a verificação
+    # é no MAIOR `Ns`, o cenário mais difícil da lista.
     try:
         from spec06_exportar_deploy import deploy_pos_treino
-        dep = deploy_pos_treino(saida / "checkpoints" / "final", na, ns,
-                                sementes=bancos.val.sementes[:100])
+        ns_dep = max(nss)
+        dep = deploy_pos_treino(saida / "checkpoints" / "final", na, ns_dep,
+                                sementes=celulas[ns_dep]["bancos"].val.sementes[:100])
         proc["deploy"] = {k: dep[k] for k in
                           ("poda", "deploy_kb", "sr_cheio", "sr_podado")
                           if k in dep} | ({"motivo": dep["motivo"]}
                                           if "motivo" in dep else {})
         print(f"deploy podado ({dep.get('poda', 0):.0%}): "
               f"{dep['deploy_kb']:.0f} KB · SR {dep['sr_cheio']:.1%}"
-              f"→{dep['sr_podado']:.1%} (val)"
+              f"→{dep['sr_podado']:.1%} (val, Ns={ns_dep})"
               + (f" · {dep['motivo']}" if "motivo" in dep else ""), flush=True)
     except Exception as e:                                    # noqa: BLE001
         proc["deploy"] = {"erro": str(e)}
@@ -324,9 +444,13 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
     saida.mkdir(parents=True, exist_ok=True)
     (saida / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
     (melhor_dir / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
-    print(f"\nNa={na} Ns={ns}: SR {metr['sr']:.0%} · CT {metr['ct_cens']:.1f} s · "
+    print(f"\nNa={na} Ns={rot_ns}: SR {metr['sr']:.0%} · CT {metr['ct_cens']:.1f} s · "
           f"cobertura {metr['cobertura']:.1%} · melhor-val {melhor:.1%} "
           f"({metr['n']} sementes)")
+    if "por_ns" in metr:
+        for k, v in metr["por_ns"].items():
+            print(f"   Ns={k}: SR {v['sr']:.0%} · CT {v['ct_cens']:.1f} s · "
+                  f"cobertura {v['cobertura']:.1%}")
     print(f"checkpoint (melhor): {melhor_dir}")
     return proc
 
@@ -334,7 +458,10 @@ def treinar(na: int, ns: int, b_max: int, replica: str, saida: Path,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--na", type=int, required=True)
-    ap.add_argument("--ns", type=int, default=24)
+    ap.add_argument("--ns", default="24",
+                    help="número de sensores, ou LISTA (`12,24,36`) para revezar "
+                         "por episódio com uma rede só — o regime da grade com "
+                         "`--ns` em lista")
     ap.add_argument("--b-max", type=int, default=10_000_000)
     ap.add_argument("--replica", default="1b")
     ap.add_argument("--saida", type=Path, default=None)
@@ -342,6 +469,15 @@ def main() -> int:
     ap.add_argument("--resolucao", type=int, default=T_RES,
                     help=f"T do termômetro; {T_RES} (padrão) ou 16 (econômico). "
                          "Ignorado com --retomar: T vem do checkpoint.")
+    ap.add_argument("--config-de", type=Path, default=None,
+                    help="artefato JSON de `spec06_busca.py`: usa o melhor ponto "
+                         "DAQUELA grade com T = --resolucao (passo, σ, n, φ, m). "
+                         "Flags explícitas abaixo têm precedência.")
+    ap.add_argument("--passo", type=float, default=None)
+    ap.add_argument("--sigma", type=float, default=None)
+    ap.add_argument("--tupla", type=int, default=None)
+    ap.add_argument("--phi", type=float, default=None)
+    ap.add_argument("--m", type=int, default=None)
     ap.add_argument("--retomar", type=Path, default=None,
                     help="dir de checkpoint (ex.: models/T32/em-treino/a8s24) para "
                          "continuar o treino em vez de recomeçar do zero")
@@ -367,17 +503,36 @@ def main() -> int:
     a = ap.parse_args()
     if a.smoke:
         a.b_max = min(a.b_max, 5000); a.progresso_cada = 1000
+    nss = _ler_ns(a.ns)
+    if not nss or min(nss) < 1:
+        ap.error(f"--ns inválido: {a.ns!r}")
+
+    hp: dict = {}
+    if a.config_de is not None:
+        hp = config_da_grade(a.config_de, a.resolucao)
+        print(f"config da grade {a.config_de} (T={a.resolucao}, ponto "
+              f"{hp['id_grade']}): passo {hp['passo']:g} σ {hp['sigma']:g} "
+              f"n {hp['tupla']} φ {hp['phi']:g} m {hp['m']} · cobertura "
+              f"{hp['cobertura_grade']:.1%} SR {hp['sr_grade']:.1%} abortos "
+              f"{hp['abortos_grade']}", flush=True)
+        hp.pop("resolucao")
+    for k in ("passo", "sigma", "tupla", "phi", "m"):
+        if getattr(a, k) is not None:
+            hp[k] = getattr(a, k)
+    hp_ef = {**HP_PADRAO, **hp}
+
     # O sufixo só aparece fora do padrão: as células de `T = 32` já publicadas
     # mantêm o caminho que `modelo-e-hiperparametros.md` registra.
     sufixo = "" if a.resolucao == T_RES else f"-T{a.resolucao}"
     saida = a.saida or Path(
-        f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{a.ns}{sufixo}")
-    print(f"SPEC-06 escalada multiagente · config vencedora "
-          f"(passo {PASSO}, σ {SIGMA}, T {a.resolucao}, n {N_TUPLA}, φ {PHI}, m {M})\n",
-          flush=True)
-    treinar(a.na, a.ns, a.b_max, a.replica, saida, a.progresso_cada,
+        f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{_rotulo_ns(nss)}{sufixo}")
+    print(f"SPEC-06 escalada multiagente · "
+          f"{'config da grade' if hp else 'config vencedora (T-06.4)'} "
+          f"(passo {hp_ef['passo']:g}, σ {hp_ef['sigma']:g}, T {a.resolucao}, "
+          f"n {hp_ef['tupla']}, φ {hp_ef['phi']:g}, m {hp_ef['m']})\n", flush=True)
+    treinar(a.na, nss, a.b_max, a.replica, saida, a.progresso_cada,
             a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n,
-            None if str(a.c_max).lower() == "none" else float(a.c_max))
+            None if str(a.c_max).lower() == "none" else float(a.c_max), hp=hp)
     return 0
 
 

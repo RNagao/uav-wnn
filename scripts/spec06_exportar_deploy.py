@@ -239,8 +239,23 @@ sorteio da mesma banda. O `final` existe em todas as corridas e não
 reintroduz seleção sobre validação."""
 
 
+def _celula(nome: str) -> tuple[int, tuple[int, ...]]:
+    """`a2s24` -> `(2, (24,))`; `a2s12-24-36` -> `(2, (12, 24, 36))`.
+
+    O rótulo com hífens é o de um modelo treinado REVEZANDO `Ns`
+    (`spec06_treino_multiagente.py --ns 12,24,36`); a pasta em `models/` leva o
+    rótulo inteiro, para que o nome diga em que regime a rede foi treinada."""
+    na = int(nome[1:nome.index("s")])
+    nss = tuple(int(v) for v in nome[nome.index("s") + 1:].split("-"))
+    return na, nss
+
+
 def promover(cel: str) -> None:
     """Instala o `final` de `runs/spec06-50M/<cel>` em `models/`.
+
+    `cel` é `T<T>-a<Na>s<Ns>`, e `Ns` pode ser `12-24-36` (revezado); nesse caso
+    o `final` é avaliado no `test` de CADA `Ns` e a `metrica_test_final` traz a
+    média e o `por_ns`.
 
     Na ordem: recusa corrida incompleta (promover parcial por engano foi o que
     já misturou orçamentos numa comparação); avalia o `final` no `test` e grava
@@ -250,9 +265,9 @@ def promover(cel: str) -> None:
     """
     import shutil
 
-    t_res = int(cel.split("-")[0][1:])
-    a = cel.split("-")[1]
-    na, ns = int(a[1:a.index("s")]), int(a[a.index("s") + 1:])
+    t_res = int(cel.split("-", 1)[0][1:])
+    nome = cel.split("-", 1)[1]
+    na, nss = _celula(nome)
     run = RAIZ / "runs" / "spec06-50M" / cel
     if not (run / "procedencia.json").exists():
         raise SystemExit(f"{cel}: sem procedencia.json — a corrida ainda está "
@@ -269,27 +284,30 @@ def promover(cel: str) -> None:
             raise SystemExit(f"{cel}: falta {d}")
 
     for raiz in (RAIZ / "models", RAIZ / "models" / "deploy"):
-        arq = RAIZ / "models" / "6M75" / (raiz / f"T{t_res}" / f"a{na}s{ns}"
+        arq = RAIZ / "models" / "6M75" / (raiz / f"T{t_res}" / nome
                                           ).relative_to(RAIZ / "models")
         if arq.exists():
             raise SystemExit(f"{cel}: {arq.relative_to(RAIZ)} já existe — "
                              f"promovido antes; não sobrescrevo")
 
-    from spec06_treino_multiagente import _cfgs, _ctx, avaliar_multi, construir
+    from spec06_treino_multiagente import _cfgs, _ctx, avaliar_celulas, construir
     from uavwnn.campanha import carregar_bancos
-    print(f"[{cel}] avaliando o final no test (100 sementes)…", flush=True)
-    cfg_tr, cfg_av = _cfgs("1b", na, ns)
-    ap, termo, _ = construir(cfg_tr, na, t_res=t_res, retomar=final)
-    test = carregar_bancos(na, ns).test.sementes[:100]
-    m = avaliar_multi(cfg_av, ap, termo, _ctx(cfg_av), test)
-    proc["metrica_test_final"] = {k: (float(v) if isinstance(v, float) else v)
-                                  for k, v in m.items()}
+    print(f"[{cel}] avaliando o final no test (100 sementes por Ns)…", flush=True)
+    celulas, test = {}, {}
+    for ns in nss:
+        cfg_tr, cfg_av = _cfgs("1b", na, ns)
+        celulas[ns] = {"cfg_tr": cfg_tr, "cfg_av": cfg_av, "ctx_av": _ctx(cfg_av)}
+        test[ns] = carregar_bancos(na, ns).test.sementes[:100]
+    ap, termo, _ = construir(celulas[nss[0]]["cfg_tr"], na, t_res=t_res,
+                             retomar=final)
+    m = avaliar_celulas(celulas, ap, termo, test)
+    proc["metrica_test_final"] = m
     proc["promovido_de"] = str(run.relative_to(RAIZ))
     print(f"[{cel}] final@test: {proc['metrica_test_final']}", flush=True)
 
     for raiz, novo in ((RAIZ / "models", final),
                        (RAIZ / "models" / "deploy", deploy)):
-        atual = raiz / f"T{t_res}" / f"a{na}s{ns}"
+        atual = raiz / f"T{t_res}" / nome
         arquivo = RAIZ / "models" / "6M75" / atual.relative_to(RAIZ / "models")
         if atual.exists():
             arquivo.parent.mkdir(parents=True, exist_ok=True)
@@ -331,9 +349,11 @@ def main() -> int:
         for d in sorted((RAIZ / "models").glob("T*/a*s*")):
             if "em-treino" in str(d) or not any(d.glob("*ator.npz")):
                 continue
-            m = d.name  # aNsM
-            na = int(m.split("s")[0][1:]); ns = int(m.split("s")[1])
-            alvos.append((d, RAIZ / "models" / "deploy" / d.parent.name / d.name, na, ns))
+            # `aNsM`, ou `aNs12-24-36` (revezado): verifica no MAIOR Ns, o
+            # cenário mais difícil da lista.
+            na, nss = _celula(d.name)
+            alvos.append((d, RAIZ / "models" / "deploy" / d.parent.name / d.name,
+                          na, max(nss)))
     else:
         if a.origem is None or a.na is None or a.ns is None:
             sys.exit("informe origem --na --ns, ou use --todos")
