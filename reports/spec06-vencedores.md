@@ -51,17 +51,35 @@ Leitura dos eixos (média marginal das 360 corridas): `n = 12` 43 % contra
 estável que 0,20 (53 contra 85 abortos); `φ` indiferente (26 % nos três níveis);
 `T = 32` ganha de 16 por ~10 pp de cobertura e 2–3× em SR.
 
-## Na = 4 · Ns = 12 / 24 / 36
+## Na = 4 · Ns = 12 / 24 / 36 (revezado)
 
-Grade ainda não rodada. Comando:
+Grade: `reports/spec06-busca-a4s12-24-36.json` (360 corridas, 120 pontos, 20,9 h,
+80 abortos). Fechou em 2026-10-11.
 
-    uv run python scripts/spec06_busca.py --modo grade --niveis desempate \
-        --na 4 --ns 12,24,36 --b-sweep 200000 --sementes 3 --processos 12 \
-        --raiz runs/spec06-desempate-a4 --saida reports/spec06-busca-a4s12-24-36.json
+| T | id | passo | σ | n | φ | N | cobertura | SR | abortos | a4s12 | a4s24 | a4s36 | top 3 (ids) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **32** | 92 | 1,5e-3 | 0,35 | 12 | 0,99 | 83 | 96,6 % | 75,9 % | 0/3 | 95 / 77 | 97 / 76 | 98 / 75 | 92 · 90 · 55 |
+| **16** | 86 | 1,5e-3 | 0,35 | 12 | 0,99 | 42 | 93,3 % | 63,4 % | 0/3 | 89 / 63 | 95 / 64 | 96 / 64 | 86 · 84 · 85 |
+
+Nas células, o par é cobertura / SR em %.
+
+Os dois vencedores têm a MESMA config fora de `T`: `passo 1,5e-3 · σ 0,35 · n 12 ·
+φ 0,99`, sem abortos nas 3 sementes. Diferente de `Na = 1` e `Na = 2`, aqui
+`passo = 1,5e-3` não é território morto: 19 abortos em 72 (contra 53/72 em
+`Na = 2` e 12/12 em `Na = 1`), e os pontos com `σ = 0,35` nesse nível não
+abortaram. A recompensa dividida por `Na` encolhe o sinal por drone, o que
+explica o passo maior caber.
+
+Leitura dos eixos (média marginal das 360 corridas): `n = 12` 63 % contra
+`n = 24` 20 %; `passo` empata 8e-4 e 1,5e-3 (52 %) e 3e-3 aborta 61/72;
+`σ = 0,35` 45 % contra 37 % (25 contra 55 abortos); `φ = 0,99` é o melhor nos
+vencedores mas o pior na média (37 %) — interage com o passo; `T = 32` ganha de
+16 por 3 pp de cobertura e 12 pp de SR, margem menor que em `Na = 2`.
 
 ## Na = 8 · Ns = 12 / 24 / 36
 
-Grade ainda não rodada (mesmo comando com `--na 8`; ~4× o custo da de `Na = 2`).
+Grade ainda não rodada: `bash scripts/spec06_grade_celula.sh 8` (~2× o custo da
+de `Na = 4`, que levou 21 h).
 
 ---
 
