@@ -225,9 +225,94 @@
         24,
         36
       ],
-      "grade": null,
-      "T32": null,
-      "T16": null
+      "grade": "reports/spec06-busca-a8s12-24-36.json",
+      "fechada_em": "2026-10-14",
+      "corridas": 360,
+      "abortos": 35,
+      "parede_h": 51.4,
+      "nota": "três trechos (dois reinícios da máquina), retomados com --retomar",
+      "T32": {
+        "id": 80,
+        "passo": 0.0015,
+        "sigma": 0.2,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 104,
+        "cobertura": 0.964,
+        "sr": 0.561,
+        "abortos": "2/3",
+        "top3": [
+          80,
+          116,
+          115
+        ],
+        "por_celula": {
+          "a8s12": [
+            0.94,
+            0.58
+          ],
+          "a8s24": [
+            0.97,
+            0.56
+          ],
+          "a8s36": [
+            0.98,
+            0.55
+          ]
+        },
+        "alternativa_estavel": {
+          "id": 115,
+          "passo": 0.003,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "cobertura": 0.933,
+          "sr": 0.436,
+          "abortos": "0/3"
+        },
+        "alternativa_2": {
+          "id": 116,
+          "passo": 0.003,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.99,
+          "cobertura": 0.956,
+          "sr": 0.531,
+          "abortos": "1/3"
+        },
+        "escolhido_treino": null
+      },
+      "T16": {
+        "id": 110,
+        "passo": 0.003,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 52,
+        "cobertura": 0.973,
+        "sr": 0.704,
+        "abortos": "0/3",
+        "top3": [
+          110,
+          108,
+          109
+        ],
+        "por_celula": {
+          "a8s12": [
+            0.97,
+            0.72
+          ],
+          "a8s24": [
+            0.97,
+            0.69
+          ],
+          "a8s36": [
+            0.98,
+            0.7
+          ]
+        },
+        "escolhido_treino": null
+      }
     }
   }
 }

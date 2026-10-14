@@ -76,10 +76,53 @@ Leitura dos eixos (média marginal das 360 corridas): `n = 12` 63 % contra
 vencedores mas o pior na média (37 %) — interage com o passo; `T = 32` ganha de
 16 por 3 pp de cobertura e 12 pp de SR, margem menor que em `Na = 2`.
 
-## Na = 8 · Ns = 12 / 24 / 36
+## Na = 8 · Ns = 12 / 24 / 36 (revezado)
 
-Grade ainda não rodada: `bash scripts/spec06_grade_celula.sh 8` (~2× o custo da
-de `Na = 4`, que levou 21 h).
+Grade: `reports/spec06-busca-a8s12-24-36.json` (360 corridas, 120 pontos, ~51 h
+somando os três trechos — dois reinícios da máquina no meio, retomados com
+`--retomar` —, 35 abortos). Fechou em 2026-10-14.
+
+| T | id | passo | σ | n | φ | N | cobertura | SR | abortos | a8s12 | a8s24 | a8s36 | top 3 (ids) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **32** | 80 | 1,5e-3 | 0,20 | 12 | 0,99 | 104 | 96,4 % | 56,1 % | **2/3** | 94 / 58 | 97 / 56 | 98 / 55 | 80 · 116 · 115 |
+| **16** | 110 | 3e-3 | 0,35 | 12 | 0,99 | 52 | 97,3 % | 70,4 % | 0/3 | 97 / 72 | 97 / 69 | 98 / 70 | 110 · 108 · 109 |
+
+Nas células, o par é cobertura / SR em %.
+
+**Aqui o `T = 16` ganha do `T = 32`**, em cobertura (97,3 contra 96,4 %), em SR
+(70,4 contra 56,1 %) e em estabilidade (0/3 contra 2/3 abortos) — e com metade
+das RAMs. É a primeira célula em que isso acontece; em `Na = 2` e `Na = 4` o
+`T = 32` ganhava. O 1º por SR da grade inteira é o id 110.
+
+**Ressalva no T = 32.** O 1º (id 80) abortou em 2 de 3 sementes e está em
+`σ = 0,20`, o nível que concentra 34 dos 35 abortos da grade. As alternativas:
+id 116 (`3e-3 · σ 0,35 · φ 0,99`, 95,6 %, SR 53,1 %, 1/3) e id 115 (`3e-3 · σ 0,35
+· φ 0,85`, 93,3 %, SR 43,6 %, **0/3**). A escolha para o treino longo é decisão a
+registrar aqui; com dois abortos em três, o id 80 não deveria ser a padrão.
+
+O passo ótimo continua subindo com `Na`: 8e-4 em `Na = 1`, 1,5e-3 em `Na = 2` e
+`4`, 3e-3 em `Na = 8` para o `T = 16`. É o efeito da recompensa dividida por
+`Na` — o sinal por drone encolhe e o passo maior cabe. `3e-3`, que abortava
+72/72 em `Na = 2`, aqui aborta 30/72 e vence em `T = 16`.
+
+Leitura dos eixos (média marginal das 360 corridas): `n = 12` 75 % contra
+`n = 24` 34 %; `passo` cresce até 1,5e-3 (64 %) e 3e-3 fica em 58 % com 30/72
+abortos; `σ = 0,35` empata com 0,20 em cobertura (55 contra 54 %) mas aborta 1
+contra 34; `φ = 0,99` é o pior na média (50 %) e o melhor nos vencedores, como em
+`Na = 4`; `T = 32` e `16` empatam na média (56 contra 53 %).
+
+## Resumo: o vencedor muda com Na
+
+| Na | T32 | T16 |
+|---|---|---|
+| 1 | 8e-4 · σ 0,35 · φ 0,85 (50 % · SR 21 %) | 8e-4 · σ 0,35 · φ 0,85 (46 % · SR 1 %) |
+| 2 | 1,5e-3 · σ 0,35 · φ 0,70 (83 % · SR 51 % · 1/3) | 8e-4 · σ 0,35 · φ 0,85 (72 % · SR 17 %) |
+| 4 | 1,5e-3 · σ 0,35 · φ 0,99 (97 % · SR 76 %) | 1,5e-3 · σ 0,35 · φ 0,99 (93 % · SR 63 %) |
+| 8 | 1,5e-3 · σ 0,20 · φ 0,99 (96 % · SR 56 % · 2/3) | 3e-3 · σ 0,35 · φ 0,99 (97 % · SR 70 %) |
+
+`n = 12` em todos. A grade a 200 mil passos mede o início do treino; o orçamento
+longo já inverteu posições antes (`spec06-grid-search.md` §9), então os números
+acima são o ponto de partida, não o veredito.
 
 ---
 
