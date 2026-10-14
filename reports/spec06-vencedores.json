@@ -109,7 +109,13 @@
           "sr": 0.432,
           "abortos": "0/3"
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 68,
+          "lancado_em": "2026-10-14",
+          "corrida": "runs/spec06-50M/T32-a2s12-24-36",
+          "c_max": null,
+          "nota": "id 68 (0/3 abortos na grade) em vez do 1º (id 90, 1/3). Primeiro lançamento caiu na asserção c_max=0,5 a 1,08 M passos (passo 0,51, pico isolado, sem checkpoint); relançado com --c-max none, como o T32-a2s24 publicado."
+        }
       },
       "T16": {
         "id": 61,
@@ -140,7 +146,12 @@
             0.16
           ]
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 61,
+          "lancado_em": "2026-10-14",
+          "corrida": "runs/spec06-50M/T16-a2s12-24-36",
+          "c_max": 0.5
+        }
       }
     },
     "a4s12-24-36": {

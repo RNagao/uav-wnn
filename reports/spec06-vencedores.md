@@ -43,8 +43,14 @@ Nas células, o par é cobertura / SR em %.
 
 **Ressalva no T = 32.** O 1º (id 90) está em `passo = 1,5e-3`, nível que abortou
 53 de 72 corridas nesta grade e 12 de 12 na de `Na = 1`; o 2º (id 68: `8e-4 ·
-σ 0,35 · φ 0,99`, 81,3 % cob, SR 43,2 %, **0/3 abortos**) fica a 1,6 pp. A escolha
-para o treino longo é decisão a registrar aqui quando for feita.
+σ 0,35 · φ 0,99`, 81,3 % cob, SR 43,2 %, **0/3 abortos**) fica a 1,6 pp.
+
+**Treino longo (lançado em 2026-10-14):** `T = 16` com o id 61; `T = 32` com o
+**id 68**, não o 1º. O primeiro lançamento do `T = 32` caiu na asserção de
+estabilidade a 1,08 M passos (`passo 0,51 > c_max 0,5`, pico isolado, antes do
+primeiro checkpoint); relançado com `--c-max none`, o mesmo botão usado no
+`T32-a2s24` publicado, que caiu igual a 40 M. A curva de validação é quem vigia
+divergência. Corridas em `runs/spec06-50M/T{16,32}-a2s12-24-36`.
 
 Leitura dos eixos (média marginal das 360 corridas): `n = 12` 43 % contra
 `n = 24` 9 %; `passo` pica em 8e-4 e 3e-3 aborta 72/72; `σ = 0,35` melhor e mais
