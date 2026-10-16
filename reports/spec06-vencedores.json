@@ -114,7 +114,42 @@
           "lancado_em": "2026-10-14",
           "corrida": "runs/spec06-50M/T32-a2s12-24-36",
           "c_max": null,
-          "nota": "id 68 (0/3 abortos na grade) em vez do 1º (id 90, 1/3). Primeiro lançamento caiu na asserção c_max=0,5 a 1,08 M passos (passo 0,51, pico isolado, sem checkpoint); relançado com --c-max none, como o T32-a2s24 publicado."
+          "nota": "id 68 (0/3 abortos na grade) em vez do 1º (id 90, 1/3). Primeiro lançamento caiu na asserção c_max=0,5 a 1,08 M passos (passo 0,51, pico isolado, sem checkpoint); relançado com --c-max none, como o T32-a2s24 publicado.",
+          "concluido_em": "2026-10-16",
+          "passos": 50000000,
+          "test_final": {
+            "cobertura": 0.896,
+            "sr": 0.723,
+            "ct_cens": 173.3,
+            "por_ns": {
+              "12": [
+                0.86,
+                0.76
+              ],
+              "24": [
+                0.89,
+                0.67
+              ],
+              "36": [
+                0.94,
+                0.74
+              ]
+            }
+          },
+          "test_melhor": {
+            "cobertura": 0.961,
+            "sr": 0.77,
+            "ct_cens": 142.7,
+            "passo_melhor": 1250017
+          },
+          "deploy": {
+            "poda": 0.0,
+            "kb": 1567,
+            "sr_cheio": 0.78,
+            "sr_podado": 0.66,
+            "motivo": "poda 70% derrubou SR; deploy sem poda"
+          },
+          "alerta": "a curva de validação degradou após 1,25 M e nunca voltou ao pico; final (50 M) < melhor (1,25 M) em cobertura e SR"
         }
       },
       "T16": {
@@ -150,7 +185,41 @@
           "id": 61,
           "lancado_em": "2026-10-14",
           "corrida": "runs/spec06-50M/T16-a2s12-24-36",
-          "c_max": 0.5
+          "c_max": 0.5,
+          "concluido_em": "2026-10-16",
+          "passos": 50000000,
+          "test_final": {
+            "cobertura": 0.955,
+            "sr": 0.853,
+            "ct_cens": 109.5,
+            "por_ns": {
+              "12": [
+                0.95,
+                0.93
+              ],
+              "24": [
+                0.94,
+                0.78
+              ],
+              "36": [
+                0.98,
+                0.85
+              ]
+            }
+          },
+          "test_melhor": {
+            "cobertura": 0.951,
+            "sr": 0.897,
+            "ct_cens": 89.6,
+            "passo_melhor": 18750918
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 259,
+            "sr_cheio": 0.79,
+            "sr_podado": 0.78
+          },
+          "nota": "T16 caiu na asserção c_max a 29,05 M (passo 0,5037); retomado de 28,75 M com --c-max none."
         }
       }
     },
@@ -195,7 +264,12 @@
             0.75
           ]
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 92,
+          "lancado_em": "2026-10-15",
+          "corrida": "runs/spec06-50M/T32-a4s12-24-36",
+          "c_max": null
+        }
       },
       "T16": {
         "id": 86,
@@ -226,7 +300,12 @@
             0.64
           ]
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 86,
+          "lancado_em": "2026-10-16",
+          "corrida": "runs/spec06-50M/T16-a4s12-24-36",
+          "c_max": null
+        }
       }
     },
     "a8s12-24-36": {

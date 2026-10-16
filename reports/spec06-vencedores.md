@@ -50,7 +50,29 @@ Nas células, o par é cobertura / SR em %.
 estabilidade a 1,08 M passos (`passo 0,51 > c_max 0,5`, pico isolado, antes do
 primeiro checkpoint); relançado com `--c-max none`, o mesmo botão usado no
 `T32-a2s24` publicado, que caiu igual a 40 M. A curva de validação é quem vigia
-divergência. Corridas em `runs/spec06-50M/T{16,32}-a2s12-24-36`.
+divergência. Corridas em `runs/spec06-50M/T{16,32}-a2s12-24-36`. O `T = 16`
+também caiu na asserção, a 29,05 M (`passo 0,5037`), e foi retomado do `ultimo`
+(28,75 M) com `--c-max none`.
+
+**Resultado dos 50 M (fechados em 2026-10-16), banco de teste, 100 sementes por Ns:**
+
+| T | checkpoint | cobertura | SR | CT | a2s12 | a2s24 | a2s36 |
+|---|---|---|---|---|---|---|---|
+| 16 | `final` (50 M) | 95,5 % | 85,3 % | 109,5 s | 95 / 93 | 94 / 78 | 98 / 85 |
+| 16 | `melhor` (18,75 M) | 95,1 % | 89,7 % | 89,6 s | 95 / 93 | 93 / 86 | 97 / 90 |
+| 32 | `final` (50 M) | 89,6 % | 72,3 % | 173,3 s | 86 / 76 | 89 / 67 | 94 / 74 |
+| 32 | `melhor` (1,25 M) | 96,1 % | 77,0 % | 142,7 s | 95 / 80 | 95 / 74 | 98 / 77 |
+
+**O `T = 16` ganha do `T = 32` em `Na = 2`**, por 13 pp de SR no `final`, com
+metade das RAMs e deploy podado de 259 KB (contra 1 567 KB sem poda no `T = 32`,
+cuja poda de 70 % derrubou o SR de 78 para 66 % e foi recusada).
+
+**Alerta no `T = 32`:** o melhor ponto da curva de validação é o PRIMEIRO
+(1,25 M); dali em diante a cobertura oscilou entre 78 e 90 % e nunca voltou. O
+`final` está abaixo do `melhor` em cobertura e SR — o oposto do que as células
+publicadas mostraram (`models/README.md`), onde o `final` sempre ganhava. Com a
+asserção desligada, esta é a corrida em que a regra "promover o `final`" precisa
+ser olhada antes de aplicada.
 
 Leitura dos eixos (média marginal das 360 corridas): `n = 12` 43 % contra
 `n = 24` 9 %; `passo` pica em 8e-4 e 3e-3 aborta 72/72; `σ = 0,35` melhor e mais
@@ -81,6 +103,11 @@ Leitura dos eixos (média marginal das 360 corridas): `n = 12` 63 % contra
 `σ = 0,35` 45 % contra 37 % (25 contra 55 abortos); `φ = 0,99` é o melhor nos
 vencedores mas o pior na média (37 %) — interage com o passo; `T = 32` ganha de
 16 por 3 pp de cobertura e 12 pp de SR, margem menor que em `Na = 2`.
+
+**Treino longo lançado** (`T = 32` em 2026-10-15, `T = 16` em 2026-10-16), ambos
+pelo `--config-de` (ids 92 e 86) e com `--c-max none` desde o início — depois de
+as duas corridas de `Na = 2` caírem em picos isolados de 1–2 % acima do teto.
+Corridas em `runs/spec06-50M/T{16,32}-a4s12-24-36`.
 
 ## Na = 8 · Ns = 12 / 24 / 36 (revezado)
 
