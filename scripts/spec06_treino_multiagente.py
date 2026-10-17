@@ -227,7 +227,8 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
             saida: Path, progresso_cada: int, t_res: int = T_RES,
             retomar: Path | None = None, sem_parada: bool = False,
             passos_previos: int | None = None, val_n: int = 20,
-            c_max: float | None = 0.5, hp: dict | None = None) -> dict:
+            c_max: float | None = 0.5, hp: dict | None = None,
+            guarda_colapso: bool = True) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -275,6 +276,7 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
     intervalo = max(1, b_max // 40)
     parada = ParadaAntecipada(maior_e_melhor=True)
     avisou_plato = False
+    colapsos, colapsou = 0, None
     saida.mkdir(parents=True, exist_ok=True)
     melhor_dir = saida / "checkpoints" / "melhor"
     ultimo_dir = saida / "checkpoints" / "ultimo"
@@ -394,6 +396,23 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
                     "ocupadas": sum(len(x) for x in ap.ator.memoria),
                     "parede_s": round(time.perf_counter() - t0, 1),
                     "melhor": bool(eh_melhor)}) + "\n")
+            # GUARDA DE COLAPSO. Com `c_max` desligado nada mais aborta a corrida,
+            # e as duas de `Na = 4` (passo 1,5e-3) mostraram o que isso custa:
+            # pico a 1,25–2,5 M, cobertura a 3,5 % — o nível da caminhada
+            # aleatória — a partir de 6 e 12 M, e 20–27 M de passos queimados até
+            # a parada antecipada ler aquilo como "platô". Três avaliações
+            # seguidas abaixo de um quarto do melhor, depois de o melhor ter
+            # passado de 0,5, não é oscilação: é a política que divergiu e não
+            # volta. O `melhor` fica; o `final` dessa corrida não é artefato.
+            colapsos = (colapsos + 1
+                        if (melhor > 0.5 and m["cobertura"] < melhor / 4) else 0)
+            if guarda_colapso and colapsos >= 3:
+                colapsou = passos
+                print(f"   COLAPSO: cobertura {m['cobertura']:.3f} contra melhor "
+                      f"{melhor:.3f} em 3 avaliações seguidas — encerrando em "
+                      f"{passos:,} passos (--sem-guarda-colapso para seguir)",
+                      flush=True)
+                break
             plato = parada.registrar(m["cobertura"])
             if plato and not sem_parada:
                 print(f"   parada antecipada (platô) em {passos:,} passos", flush=True)
@@ -418,13 +437,16 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
             "passos": passos, "episodios": ep,
             **({"episodios_por_ns": {str(k): v for k, v in ep_por_ns.items()}}
                if len(nss) > 1 else {}),
-            "melhor_val_cobertura": melhor,
+            "melhor_val_cobertura": melhor, "colapsou_em": colapsou,
             "metrica_test": metr, "fonte": "spec06_treino_multiagente.py"}
     # Poda pós-treino PADRÃO: `checkpoints/deploy` podado e verificado no VAL.
     # Nunca falha o treino — um erro aqui perde o artefato de deploy, não a
     # corrida — e nunca toca `final`/`melhor`. Com revezamento, a verificação
     # é no MAIOR `Ns`, o cenário mais difícil da lista.
     try:
+        if colapsou is not None:
+            raise RuntimeError(f"corrida colapsou em {colapsou:,} passos; o "
+                               f"`final` não é artefato de implantação")
         from spec06_exportar_deploy import deploy_pos_treino
         ns_dep = max(nss)
         dep = deploy_pos_treino(saida / "checkpoints" / "final", na, ns_dep,
@@ -446,7 +468,9 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
     (melhor_dir / "procedencia.json").write_text(json.dumps(proc, indent=2, ensure_ascii=False))
     print(f"\nNa={na} Ns={rot_ns}: SR {metr['sr']:.0%} · CT {metr['ct_cens']:.1f} s · "
           f"cobertura {metr['cobertura']:.1%} · melhor-val {melhor:.1%} "
-          f"({metr['n']} sementes)")
+          f"({metr['n']} sementes)"
+          + (f" · COLAPSOU em {colapsou:,} passos — métricas do checkpoint "
+             f"`melhor`, o `final` não serve" if colapsou is not None else ""))
     if "por_ns" in metr:
         for k, v in metr["por_ns"].items():
             print(f"   Ns={k}: SR {v['sr']:.0%} · CT {v['ct_cens']:.1f} s · "
@@ -499,6 +523,9 @@ def main() -> int:
     ap.add_argument("--sem-parada", action="store_true",
                     help="ignora a parada antecipada da §4.4 e gasta --b-max "
                          "inteiro; a avaliação periódica continua rodando")
+    ap.add_argument("--sem-guarda-colapso", action="store_true",
+                    help="não encerra a corrida quando a cobertura de validação "
+                         "cai a menos de 1/4 do melhor por 3 avaliações seguidas")
     ap.add_argument("--smoke", action="store_true", help="b-max=5000, avaliação curta")
     a = ap.parse_args()
     if a.smoke:
@@ -532,7 +559,8 @@ def main() -> int:
           f"n {hp_ef['tupla']}, φ {hp_ef['phi']:g}, m {hp_ef['m']})\n", flush=True)
     treinar(a.na, nss, a.b_max, a.replica, saida, a.progresso_cada,
             a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n,
-            None if str(a.c_max).lower() == "none" else float(a.c_max), hp=hp)
+            None if str(a.c_max).lower() == "none" else float(a.c_max), hp=hp,
+            guarda_colapso=not a.sem_guarda_colapso)
     return 0
 
 

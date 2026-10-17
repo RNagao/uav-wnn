@@ -268,7 +268,17 @@
           "id": 92,
           "lancado_em": "2026-10-15",
           "corrida": "runs/spec06-50M/T32-a4s12-24-36",
-          "c_max": null
+          "c_max": null,
+          "estado": "COLAPSOU",
+          "pico_val": {
+            "passo": 1250001,
+            "cobertura": 0.987,
+            "sr": 0.933
+          },
+          "colapso_em": 12500531,
+          "parou_em": 30727401,
+          "motivo_parada": "interrompida à mão em 2026-10-17 (18 M passos a 3,5 %)",
+          "final": "sem final; `melhor` (1,25 M) e `ultimo` (30 M, colapsado) em disco"
         }
       },
       "T16": {
@@ -304,9 +314,26 @@
           "id": 86,
           "lancado_em": "2026-10-16",
           "corrida": "runs/spec06-50M/T16-a4s12-24-36",
-          "c_max": null
+          "c_max": null,
+          "estado": "COLAPSOU",
+          "pico_val": {
+            "passo": 2500039,
+            "cobertura": 0.967,
+            "sr": 0.83
+          },
+          "colapso_em": 6250301,
+          "parou_em": 33750848,
+          "motivo_parada": "platô (parada antecipada), já colapsada",
+          "test_melhor": {
+            "cobertura": 0.978,
+            "sr": 0.86,
+            "ct_cens": 103.2,
+            "passo_melhor": 2500039
+          },
+          "final": "inútil (cobertura 3,5 %, SR 0 na validação); deploy gerado a partir dele, NÃO usar"
         }
-      }
+      },
+      "licao": "passo 1,5e-3 com --c-max none diverge entre 6 e 12 M: a grade a 200 mil não enxerga isso. Retreinar com a asserção ligada e/ou passo um nível abaixo (8e-4). Guarda de colapso adicionada ao treinador em 2026-10-17."
     },
     "a8s12-24-36": {
       "na": 8,

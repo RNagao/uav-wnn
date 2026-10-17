@@ -109,6 +109,26 @@ pelo `--config-de` (ids 92 e 86) e com `--c-max none` desde o início — depois
 as duas corridas de `Na = 2` caírem em picos isolados de 1–2 % acima do teto.
 Corridas em `runs/spec06-50M/T{16,32}-a4s12-24-36`.
 
+**As duas COLAPSARAM** (constatado em 2026-10-17), e a decisão de desligar a
+asserção foi errada para este `passo`:
+
+| T | pico da validação | colapso | depois | parou |
+|---|---|---|---|---|
+| 16 | 2,5 M: 96,7 % · SR 83 % | 6,25 M → 4,2 % | 27 M de passos a 3,5 % | 33,7 M, parada antecipada leu "platô" |
+| 32 | 1,25 M: 98,7 % · SR 93 % | 12,5 M → 4,3 % | 18 M de passos a 3,5 % | 30,7 M, interrompida à mão |
+
+3,5 % de cobertura é o nível da caminhada aleatória: a política divergiu e não
+voltou. É o que `c_max = 0,5` teria abortado na hora. Os `melhor` (2,5 M e
+1,25 M) estão em disco e são bons — o `T = 16` dá 97,8 % / SR 86 % no teste —,
+mas são redes de início de treino, não os 50 M que a comparação com Lamenza
+pede. O `final` do `T = 16` e o deploy gerado dele NÃO servem.
+
+Lição: a grade a 200 mil passos seleciona um `passo` que o treino longo não
+sustenta — em `Na = 1` isso já tinha aparecido no 2º colocado (`grid-search.md`
+§9). O treinador ganhou uma **guarda de colapso** (3 avaliações seguidas abaixo
+de ¼ do melhor encerram a corrida) para isso não custar dias de novo. Retreino
+de `Na = 4`: asserção ligada e/ou `passo` um nível abaixo (8e-4), a decidir.
+
 ## Na = 8 · Ns = 12 / 24 / 36 (revezado)
 
 Grade: `reports/spec06-busca-a8s12-24-36.json` (360 corridas, 120 pontos, ~51 h
