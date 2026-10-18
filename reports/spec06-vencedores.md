@@ -163,11 +163,20 @@ escala — o passo efetivo do ator é `∝ passo·δ`. Em `Na = 2`, `φ = 0,85` 
 sem colapsar; aqui `φ = 0,99` com `1,5e-3` colapsou duas vezes. A grade a 200 mil
 passos premia a agressividade (ids 92 e 86 são 1º e 3º) antes de ela cobrar.
 
-**Retreino (lançado em 2026-10-17):** `passo 8e-4 · σ 0,35 · n 12 · φ 0,85`, a
-config da T-06.4 — ids 67 (T32, 11º da grade) e 61 (T16, 18º) —, com a asserção
-LIGADA (`c_max = 0,5`) e a guarda de colapso. É a mesma config que treinou os
-`a4s24` publicados até 50 M com SR 90 %, então o modelo revezado fica comparável
-a eles mudando só o regime de `Ns`. A alternativa que mantém o `passo` da grade,
+**Retreino (lançado em 2026-10-17):** o melhor ponto de cada `T` na grade DEPOIS
+de excluir as três causas do colapso — `φ = 0,99`, `passo > 8e-4` e `σ = 0,20`
+(σ está no denominador do passo efetivo e abortou 55/180 contra 25/180) —, com a
+asserção LIGADA (`c_max = 0,5`) e a guarda de colapso:
+
+| T | id | passo | σ | n | φ | grade |
+|---|---|---|---|---|---|---|
+| 32 | 67 | 8e-4 | 0,35 | 12 | 0,85 | 84,0 % · SR 28 % · 11º |
+| 16 | 60 | 8e-4 | 0,35 | 12 | 0,70 | 82,8 % · SR 8,6 % · 13º |
+
+O `T = 32` coincide com a config da T-06.4, que treinou os `a4s24` publicados até
+50 M com SR 90 %. No `T = 16` o id 60 (φ 0,70) fica 2,7 pp acima do id 61 (φ 0,85,
+a T-06.4) — diferença dentro do ruído de 3 sementes; a escolha pelo melhor da
+grade filtrada foi do usuário. A alternativa que mantém o `passo` da grade,
 `1,5e-3 · φ 0,85` (ids 91 e 85, 7º e 8º), fica registrada caso esta não chegue
 ao desempenho dos colapsados antes do colapso (SR 83–93 % a 1,25–2,5 M). Pastas
 dos colapsados: `runs/spec06-50M/T{16,32}-a4s12-24-36.colapso-p1.5e-3-phi0.99`.

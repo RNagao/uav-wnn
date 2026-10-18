@@ -325,17 +325,17 @@
           ]
         },
         "escolhido_treino": {
-          "id": 61,
+          "id": 60,
           "passo": 0.0008,
           "sigma": 0.35,
           "tupla": 12,
-          "phi": 0.85,
+          "phi": 0.7,
           "m": 8,
           "lancado_em": "2026-10-17",
           "corrida": "runs/spec06-50M/T16-a4s12-24-36",
           "c_max": 0.5,
           "guarda_colapso": true,
-          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md"
+          "motivo": "melhor ponto da grade sob o filtro que exclui as causas do colapso (φ 0,99, passo >8e-4, σ 0,20): id 60 (82,8 %, SR 8,6 %, 13º) contra id 61 (80,1 %, SR 2,9 %, 18º). Decisão do usuário em 2026-10-17; o lançamento com φ 0,85 foi interrompido minutos depois de subir."
         },
         "colapsado": {
           "id": 86,
