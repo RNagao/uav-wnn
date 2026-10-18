@@ -265,6 +265,19 @@
           ]
         },
         "escolhido_treino": {
+          "id": 67,
+          "passo": 0.0008,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-17",
+          "corrida": "runs/spec06-50M/T32-a4s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md"
+        },
+        "colapsado": {
           "id": 92,
           "lancado_em": "2026-10-15",
           "corrida": "runs/spec06-50M/T32-a4s12-24-36",
@@ -278,7 +291,8 @@
           "colapso_em": 12500531,
           "parou_em": 30727401,
           "motivo_parada": "interrompida à mão em 2026-10-17 (18 M passos a 3,5 %)",
-          "final": "sem final; `melhor` (1,25 M) e `ultimo` (30 M, colapsado) em disco"
+          "final": "sem final; `melhor` (1,25 M) e `ultimo` (30 M, colapsado) em disco",
+          "pasta": "runs/spec06-50M/T32-a4s12-24-36.colapso-p1.5e-3-phi0.99"
         }
       },
       "T16": {
@@ -311,6 +325,19 @@
           ]
         },
         "escolhido_treino": {
+          "id": 61,
+          "passo": 0.0008,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-17",
+          "corrida": "runs/spec06-50M/T16-a4s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md"
+        },
+        "colapsado": {
           "id": 86,
           "lancado_em": "2026-10-16",
           "corrida": "runs/spec06-50M/T16-a4s12-24-36",
@@ -330,10 +357,15 @@
             "ct_cens": 103.2,
             "passo_melhor": 2500039
           },
-          "final": "inútil (cobertura 3,5 %, SR 0 na validação); deploy gerado a partir dele, NÃO usar"
+          "final": "inútil (cobertura 3,5 %, SR 0 na validação); deploy gerado a partir dele, NÃO usar",
+          "pasta": "runs/spec06-50M/T16-a4s12-24-36.colapso-p1.5e-3-phi0.99"
         }
       },
-      "licao": "passo 1,5e-3 com --c-max none diverge entre 6 e 12 M: a grade a 200 mil não enxerga isso. Retreinar com a asserção ligada e/ou passo um nível abaixo (8e-4). Guarda de colapso adicionada ao treinador em 2026-10-17."
+      "licao": "passo 1,5e-3 com --c-max none diverge entre 6 e 12 M: a grade a 200 mil não enxerga isso. Retreinar com a asserção ligada e/ou passo um nível abaixo (8e-4). Guarda de colapso adicionada ao treinador em 2026-10-17.",
+      "autopsia": {
+        "mecanismo": "f2 (velocidade) -> fortemente negativo em todos os estados visitados; velocidade 0; stalled aos 30 s; δ negativo enorme realimenta; LUT estoura (max |f| 35 -> 423)",
+        "fator": "φ=0,99 infla V (~1/(1-φ)) e δ; com passo 1,5e-3 o passo efetivo do ator estoura; c_max=0,5 teria abortado"
+      }
     },
     "a8s12-24-36": {
       "na": 8,

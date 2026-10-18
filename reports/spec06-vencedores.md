@@ -126,8 +126,51 @@ pede. O `final` do `T = 16` e o deploy gerado dele NÃO servem.
 Lição: a grade a 200 mil passos seleciona um `passo` que o treino longo não
 sustenta — em `Na = 1` isso já tinha aparecido no 2º colocado (`grid-search.md`
 §9). O treinador ganhou uma **guarda de colapso** (3 avaliações seguidas abaixo
-de ¼ do melhor encerram a corrida) para isso não custar dias de novo. Retreino
-de `Na = 4`: asserção ligada e/ou `passo` um nível abaixo (8e-4), a decidir.
+de ¼ do melhor encerram a corrida) para isso não custar dias de novo.
+
+### Autópsia do colapso (2026-10-17)
+
+Comparação dos checkpoints `melhor` e `ultimo` e rollout determinístico de cada
+um em `a4s24` (5 sementes):
+
+| | T16 `melhor` (2,5 M) | T16 `ultimo` (33,7 M) | T32 `melhor` (1,25 M) | T32 `ultimo` (30 M) |
+|---|---|---|---|---|
+| ator, p99 de \|(f₀,f₁)\| | 5,7 | **16,0** | 3,3 | **18,8** |
+| ator, máx de \|(f₀,f₁)\| | 35 | **423** | 24 | **444** |
+| crítico, mediana de V | +1 467 | **+53** | +1 084 | **+141** |
+| crítico, p1 de V | +11 | **−858** | −28 | **−852** |
+| velocidade pedida no rollout | 0,98 (97 % a 1,0) | **0,00 (100 % a 0)** | 0,90 (71 % a 1,0) | **0,00 (100 % a 0)** |
+| f médio no rollout | (−0,45, 0,18, **+4,0**) | (−6,0, 30,0, **−26,9**) | (−0,15, −0,06, **+1,5**) | (4,8, 1,2, **−15,9**) |
+| cobertura · passos/ep | 0,94 · 98 | 0,01 · **61** | 1,00 · 79 | 0,01 · **61** |
+
+**Mecanismo.** A terceira saída do ator é a velocidade (`s = clip(f₂, 0, 1)`).
+Na rede colapsada, `f₂` vale −16 a −27 em TODOS os estados visitados: velocidade
+zero, os quatro drones param onde nasceram, nenhum sensor novo é coletado, o
+`environment.py` trunca por `stalled` aos 30 s (61 passos), e a cobertura é só o
+que estava embaixo do ponto de partida. É um poço sem saída: parado, a
+recompensa é negativa a cada passo, o retorno é muito negativo, o crítico
+acompanha (p1 de V: de +11 para −858), e o `δ` enorme e negativo empurra `f₂`
+ainda mais para baixo — nos mesmos poucos estados, porque parado o agente não
+visita outros (`ocupadas` quase não cresce depois do colapso). Os valores da LUT
+estouram (máximo de 35 para 423): foram atualizações de dezenas de unidades em
+`f`, exatamente o que `c_max = 0,5` aborta.
+
+**Por que estes dois e não os de `Na = 2`.** `passo` e `φ` juntos. Com
+`φ = 0,99` o crítico da eq. (4.8) quase não esquece: a mediana de V passa de
+1 000 (contra recompensas por passo da ordem de 1 a 10), e `δ = G − V` herda essa
+escala — o passo efetivo do ator é `∝ passo·δ`. Em `Na = 2`, `φ = 0,85` com
+`8e-4` (T16) atravessou 50 M sem incidente; `φ = 0,99` com `8e-4` (T32) degradou
+sem colapsar; aqui `φ = 0,99` com `1,5e-3` colapsou duas vezes. A grade a 200 mil
+passos premia a agressividade (ids 92 e 86 são 1º e 3º) antes de ela cobrar.
+
+**Retreino (lançado em 2026-10-17):** `passo 8e-4 · σ 0,35 · n 12 · φ 0,85`, a
+config da T-06.4 — ids 67 (T32, 11º da grade) e 61 (T16, 18º) —, com a asserção
+LIGADA (`c_max = 0,5`) e a guarda de colapso. É a mesma config que treinou os
+`a4s24` publicados até 50 M com SR 90 %, então o modelo revezado fica comparável
+a eles mudando só o regime de `Ns`. A alternativa que mantém o `passo` da grade,
+`1,5e-3 · φ 0,85` (ids 91 e 85, 7º e 8º), fica registrada caso esta não chegue
+ao desempenho dos colapsados antes do colapso (SR 83–93 % a 1,25–2,5 M). Pastas
+dos colapsados: `runs/spec06-50M/T{16,32}-a4s12-24-36.colapso-p1.5e-3-phi0.99`.
 
 ## Na = 8 · Ns = 12 / 24 / 36 (revezado)
 
