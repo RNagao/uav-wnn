@@ -335,7 +335,43 @@
           "corrida": "runs/spec06-50M/T16-a4s12-24-36",
           "c_max": 0.5,
           "guarda_colapso": true,
-          "motivo": "melhor ponto da grade sob o filtro que exclui as causas do colapso (φ 0,99, passo >8e-4, σ 0,20): id 60 (82,8 %, SR 8,6 %, 13º) contra id 61 (80,1 %, SR 2,9 %, 18º). Decisão do usuário em 2026-10-17; o lançamento com φ 0,85 foi interrompido minutos depois de subir."
+          "motivo": "melhor ponto da grade sob o filtro que exclui as causas do colapso (φ 0,99, passo >8e-4, σ 0,20): id 60 (82,8 %, SR 8,6 %, 13º) contra id 61 (80,1 %, SR 2,9 %, 18º). Decisão do usuário em 2026-10-17; o lançamento com φ 0,85 foi interrompido minutos depois de subir.",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-19",
+          "passos": 33751919,
+          "motivo_parada": "platô da cobertura (parada antecipada da §4.4), SEM colapso",
+          "val_final": {
+            "passo": 33751919,
+            "cobertura": 0.967,
+            "sr": 0.923
+          },
+          "melhor_val": 0.987,
+          "test_melhor": {
+            "cobertura": 0.976,
+            "sr": 0.94,
+            "ct_cens": 67.1,
+            "por_ns": {
+              "12": [
+                0.965,
+                0.93
+              ],
+              "24": [
+                0.978,
+                0.95
+              ],
+              "36": [
+                0.986,
+                0.93
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 288,
+            "sr_cheio": 0.88,
+            "sr_podado": 0.92,
+            "ns_verificacao": 36
+          }
         },
         "colapsado": {
           "id": 86,

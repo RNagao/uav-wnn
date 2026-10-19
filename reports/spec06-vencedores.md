@@ -176,7 +176,16 @@ asserção LIGADA (`c_max = 0,5`) e a guarda de colapso:
 O `T = 32` coincide com a config da T-06.4, que treinou os `a4s24` publicados até
 50 M com SR 90 %. No `T = 16` o id 60 (φ 0,70) fica 2,7 pp acima do id 61 (φ 0,85,
 a T-06.4) — diferença dentro do ruído de 3 sementes; a escolha pelo melhor da
-grade filtrada foi do usuário. A alternativa que mantém o `passo` da grade,
+grade filtrada foi do usuário.
+
+**`T = 16` concluído em 2026-10-19, sem colapso:** parou por platô da cobertura
+a 33,75 M passos (parada antecipada da §4.4; a asserção `c_max` nunca
+disparou). Validação final 96,7 % / SR 92,3 %; melhor validação 98,7 %. No
+teste (checkpoint `melhor`, 100 sementes por Ns): **cobertura 97,6 %, SR 94 %,
+CT 67,1 s** — a2s12 96,5 / 93, a4s24 97,8 / 95, a4s36 98,6 / 93. Deploy podado
+a 70 % com 288 KB, SR 88 → 92 % na validação em Ns = 36. É o melhor modelo de
+`Na = 4` até aqui, e supera o `a4s24` publicado (SR 90 %) com um regime de `Ns`
+mais difícil. O `T = 32` (id 67) segue em treino. A alternativa que mantém o `passo` da grade,
 `1,5e-3 · φ 0,85` (ids 91 e 85, 7º e 8º), fica registrada caso esta não chegue
 ao desempenho dos colapsados antes do colapso (SR 83–93 % a 1,25–2,5 M). Pastas
 dos colapsados: `runs/spec06-50M/T{16,32}-a4s12-24-36.colapso-p1.5e-3-phi0.99`.
