@@ -185,7 +185,20 @@ teste (checkpoint `melhor`, 100 sementes por Ns): **cobertura 97,6 %, SR 94 %,
 CT 67,1 s** — a2s12 96,5 / 93, a4s24 97,8 / 95, a4s36 98,6 / 93. Deploy podado
 a 70 % com 288 KB, SR 88 → 92 % na validação em Ns = 36. É o melhor modelo de
 `Na = 4` até aqui, e supera o `a4s24` publicado (SR 90 %) com um regime de `Ns`
-mais difícil. O `T = 32` (id 67) segue em treino. A alternativa que mantém o `passo` da grade,
+mais difícil.
+
+**`T = 32` (id 67) concluído em 2026-10-20, sem colapso:** parou por platô a
+33,75 M passos, a asserção nunca disparou. Validação final 97,7 % / SR 95 %;
+melhor validação 99,3 %. No teste (checkpoint `melhor`, 100 sementes por Ns):
+**cobertura 98,8 %, SR 96 %, CT 49,1 s** — a4s12 99,8 / 98, a4s24 96,7 / 91,
+a4s36 99,9 / 98. A poda de 70 % derrubou o SR de 97 para 93 % na validação e foi
+recusada: deploy sem poda, 1 833 KB.
+
+**Na=4, os dois fechados:** o `T = 32` ganha em SR (96 contra 94 %) e CT (49 contra
+67 s), o `T = 16` ganha em tamanho por 6× (288 KB podado contra 1 833 KB sem poda).
+Mesmo passo (8e-4), φ diferente (0,85 e 0,70), os dois pararam por platô a 33,75 M
+— o mesmo passo, porque a parada antecipada conta avaliações e as duas corridas
+avaliam no mesmo ritmo. A alternativa que mantém o `passo` da grade,
 `1,5e-3 · φ 0,85` (ids 91 e 85, 7º e 8º), fica registrada caso esta não chegue
 ao desempenho dos colapsados antes do colapso (SR 83–93 % a 1,25–2,5 M). Pastas
 dos colapsados: `runs/spec06-50M/T{16,32}-a4s12-24-36.colapso-p1.5e-3-phi0.99`.

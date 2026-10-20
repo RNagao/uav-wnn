@@ -275,7 +275,44 @@
           "corrida": "runs/spec06-50M/T32-a4s12-24-36",
           "c_max": 0.5,
           "guarda_colapso": true,
-          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md"
+          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-20",
+          "passos": 33751623,
+          "motivo_parada": "platô da cobertura (parada antecipada da §4.4), SEM colapso; c_max nunca disparou",
+          "val_final": {
+            "passo": 33751623,
+            "cobertura": 0.977,
+            "sr": 0.95
+          },
+          "melhor_val": 0.993,
+          "test_melhor": {
+            "cobertura": 0.988,
+            "sr": 0.96,
+            "ct_cens": 49.1,
+            "por_ns": {
+              "12": [
+                0.998,
+                0.98
+              ],
+              "24": [
+                0.967,
+                0.91
+              ],
+              "36": [
+                0.999,
+                0.98
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.0,
+            "kb": 1833,
+            "sr_cheio": 0.97,
+            "sr_podado": 0.93,
+            "ns_verificacao": 36,
+            "motivo": "poda 70% derrubou SR 97→93; deploy sem poda"
+          }
         },
         "colapsado": {
           "id": 92,
