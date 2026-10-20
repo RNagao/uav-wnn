@@ -400,3 +400,26 @@ def test_sinal_do_gradiente_da_mlp_esta_certo():
     ap2 = MlpAprox(6, taxa_ator=1e-4, taxa_critico=1e-4, seed=0)
     final, _ = _bandido(ap2, cod, "", passos=6000)
     assert final < inicial, f"{inicial:.1f}° -> {final:.1f}°: não melhorou"
+
+
+def test_concentracao_media_e_acumulada_sem_guardar_cada_decisao():
+    """A média dos metadados sai de soma e contagem. A versão anterior guardava
+    uma lista com um float por `act` e nunca a esvaziava: 38 bytes por decisão,
+    ~15 GB numa corrida de 50 M passos com 8 drones — as duas de `Na = 8`
+    estavam a 3 GB em 10 M com LUTs de poucos MB."""
+    from uavwnn.agents.ac_continuo import AtorCriticoContinuo
+
+    class _Ap:
+        def f(self, x):
+            return np.asarray(x, float)
+
+        def custo(self):
+            return {}
+
+    pol = AtorCriticoContinuo(aproximador=_Ap(), codificar=lambda v: v, treinando=False)
+    assert np.isnan(pol.metadados()["concentracao_media"])
+    for v in ([3.0, 4.0, 0.0], [0.0, 0.0, 0.0], [6.0, 8.0, 0.0]):
+        pol.act_vetor(np.array(v))
+    assert pol.metadados()["concentracao_media"] == pytest.approx((5.0 + 0.0 + 10.0) / 3)
+    assert not hasattr(pol, "_concentracoes")
+    assert pol._conc_n == 3
