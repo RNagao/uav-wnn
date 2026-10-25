@@ -139,6 +139,7 @@ Roda automaticamente ao fim de todo treino (§ pós-treino padrão).
 ```
 spec06_campanha_fila.sh     (a fila de 33 corridas — a campanha publicada)
 spec06_campanha_fila.py     (fila livre: --modelos × --celulas × --regimes, manifesto por corrida)
+spec06_campanha_novos.sh    (embrulho da fila livre: modelos revezados, cada um só nas células do seu Na)
 spec06_campanha_uma.sh      (uma corrida)
 spec06_campanha_supervisor.py (mantém N em voo sem derrubar treino)
         └─> spec06_campanha_completa.py  ─> MADDPG | WNN T16 | WNN T32

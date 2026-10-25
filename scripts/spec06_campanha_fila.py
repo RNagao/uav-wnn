@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -85,15 +86,40 @@ def _ler_lista(txt: str) -> tuple[int, ...]:
                                if v.strip()))
 
 
+_CELULA = re.compile(r"a(\d+)s([\d-]+)")
+
+
+def _procedencia_de(ckpt: Path) -> dict | None:
+    """O `procedencia.json` do checkpoint, ou o da corrida que o gerou.
+
+    Em `models/` ele está na própria pasta; em `runs/spec06-50M/<cel>/checkpoints/
+    {deploy,final}` não (só o `melhor` o tem), e o da corrida fica dois níveis
+    acima. Sem isto, um modelo apontado direto da corrida sairia sem
+    `treinado_em_ns` e com o manifesto vazio."""
+    for d in (ckpt, ckpt.parent, ckpt.parent.parent):
+        arq = d / "procedencia.json"
+        if arq.exists():
+            try:
+                return json.loads(arq.read_text())
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
 def _treinado_em(ckpt: Path) -> str:
-    """`24` ou `12-24-36`, da procedência; senão, do nome da pasta (`a2s12-24-36`)."""
-    proc = ckpt / "procedencia.json"
-    if proc.exists():
-        ns = json.loads(proc.read_text()).get("config", {}).get("ns")
+    """`24` ou `12-24-36`: da procedência (a do checkpoint ou a da corrida);
+    senão, do primeiro trecho do caminho com a forma `a<Na>s<Ns>` (`a2s12-24-36`,
+    `T16-a2s12-24-36`)."""
+    proc = _procedencia_de(ckpt)
+    if proc:
+        ns = proc.get("config", {}).get("ns")
         if ns is not None:
             return "-".join(map(str, ns)) if isinstance(ns, list) else str(ns)
-    nome = ckpt.name
-    return nome[nome.index("s") + 1:] if nome.startswith("a") and "s" in nome else "?"
+    for parte in reversed(ckpt.parts):
+        m = _CELULA.search(parte)
+        if m:
+            return m.group(2)
+    return "?"
 
 
 def _checkpoint_wnn(raiz: Path, t: int, na: int, ns: int) -> Path | str:
@@ -222,7 +248,7 @@ def comando(c: Corrida, a) -> list[str]:
             "--ruido", REGIMES[c.regime][0],
             "--runs", str(a.runs), "--episodios", str(a.episodios),
             "--dir-saida", str(a.dir_saida)]
-    if c.treinado_em_ns is not None:
+    if c.treinado_em_ns is not None and c.treinado_em_ns != "?":
         cmd += ["--treinado-em-ns", c.treinado_em_ns]
     if c.checkpoint is not None:
         cmd += ["--checkpoint", c.checkpoint]
@@ -238,9 +264,8 @@ def rodar(c: Corrida, a) -> tuple[Corrida, int]:
     (RAIZ / c.manifesto).write_text(json.dumps({
         **asdict(c), "transferencia": c.transferencia, "comando": cmd,
         "lancado_em": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "procedencia": (json.loads((RAIZ / c.checkpoint / "procedencia.json").read_text())
-                        if c.checkpoint and (RAIZ / c.checkpoint / "procedencia.json").exists()
-                        else None)}, indent=2, ensure_ascii=False))
+        "procedencia": (_procedencia_de(RAIZ / c.checkpoint) if c.checkpoint else None)},
+        indent=2, ensure_ascii=False))
     env = {**os.environ, "OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1",
            "MKL_NUM_THREADS": "1"}
     with log.open("a") as fh:
