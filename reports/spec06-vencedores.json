@@ -502,7 +502,56 @@
           "sr": 0.531,
           "abortos": "1/3"
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 91,
+          "passo": 0.0015,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-19",
+          "corrida": "runs/spec06-50M/T32-a8s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "idem T16; o 1º da grade (id 80) tinha σ 0,20 e 2/3 abortos",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-25",
+          "passos": 42502159,
+          "motivo_parada": "platô da cobertura (parada antecipada); c_max nunca disparou; retomada de 8,75 M após a correção do vazamento",
+          "val_final": {
+            "passo": 42502159,
+            "cobertura": 0.985,
+            "sr": 0.9
+          },
+          "melhor_val": 0.992,
+          "passo_melhor": 23750893,
+          "test_melhor": {
+            "cobertura": 0.992,
+            "sr": 0.89,
+            "ct_cens": 85.2,
+            "por_ns": {
+              "12": [
+                0.99,
+                0.88
+              ],
+              "24": [
+                0.996,
+                0.91
+              ],
+              "36": [
+                0.989,
+                0.88
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 654,
+            "sr_cheio": 0.84,
+            "sr_podado": 0.83,
+            "ns_verificacao": 36
+          }
+        }
       },
       "T16": {
         "id": 110,
@@ -533,7 +582,56 @@
             0.7
           ]
         },
-        "escolhido_treino": null
+        "escolhido_treino": {
+          "id": 85,
+          "passo": 0.0015,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-20",
+          "corrida": "runs/spec06-50M/T16-a8s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "análogo do que funcionou em Na=4 pela escala α/Na (1,5e-3 em Na=8 ≡ 8e-4 em Na=4); o 1º da grade (id 110, 3e-3, φ 0,99) repetiria a receita do colapso",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-25",
+          "passos": 50000000,
+          "motivo_parada": "orçamento de 50 M esgotado; c_max nunca disparou; retomada de 7,5 M após a correção do vazamento de memória",
+          "val_final": {
+            "passo": 48753164,
+            "cobertura": 0.974,
+            "sr": 0.88
+          },
+          "melhor_val": 0.985,
+          "passo_melhor": 36252298,
+          "test_melhor": {
+            "cobertura": 0.978,
+            "sr": 0.93,
+            "ct_cens": 72.1,
+            "por_ns": {
+              "12": [
+                0.973,
+                0.95
+              ],
+              "24": [
+                0.975,
+                0.93
+              ],
+              "36": [
+                0.986,
+                0.92
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 308,
+            "sr_cheio": 0.93,
+            "sr_podado": 0.96,
+            "ns_verificacao": 36
+          }
+        }
       }
     }
   }

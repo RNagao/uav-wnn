@@ -238,6 +238,25 @@ abortos; `σ = 0,35` empata com 0,20 em cobertura (55 contra 54 %) mas aborta 1
 contra 34; `φ = 0,99` é o pior na média (50 %) e o melhor nos vencedores, como em
 `Na = 4`; `T = 32` e `16` empatam na média (56 contra 53 %).
 
+**Treino longo (2026-10-19/20 → 2026-10-25), concluído sem colapso nos dois T.**
+Config escolhida: `passo 1,5e-3 · σ 0,35 · n 12 · φ 0,85` (ids 91 e 85) — o análogo
+do 8e-4 que funcionou em `Na = 4`, porque a recompensa é dividida por `Na` e o
+salto do ator por unidade de recompensa é `α/Na`; os 1ºs da grade (3e-3 com
+φ 0,99; σ 0,20 com 2/3 abortos) repetiriam a receita do colapso de `Na = 4`.
+Asserção ligada e guarda de colapso; nenhuma disparou. As duas corridas foram
+retomadas a 7,5 e 8,75 M depois da correção do vazamento de memória
+(`ac_continuo`, 2026-10-20).
+
+| T | parou | validação final | melhor val | teste (`melhor`): cob / SR / CT | a8s12 | a8s24 | a8s36 | deploy 70 % |
+|---|---|---|---|---|---|---|---|---|
+| 16 | 50 M (orçamento) | 97,4 % / 88 % | 98,5 % a 36,3 M | **97,8 % / 93 % / 72 s** | 97 / 95 | 98 / 93 | 99 / 92 | 308 KB, SR 93 → 96 % |
+| 32 | 42,5 M (platô) | 98,5 % / 90 % | 99,2 % a 23,8 M | **99,2 % / 89 % / 85 s** | 99 / 88 | 100 / 91 | 99 / 88 | 654 KB, SR 84 → 83 % |
+
+Em `Na = 8` o `T = 16` ganha em SR (93 contra 89 %) e CT, com menos da metade do
+tamanho; o `T = 32` ganha em cobertura (99,2 contra 97,8 %). O SR em `Na = 8`
+oscila mais de avaliação para avaliação (71–92 %) porque exige que os oito drones
+zerem a coleta no mesmo episódio.
+
 ## Resumo: o vencedor muda com Na
 
 | Na | T32 | T16 |
@@ -250,6 +269,26 @@ contra 34; `φ = 0,99` é o pior na média (50 %) e o melhor nos vencedores, com
 `n = 12` em todos. A grade a 200 mil passos mede o início do treino; o orçamento
 longo já inverteu posições antes (`spec06-grid-search.md` §9), então os números
 acima são o ponto de partida, não o veredito.
+
+## Os oito modelos treinados a 50 M (o veredito, no teste, checkpoint `melhor`)
+
+| Na | T | config treinada | cobertura | SR | CT | deploy |
+|---|---|---|---|---|---|---|
+| 1 | 16 | 8e-4 · 0,35 · 12 · 0,85 | 94,6 % | 93 % | 70 s | `models/deploy/T16/a1s12` (`final`, 50 M) |
+| 1 | 32 | 8e-4 · 0,35 · 12 · 0,85 | 98,9 % | 98 % | 49 s | `models/deploy/T32/a1s12` (`final`, 50 M) |
+| 2 | 16 | 8e-4 · 0,35 · 12 · 0,85 | 95,1 % | 90 % | 90 s | 259 KB (70 %) |
+| 2 | 32 | 8e-4 · 0,35 · 12 · 0,99 | 96,1 % | 77 % | 143 s | 1 567 KB (sem poda) |
+| 4 | 16 | 8e-4 · 0,35 · 12 · 0,70 | 97,6 % | 94 % | 67 s | 288 KB (70 %) |
+| 4 | 32 | 8e-4 · 0,35 · 12 · 0,85 | 98,8 % | 96 % | 49 s | 1 833 KB (sem poda) |
+| 8 | 16 | 1,5e-3 · 0,35 · 12 · 0,85 | 97,8 % | 93 % | 72 s | 308 KB (70 %) |
+| 8 | 32 | 1,5e-3 · 0,35 · 12 · 0,85 | 99,2 % | 89 % | 85 s | 654 KB (70 %) |
+
+`Na = 1` é o modelo promovido (`final` dos 50 M, `metrica_test_final` da
+procedência em `models/deploy`), em `Ns = 12`; as demais são os 50 M deste ciclo
+com o checkpoint `melhor`, 100 sementes de teste por Ns, média das três células. A config é a mesma em todas fora de φ (0,70–0,99) e do passo em `Na = 8`,
+que é 8e-4 na escala `α/Na`. Promoção para `models/` pendente de
+`spec06_exportar_deploy.py --promover` célula a célula; o `T32` de `Na = 2` pede
+decisão antes (ver o alerta na seção dele).
 
 ---
 
