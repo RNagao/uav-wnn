@@ -290,9 +290,63 @@ que é 8e-4 na escala `α/Na`. Promoção para `models/` pendente de
 `spec06_exportar_deploy.py --promover` célula a célula; o `T32` de `Na = 2` pede
 decisão antes (ver o alerta na seção dele).
 
----
+## Campanha comparável dos modelos novos (2026-10-26)
 
-## Como atualizar
+`spec06_campanha_novos.sh`, rótulos `wnn-v2-T16`/`wnn-v2-T32`, origem `deploy`
+(o podado gerado do `final`; em `Na = 2` `T32` sem poda), cada modelo só nas
+células do seu `Na`, MADDPG publicado como baseline (joga em casa em cada célula).
+100 runs × 200 episódios por célula e regime; 81 corridas, 72 novas, 8 h 40 com 10
+em paralelo, zero falhas. Atestados RF-05: 18, todos aprovados — `q_w = 4` em 17 e
+`q_w = 5` no `T32` de `a2s36` (grade fina 4–8 depois de reprovar com a grade padrão).
+CSVs em `reports/campanha/wnn-v2-*.csv`; manifesto por corrida em `logs/`.
+
+**SR em % (média de 100 runs) · CT em s** — colunas: `wnn-v2-T16` | `wnn-v2-T32` | `maddpg`
+
+| célula | limpo | sem-kf (σ 10) | com-kf (σ 10) |
+|---|---|---|---|
+| a2s12 | 88,9 · 83 \| 77,0 · 143 \| 100 · 18 | 95,9 · 54 \| 92,8 · 76 \| 100 · 19 | 91,8 · 70 \| 86,0 · 103 \| 100 · 19 |
+| a2s24 | 78,3 · 144 \| 69,5 · 189 \| 99,4 · 30 | 91,2 · 91 \| 88,7 · 111 \| 100 · 30 | 84,6 · 116 \| 79,3 · 146 \| 99,8 · 29 |
+| a2s36 | 77,8 · 153 \| 69,8 · 193 \| 99,6 · 35 | 89,2 · 109 \| 88,3 · 121 \| 100 · 36 | 83,2 · 129 \| 80,6 · 147 \| 99,8 · 35 |
+| a4s12 | 94,8 · 55 \| 96,6 · 44 \| 100 · 10 | 97,8 · 44 \| 98,3 · 38 \| 100 · 11 | 96,1 · 50 \| 96,8 · 43 \| 100 · 10 |
+| a4s24 | 94,6 · 66 \| 92,9 · 72 \| 100 · 14 | 96,9 · 60 \| 94,4 · 71 \| 100 · 15 | 95,5 · 62 \| 94,0 · 68 \| 100 · 14 |
+| a4s36 | 94,5 · 70 \| 93,9 · 71 \| 100 · 16 | 97,1 · 63 \| 95,2 · 71 \| 100 · 18 | 95,6 · 65 \| 94,3 · 70 \| 100 · 16 |
+| a8s12 | 92,5 · 67 \| 91,0 · 69 \| 100 · 15 | 96,1 · 52 \| 94,9 · 52 \| 100 · 16 | 91,1 · 74 \| 88,8 · 79 \| 100 · 15 |
+| a8s24 | 93,9 · 70 \| 86,5 · 101 \| 100 · 10 | 95,6 · 68 \| 89,8 · 91 \| 100 · 10 | 92,0 · 81 \| 84,7 · 110 \| 100 · 10 |
+| a8s36 | 92,5 · 82 \| 85,7 · 109 \| 100 · 13 | 92,9 · 87 \| 88,9 · 101 \| 100 · 14 | 90,0 · 95 \| 84,3 · 116 \| 100 · 13 |
+
+Três leituras, a confirmar na análise:
+
+- **O MADDPG domina** em todas as células e regimes: SR 99–100 % e CT 3 a 6×
+  menor. A WNN chega perto em SR nas células de `Na = 4` (93–98 %) e fica mais
+  longe em `Na = 2` (70–89 % no limpo), onde o `T32` do `final` degradado pesa.
+- **Ruído sem filtro MELHORA a WNN** (sem-kf > limpo em todas as 18 células, +3 a
+  +19 pp de SR, CT menor). É o padrão da memória de ruído do projeto: as falhas
+  da WNN são estagnação, e o ruído por passo tira o drone do estado parado. O KF
+  (`com-kf`) devolve parte disso ao remover o ruído: fica entre os dois.
+- **`T16 ≥ T32`** em quase todas as células, com 2 a 4× menos memória; a exceção é
+  `a4s12`, onde o `T32` ganha por 2 pp.
+
+**Alerta em `Na = 2`: os modelos novos perdem para os publicados** (`wnn-T16`/
+`wnn-T32`, treinados em `a2s24` fixo com a MESMA config da T-06.4, campanha
+anterior nas mesmas células e sementes):
+
+| célula · regime | T16 publicado | T16 novo | T32 publicado | T32 novo |
+|---|---|---|---|---|
+| a2s12 · limpo | 90,5 · 78 s | 88,9 · 83 s | 89,8 · 80 s | 77,0 · 143 s |
+| a2s24 · limpo | 91,8 · 81 s | 78,3 · 144 s | 94,3 · 68 s | 69,5 · 189 s |
+| a2s36 · limpo | 92,8 · 82 s | 77,8 · 153 s | 96,4 · 62 s | 69,8 · 193 s |
+| a2s24 · sem-kf | 98,3 · 58 s | 91,2 · 91 s | 98,1 · 57 s | 88,7 · 111 s |
+| a2s24 · com-kf | 96,6 · 60 s | 84,6 · 116 s | 96,6 · 59 s | 79,3 · 146 s |
+
+O publicado ganha até em `a2s12` e `a2s36`, onde ele TRANSFERE e o novo joga em
+casa. As diferenças entre as duas gerações em `Na = 2`: revezamento de `Ns` no
+treino, `--c-max none` (os dois novos), o `T32` com φ 0,99 (degradou após 1,25 M)
+e o `deploy` gerado do `final` (no `T16` novo o `final` tem SR 85 % contra 90 %
+do `melhor`). O diagnóstico barato é repetir a campanha de `Na = 2` com
+`ORIGEM=melhor` (`ROT=wnn-v2m`): se o `melhor` recupera os ~13 pp, o problema é
+o `final`; se não, é o regime de treino revezado para `Na = 2`. Em `Na = 4` e `8`
+não há publicado revezado para comparar; o `a4s24` publicado (T16, SR 90 % no
+teste) fica abaixo do novo (94–96 %).
 
 Com o JSON da grade em mãos:
 
