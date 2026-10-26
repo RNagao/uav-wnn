@@ -52,6 +52,13 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 BLOCOS, REPS_BLOCO = 8, 1000
+CKPT_PADRAO = "models/deploy/T{T}/a{na}s{ns}"
+"""De onde vem o ator WNN de cada `T` na célula. `--ckpt-padrao` troca por outro
+caminho com os mesmos marcadores — ex. os modelos revezados, que vivem em
+`runs/spec06-50M/T{T}-a{na}s12-24-36/checkpoints/deploy` até serem promovidos."""
+SUFIXO = ""
+"""`--sufixo`: acrescido ao nome de TODOS os artefatos (json, md, png), para que uma
+medição de outros modelos na mesma célula não sobrescreva a canônica."""
 SEED_OBS = 12345
 
 
@@ -141,7 +148,7 @@ def _filho_wnn(na: int, ns: int, t_res: int, obs: Path) -> dict:
     from uavwnn.refenv import LAMENZA_003
     pico_imports = _pico_kb()
 
-    ckpt = RAIZ / "models" / "deploy" / f"T{t_res}" / f"a{na}s{ns}"
+    ckpt = RAIZ / CKPT_PADRAO.format(T=t_res, na=na, ns=ns)
     cfg = LAMENZA_003(num_drones=na, num_sensors=ns)
     pol, ap = montar("ntupla_dissertacao", cfg, ckpt, plana=True)
     rss_carga = _rss_kb(aparar=True)
@@ -188,7 +195,7 @@ def _filho_maddpg(na: int, ns: int, obs: Path) -> dict:
 def _rodar_filho(alvo: str, na: int, ns: int, obs: Path) -> dict:
     r = subprocess.run(
         [sys.executable, __file__, "--filho", alvo, "--na", str(na),
-         "--ns", str(ns), "--obs", str(obs)],
+         "--ns", str(ns), "--obs", str(obs), "--ckpt-padrao", CKPT_PADRAO],
         capture_output=True, text=True, cwd=RAIZ)
     if r.returncode != 0:
         raise RuntimeError(f"filho {alvo} falhou:\n{r.stderr[-800:]}")
@@ -196,6 +203,7 @@ def _rodar_filho(alvo: str, na: int, ns: int, obs: Path) -> dict:
 
 
 def main() -> int:
+    global CKPT_PADRAO, SUFIXO
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--na", type=int, default=2)
     ap.add_argument("--ns", type=int, default=24)
@@ -203,15 +211,22 @@ def main() -> int:
     ap.add_argument("--obs", type=Path, default=None, help=argparse.SUPPRESS)
     ap.add_argument("--so-figuras", action="store_true",
                     help="não mede: regenera relatório e PNGs do JSON já gravado")
+    ap.add_argument("--ckpt-padrao", default=CKPT_PADRAO,
+                    help="caminho do ator WNN com {T}, {na}, {ns} (relativo à raiz); "
+                         f"padrão {CKPT_PADRAO}")
+    ap.add_argument("--sufixo", default="",
+                    help="sufixo dos artefatos (ex. -v2), para não sobrescrever a "
+                         "medição canônica da célula")
     ap.add_argument("--repeticoes", type=int, default=1,
                     help="N > 1: roda cada filho N vezes (processo novo a cada vez) e "
                          "grava média/desvio por modelo em spec03-pico-ram-repN-*.json/.md; "
                          "o artefato canônico (N=1) não é tocado")
     a = ap.parse_args()
+    CKPT_PADRAO, SUFIXO = a.ckpt_padrao, a.sufixo
 
-    saida = RAIZ / "reports" / f"spec03-latencia-memoria-a{a.na}s{a.ns}.json"
+    saida = RAIZ / "reports" / f"spec03-latencia-memoria-a{a.na}s{a.ns}{SUFIXO}.json"
     if a.so_figuras and a.repeticoes > 1:
-        base = RAIZ / "reports" / f"spec03-pico-ram-rep{a.repeticoes}-a{a.na}s{a.ns}"
+        base = RAIZ / "reports" / f"spec03-pico-ram-rep{a.repeticoes}-a{a.na}s{a.ns}{SUFIXO}"
         d = json.loads(Path(f"{base}.json").read_text())
         for f in _artefatos_rep(d["amostras"], d["agregado"], a.na, a.ns, a.repeticoes):
             print(f"-> {f.relative_to(RAIZ)}")
@@ -325,7 +340,7 @@ def _repetir(na: int, ns: int, obs: Path, n: int) -> int:
             print(f"    {modelo:<9} {e['media']/div:>9,.2f} ± {e['desvio']/div:>6,.2f} {un}"
                   f"   ({e['min']/div:,.2f}–{e['max']/div:,.2f})   n={g['n']}")
 
-    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}"
+    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}{SUFIXO}"
     Path(f"{base}.json").write_text(json.dumps(
         {"celula": f"a{na}s{ns}", "repeticoes": n, "agregado": agg,
          "amostras": amostras}, indent=2))
@@ -338,7 +353,7 @@ def _repetir(na: int, ns: int, obs: Path, n: int) -> int:
 def _artefatos_rep(amostras: dict, agg: dict, na: int, ns: int, n: int) -> list[Path]:
     """Relatório e box plot das N medições — escritos do JSON, nada transcrito."""
     import datetime
-    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}"
+    base = RAIZ / "reports" / f"spec03-pico-ram-rep{n}-a{na}s{ns}{SUFIXO}"
 
     def linha(cels):
         return "| " + " | ".join(str(c) for c in cels) + " |"
@@ -478,7 +493,7 @@ def _markdown(linhas: list[dict], na: int, ns: int) -> Path:
           f"![tempos](spec03-latencia-a{na}s{ns}.png)",
           f"![pico de RAM](spec03-pico-ram-a{na}s{ns}.png)", ""]
 
-    f = RAIZ / "reports" / f"spec03-latencia-memoria-a{na}s{ns}.md"
+    f = RAIZ / "reports" / f"spec03-latencia-memoria-a{na}s{ns}{SUFIXO}.md"
     f.write_text("\n".join(L))
     return f
 
@@ -493,7 +508,7 @@ def _agregado_rep(na: int, ns: int):
     figuras usam a média ± desvio do pico total de lá; sem o arquivo, a medição única.
     """
     melhor = None
-    for f in (RAIZ / "reports").glob(f"spec03-pico-ram-rep*-a{na}s{ns}.json"):
+    for f in (RAIZ / "reports").glob(f"spec03-pico-ram-rep*-a{na}s{ns}{SUFIXO}.json"):
         m = re.search(r"rep(\d+)-", f.name)
         n = int(m.group(1)) if m else 0
         if melhor is None or n > melhor[0]:
@@ -539,7 +554,7 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
     ax.legend(frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    f = RAIZ / "reports" / f"spec03-latencia-a{na}s{ns}.png"
+    f = RAIZ / "reports" / f"spec03-latencia-a{na}s{ns}{SUFIXO}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
 
     # -- pico de RAM: SÓ o pico total, em log; média ± desvio das repetições se houver --
@@ -570,7 +585,7 @@ def _graficos(linhas: list[dict], na: int, ns: int) -> list[Path]:
                  f"{sub} · observation precomputed outside the child", fontsize=10)
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    f = RAIZ / "reports" / f"spec03-pico-ram-a{na}s{ns}.png"
+    f = RAIZ / "reports" / f"spec03-pico-ram-a{na}s{ns}{SUFIXO}.png"
     fig.savefig(f, dpi=160); plt.close(fig); saidas.append(f)
     return saidas
 
