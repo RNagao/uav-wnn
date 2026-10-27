@@ -348,6 +348,37 @@ o `final`; se não, é o regime de treino revezado para `Na = 2`. Em `Na = 4` e 
 não há publicado revezado para comparar; o `a4s24` publicado (T16, SR 90 % no
 teste) fica abaixo do novo (94–96 %).
 
+## Pico de RAM e latência dos modelos novos × MADDPG (2026-10-26, máquina ociosa)
+
+`spec03_latencia_memoria.py --ckpt-padrao <caminho> --sufixo=-v2`, um processo novo
+por modelo, mesma observação para todos, Ns = 24 por Na; pico = VmHWM do processo que
+carrega o ator e decide, média ± dp de 30 processos; latência = menor mediana de
+8×1000 decisões (p99 global). Artefatos `reports/spec03-*-a{2,4,8}s24-v2.*`; os
+publicados de a2s24 remedidos no mesmo estado em `-ref`.
+
+| célula | modelo | latência mediana | p99 | pico de RAM | arcabouço | acréscimo da rede | entradas |
+|---|---|---|---|---|---|---|---|
+| a2s24 | WNN T16 novo | 22,3 µs | 58 | 45,9 ± 0,1 MB | 31,4 | 14,4 MB | 20 833 |
+| a2s24 | WNN T32 novo | 24,9 µs | 55 | 73,4 ± 0,1 MB | 31,6 | 41,8 MB | 134 013 |
+| a2s24 | MADDPG | 48,6 µs | 176 | 506,1 ± 0,1 MB | 496,0 | 10,0 MB | 73 478 |
+| a2s24 | WNN T16 publicado | 22,3 µs | 55 | 46,2 ± 0,1 MB | 31,5 | 14,7 MB | 22 453 |
+| a2s24 | WNN T32 publicado | 24,9 µs | 63 | 53,6 ± 0,1 MB | 31,6 | 22,0 MB | 41 476 |
+| a4s24 | WNN T16 novo | 23,4 µs | 64 | 46,6 ± 0,1 MB | 31,5 | 15,1 MB | 23 234 |
+| a4s24 | WNN T32 novo | 25,4 µs | 63 | 79,4 ± 0,1 MB | 31,5 | 47,9 MB | 157 388 |
+| a4s24 | MADDPG | 48,0 µs | 162 | 506,1 ± 0,1 MB | 496,1 | 10,0 MB | 74 502 |
+| a8s24 | WNN T16 novo | 23,4 µs | 60 | 48,0 ± 0,2 MB | 31,6 | 16,4 MB | 24 728 |
+| a8s24 | WNN T32 novo | 27,3 µs | 68 | 59,4 ± 0,2 MB | 31,3 | 28,1 MB | 53 032 |
+| a8s24 | MADDPG | 48,9 µs | 186 | 506,1 ± 0,1 MB | 496,1 | 10,0 MB | 76 550 |
+
+A WNN decide em 22–27 µs contra ~49 µs do MADDPG (2×), com pico de RAM 6 a 11×
+menor; 496 MB do pico do MADDPG são o PyTorch. O acréscimo da rede é maior na WNN
+(14–48 MB: o load constrói a rede de dicionários antes de achatá-la em LUT) que no
+MADDPG (10 MB). Os números batem com a medição canônica de a2s24 do deck do artigo
+(`spec06-merito.json`: 47/52 MB, 22/25/49 µs). O `T32` novo de a2s24 ocupa 3,2× mais
+entradas que o publicado (três Ns no treino) e por isso 73 contra 54 MB de pico.
+
+## Como atualizar
+
 Com o JSON da grade em mãos:
 
     uv run python - <<'EOF'

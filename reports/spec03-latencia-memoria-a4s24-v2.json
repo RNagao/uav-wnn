@@ -1,0 +1,41 @@
+[
+  {
+    "modelo": "wnn-T16",
+    "mediana_us": 23.368499999999997,
+    "p99_us": 64.24488000000002,
+    "params": 23234,
+    "arcabouco": "NumPy",
+    "pico_base_kb": 14844,
+    "pico_arcabouco_kb": 32240,
+    "rss_apos_carga_kb": 41600,
+    "pico_apos_carga_kb": 47660,
+    "pico_total_kb": 47660,
+    "pico_modelo_kb": 15420
+  },
+  {
+    "modelo": "wnn-T32",
+    "mediana_us": 25.4255,
+    "p99_us": 63.21973000000021,
+    "params": 157388,
+    "arcabouco": "NumPy",
+    "pico_base_kb": 14888,
+    "pico_arcabouco_kb": 32276,
+    "rss_apos_carga_kb": 43620,
+    "pico_apos_carga_kb": 81372,
+    "pico_total_kb": 81372,
+    "pico_modelo_kb": 49096
+  },
+  {
+    "modelo": "maddpg",
+    "mediana_us": 48.003,
+    "p99_us": 161.80390000000028,
+    "params": 74502,
+    "arcabouco": "PyTorch",
+    "pico_base_kb": 14984,
+    "pico_arcabouco_kb": 508088,
+    "rss_apos_carga_kb": 511408,
+    "pico_apos_carga_kb": 512476,
+    "pico_total_kb": 518308,
+    "pico_modelo_kb": 10220
+  }
+]
