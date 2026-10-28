@@ -25,12 +25,13 @@ ROT=${ROT:-wnn-v2}
 PARALELO=${PARALELO:-4}
 EPS=${EPS:-100}
 RAIZ_DADOS=${RAIZ_DADOS:-/home/rnagao/mestrado/fusao}
+RUNS=${RUNS:-spec06-50M}      # pasta de runs (ex.: spec06-50M-ctde para o crítico centralizado)
 G="$RAIZ_DADOS/results/etapa2"
 
 ckpt() {   # $1=T $2=Na
   case "$ORIGEM" in
     models) echo "$RAIZ_DADOS/models/deploy/T$1/a$2s12-24-36" ;;
-    *)      echo "$RAIZ_DADOS/runs/spec06-50M/T$1-a$2s12-24-36/checkpoints/$ORIGEM" ;;
+    *)      echo "$RAIZ_DADOS/runs/$RUNS/T$1-a$2s12-24-36/checkpoints/$ORIGEM" ;;
   esac
 }
 fila() {

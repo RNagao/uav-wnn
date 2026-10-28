@@ -22,6 +22,8 @@
 #     nohup bash scripts/spec06_campanha_novos.sh > reports/campanha/logs/_novos.log 2>&1 &
 #     NAS=2 REGIMES=limpo bash scripts/spec06_campanha_novos.sh  # um Na, um regime
 #     ORIGEM=melhor ROT=wnn-v2m bash scripts/spec06_campanha_novos.sh --listar
+#     RUNS=spec06-50M-ctde ROT=wnn-ctde NAS=2 bash scripts/spec06_campanha_novos.sh --listar
+#                                                               # modelos de outra pasta de runs
 #     bash scripts/spec06_campanha_novos.sh --parar
 #
 # O rótulo (ROT) é a identidade dos CSVs: `wnn-v2-T16-a4s24-limpo.csv`. Mudou o
@@ -37,10 +39,11 @@ PARALELO=${PARALELO:-6}
 SIGMAS=${SIGMAS:-10}
 COM_MADDPG=${COM_MADDPG:-1}
 RAIZ_DADOS=${RAIZ_DADOS:-/home/rnagao/mestrado/fusao}
+RUNS=${RUNS:-spec06-50M}
 
 case "$ORIGEM" in
   models)              PAD="$RAIZ_DADOS/models/deploy/T%s/a{na}s12-24-36" ;;
-  deploy|melhor|final) PAD="$RAIZ_DADOS/runs/spec06-50M/T%s-a{na}s12-24-36/checkpoints/$ORIGEM" ;;
+  deploy|melhor|final) PAD="$RAIZ_DADOS/runs/$RUNS/T%s-a{na}s12-24-36/checkpoints/$ORIGEM" ;;
   *) echo "ORIGEM desconhecida: $ORIGEM (deploy|melhor|final|models)"; exit 1 ;;
 esac
 # shellcheck disable=SC2059  # o padrão tem só o %s do T; `{na}` fica literal
