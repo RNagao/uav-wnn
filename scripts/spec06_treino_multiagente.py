@@ -11,14 +11,27 @@ Fiel ao Lamenza: **um** conjunto de hiperparâmetros (a config vencedora da T-06
 punish), escala `(1−γ)` como na SPEC-06.
 
 **Ressalva de método (documentada):** o MADDPG do Lamenza é CTDE — crítico
-CENTRALIZADO (vê obs+ações de todos). Este AC tem crítico DESCENTRALIZADO on-policy
-(Algoritmo 4.4). O **ator implantado** é descentralizado e compartilhado nos dois,
-logo comparável no deploy; os algoritmos de treino diferem, e a comparação
-WNN×MADDPG é cross-método (a comparação "mesmo algoritmo" do projeto é WNN-AC vs
-MLP-AC).
+CENTRALIZADO (vê obs+ações de todos). O AC padrão aqui tem crítico DESCENTRALIZADO
+on-policy (Algoritmo 4.4). O **ator implantado** é descentralizado e compartilhado
+nos dois, logo comparável no deploy; os algoritmos de treino diferem, e a
+comparação WNN×MADDPG é cross-método (a comparação "mesmo algoritmo" do projeto é
+WNN-AC vs MLP-AC).
+
+**Crítico centralizado (CTDE), desde 2026-10-28 — `--critico centralizado`.** A
+campanha mediu que os drones da WNN voam a 0,5–0,85 da separação do MADDPG, e a
+causa é o crítico `V(x_i)` que não vê os outros drones nem as ações deles (sem
+atribuição de crédito). `uavwnn/agents/ctde.py` dá ao treino um crítico n-tuple
+sobre o estado conjunto — `--contrafactual 0`: `V_c(s)` com δ compartilhado;
+`--contrafactual K>0`: `Q_c(s, a)` com vantagem contrafactual por drone (COMA),
+o análogo do `∂Q/∂a_i` do MADDPG. O ator, a observação, o deploy e o problema de
+Lamenza NÃO mudam. A avaliação passa a registrar `separacao_m` (coordenação) e,
+no CTDE, `credito.dispersao_credito` (0 = todos recebem o mesmo sinal).
 
     uv run python scripts/spec06_treino_multiagente.py --na 2 --ns 24 --smoke
     uv run python scripts/spec06_treino_multiagente.py --na 2 --ns 24 --b-max 10000000
+    uv run python scripts/spec06_treino_multiagente.py --na 4 --ns 12,24,36 --resolucao 16 \
+        --config-de reports/spec06-busca-a4s12-24-36.json --critico centralizado \
+        --contrafactual 4 --b-max 10000000 --saida runs/spec06-ctde/T16-a4s12-24-36-ctde4
 
 UMA GRADE POR `Na`, E O `Ns` REVEZADO
 
@@ -49,6 +62,7 @@ from spec06_treinar import (  # noqa: E402
 )
 from uavwnn.agents import APROXIMADORES, AtorCriticoContinuo  # noqa: E402
 from uavwnn.agents.base import Observacao  # noqa: E402
+from uavwnn.agents.ctde import CriticoCentral, TimeAtorCritico  # noqa: E402
 from uavwnn.agents.politica_continua import NormalProjetada  # noqa: E402
 from uavwnn.campanha import ParadaAntecipada, carregar_bancos  # noqa: E402
 from uavwnn.encoding import TermometroQuantil  # noqa: E402
@@ -180,12 +194,20 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
     aval = AtorCriticoContinuo(aproximador=ap, codificar=codificar,
                                politica=NormalProjetada(SIGMA, None), passos=M,
                                desconto=GAMMA, id="wnn_eval", treinando=False)
-    cts, oks, cov = [], [], []
+    cts, oks, cov, seps = [], [], [], []
     for s in sementes:
         random.seed(int(s)); np.random.seed(int(s))
         env = make_env(cfg); obs, _ = env.reset()
         ct, ok = float(cfg.max_episode_length), False
+        dist = []
         for _ in range(int(cfg.max_episode_length / cfg.algorithm_iteration_interval) + 2):
+            # Separação média entre drones a cada decisão — a medida direta da
+            # coordenação (drones que dividem a área ficam longe; os que competem
+            # pelos mesmos sensores ficam perto). É o que a correção CTDE tem de mover.
+            if cfg.num_drones > 1:
+                P = np.array([env.simulator.get_node(i).position[:2] for i in env.agent_node_ids])
+                dist.append(float(np.mean([np.linalg.norm(P[i] - P[j])
+                                           for i in range(len(P)) for j in range(i + 1, len(P))])))
             acoes = {a: aval.act(Observacao.decodificar(obs[a], ctx)).como_array()
                      for a in env.agents}
             obs, _, term, trunc, infos = env.step(acoes)
@@ -197,12 +219,15 @@ def avaliar_multi(cfg, ap, termo, ctx, sementes) -> dict:
                 break
         cov.append(int(env.sensors_collected) / cfg.num_sensors)
         cts.append(ct); oks.append(ok)
+        if dist:
+            seps.append(float(np.mean(dist)))
         try:
             env.close()
         except Exception:  # pragma: no cover
             pass
     return {"sr": float(np.mean(oks)), "ct_cens": float(np.mean(cts)),
-            "cobertura": float(np.mean(cov)), "n": len(cts)}
+            "cobertura": float(np.mean(cov)), "n": len(cts),
+            "separacao_m": float(np.mean(seps)) if seps else float("nan")}
 
 
 def avaliar_celulas(celulas: dict, ap, termo, sementes_por_ns: dict) -> dict:
@@ -217,7 +242,7 @@ def avaliar_celulas(celulas: dict, ap, termo, sementes_por_ns: dict) -> dict:
     if len(por) == 1:
         return next(iter(por.values()))
     agg = {k: float(np.mean([m[k] for m in por.values()]))
-           for k in ("sr", "ct_cens", "cobertura")}
+           for k in ("sr", "ct_cens", "cobertura", "separacao_m")}
     agg["n"] = sum(m["n"] for m in por.values())
     agg["por_ns"] = {str(ns): m for ns, m in por.items()}
     return agg
@@ -228,7 +253,8 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
             retomar: Path | None = None, sem_parada: bool = False,
             passos_previos: int | None = None, val_n: int = 20,
             c_max: float | None = 0.5, hp: dict | None = None,
-            guarda_colapso: bool = True) -> dict:
+            guarda_colapso: bool = True, critico: str = "descentralizado",
+            contrafactual: int = 0, res_acao: int = 16) -> dict:
     """`sem_parada` gasta o orçamento inteiro — a avaliação continua rodando.
 
     A §4.4 para em platô da `cobertura`, e ela satura em 1,0 cedo (medido: 1,5 M
@@ -246,6 +272,11 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
     """
     nss = (nss,) if isinstance(nss, int) else tuple(nss)
     hp = {**HP_PADRAO, **(hp or {})}
+    if critico not in ("descentralizado", "centralizado"):
+        raise ValueError(f"critico={critico!r}")
+    if critico == "centralizado" and na < 2:
+        print("  aviso: crítico centralizado com Na = 1 é o descentralizado com a "
+              "própria ação na entrada — não há outro drone a ver", flush=True)
     r = REPLICAS[replica]
     escala = r["escala_recompensa"]
     recompensa = RECOMPENSAS[r["recompensa"]]
@@ -261,6 +292,21 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
     ap, termo, acs = construir(primeira["cfg_tr"], na, t_res, retomar, c_max=c_max,
                                hp=hp, corpus=corpus)
     t_res = termo.n_bits // primeira["cfg_tr"].observation_size   # após retomar
+    time_ctde = None
+    if critico == "centralizado":
+        # GUARD RAIL: o crítico central tem de ver TODOS os drones. A entrada é
+        # Na·(bits da observação + bits da ação); qualquer outra coisa é um
+        # crítico que não enxerga o time, e o treino degeneraria para o
+        # descentralizado sem avisar.
+        com_acoes = contrafactual > 0        # K = 0 → V_c(s); K > 0 → Q_c(s, a) (ver ctde.py)
+        if retomar is not None and (Path(retomar) / CriticoCentral.NOME).exists():
+            cc = CriticoCentral.carregar(Path(retomar), termo.n_bits, na, res_acao, com_acoes)
+        else:
+            cc = CriticoCentral(termo.n_bits, na, hp["tupla"], hp["phi"], seed=0,
+                                resolucao_acao=res_acao, com_acoes=com_acoes)
+        assert cc.n_bits == na * (termo.n_bits + cc.n_bits_acao), "crítico central não cobre o time"
+        time_ctde = TimeAtorCritico(ap, acs[0].codificar, cc, na=na, sigma=hp["sigma"],
+                                    passos=hp["m"], desconto=GAMMA, contrafactual=contrafactual)
     if retomar is not None:
         print(f"RETOMANDO de {retomar} (ator/crítico/termômetro carregados)",
               flush=True)
@@ -270,6 +316,13 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
           f"N={ap.ator.n_ram} RAMs · B={termo.n_bits} bits · {na} trajetórias "
           f"compartilhando a rede · passo {hp['passo']:g} σ {hp['sigma']:g} "
           f"n {hp['tupla']} φ {hp['phi']:g} m {hp['m']}", flush=True)
+    if time_ctde is not None:
+        cc = time_ctde.critico
+        print(f"  crítico CENTRALIZADO (CTDE): {'Q_c(s, a)' if cc.com_acoes else 'V_c(s)'} n-tuple com "
+              f"{cc.n_bits} bits = {na}·({termo.n_bits} obs + {cc.n_bits_acao} ação) · "
+              f"{cc.rede.n_ram} RAMs · contrafactual K = {contrafactual}"
+              f"{' (δ compartilhado, sem crédito por drone)' if contrafactual == 0 else ' (vantagem por drone)'}",
+              flush=True)
 
     handlers = list(__import__("logging").getLogger().handlers)
     val = {ns: c["bancos"].val.sementes[:val_n] for ns, c in celulas.items()}
@@ -286,13 +339,17 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
               "replica": replica, "parameter_sharing": True,
               "recompensa_por_na": True,
               "retomado_de": str(retomar) if retomar else None,
-              "critico": "descentralizado (Alg. 4.4)",
+              "critico": ("descentralizado (Alg. 4.4)" if time_ctde is None else
+                          f"centralizado (CTDE: Q(s,a) n-tuple, contrafactual K={contrafactual}, "
+                          f"res_acao={res_acao})"),
               **{k: v for k, v in hp.items() if k not in HP_PADRAO}}
 
     def _salvar(dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
         ap.salvar(dest)
         termo.salvar(dest / "termometro.npz")
+        if time_ctde is not None:
+            time_ctde.critico.salvar(dest)      # só nos checkpoints de treino
 
     passos, ep, melhor = 0, 0, -1.0
     ep_por_ns = {ns: 0 for ns in nss}
@@ -329,12 +386,21 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
         env = make_env(cfg_tr); obs, _ = env.reset()
         prune_logging_handlers(handlers)
         agentes = list(env.agents)
-        for i, _ in enumerate(agentes):
-            acs[i].reset(ctx, np.random.default_rng(s + 7919 * i))
+        if time_ctde is not None:
+            time_ctde.reset([np.random.default_rng(s + 7919 * i) for i in range(len(agentes))])
+        else:
+            for i, _ in enumerate(agentes):
+                acs[i].reset(ctx, np.random.default_rng(s + 7919 * i))
         antes = 0
         for _ in range(passos_max):
-            acoes = {a: acs[i].act(Observacao.decodificar(obs[a], ctx)).como_array()
-                     for i, a in enumerate(agentes)}
+            if time_ctde is not None:
+                # CTDE: as observações de TODOS entram juntas; o fechamento da
+                # transição mais antiga (bootstrap Q(s', a')) acontece dentro de agir().
+                lista = time_ctde.agir([obs[a] for a in agentes])
+                acoes = {a: lista[i] for i, a in enumerate(agentes)}
+            else:
+                acoes = {a: acs[i].act(Observacao.decodificar(obs[a], ctx)).como_array()
+                         for i, a in enumerate(agentes)}
             obs, _, term, trunc, _ = env.step(acoes)
             colhidos = int(env.sensors_collected)
             # Normaliza a recompensa de time por Na: cada drone recebe a fração
@@ -344,17 +410,24 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
             # escalar positivo → não muda a política ótima (como a escala (1−γ)).
             rew = escala * recompensa(colhidos, antes, cfg_tr.num_sensors) / len(agentes)
             antes = colhidos
-            for i in range(len(agentes)):           # CADA drone fecha sua transição
-                acs[i].registrar(rew)
+            if time_ctde is not None:
+                time_ctde.registrar(rew)
+            else:
+                for i in range(len(agentes)):       # CADA drone fecha sua transição
+                    acs[i].registrar(rew)
             passos += 1                              # passo de AMBIENTE (todos os drones)
             if any(term.values()) or any(trunc.values()):
                 break
-            for i, a in enumerate(agentes):          # e atualiza com o SEU próximo obs
-                acs[i].passo_intermediario(Observacao.decodificar(obs[a], ctx))
+            if time_ctde is None:
+                for i, a in enumerate(agentes):      # e atualiza com o SEU próximo obs
+                    acs[i].passo_intermediario(Observacao.decodificar(obs[a], ctx))
             if passos >= b_max:
                 break
-        for ac in acs:
-            ac.fim_de_episodio()
+        if time_ctde is not None:
+            time_ctde.fim_de_episodio()
+        else:
+            for ac in acs:
+                ac.fim_de_episodio()
         ep += 1
         ep_por_ns[ns] += 1
         try:
@@ -376,8 +449,12 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
             por_ns_txt = ("  " + " ".join(f"s{k}:{v['cobertura']:.2f}" for k, v in
                                           m["por_ns"].items())
                           if "por_ns" in m else "")
+            cred = time_ctde.estatisticas() if time_ctde is not None else None
+            cred_txt = (f" · crédito disp {cred['dispersao_credito']:.2f}"
+                        f" |A| {np.mean(cred['abs_vantagem']):.2f}") if cred else ""
             print(f"   eval @ {passos:,}: cob {m['cobertura']:.3f} · sr {m['sr']:.3f}"
-                  f" · CT {m['ct_cens']:.1f} s{por_ns_txt}"
+                  f" · CT {m['ct_cens']:.1f} s · sep {m.get('separacao_m', float('nan')):.1f} m"
+                  f"{cred_txt}{por_ns_txt}"
                   f"{'  (melhor)' if eh_melhor else ''}", flush=True)
             # A curva também em JSONL: o log é prosa, e uma corrida de 31 h
             # precisa ser plotável sem reparsear texto. `ocupadas` entra porque é
@@ -392,7 +469,11 @@ def treinar(na: int, nss: tuple[int, ...] | int, b_max: int, replica: str,
                 fh.write(json.dumps({
                     "passo": passos, "episodios": ep, "cobertura": m["cobertura"],
                     "sr": m["sr"], "ct_cens": m["ct_cens"], "n_val": m["n"],
+                    "separacao_m": m.get("separacao_m"),
                     **({"por_ns": m["por_ns"]} if "por_ns" in m else {}),
+                    **({"ocupadas_critico_central": time_ctde.critico.entradas_ocupadas(),
+                        "credito": cred}
+                       if time_ctde is not None else {}),
                     "ocupadas": sum(len(x) for x in ap.ator.memoria),
                     "parede_s": round(time.perf_counter() - t0, 1),
                     "melhor": bool(eh_melhor)}) + "\n")
@@ -523,6 +604,16 @@ def main() -> int:
     ap.add_argument("--sem-parada", action="store_true",
                     help="ignora a parada antecipada da §4.4 e gasta --b-max "
                          "inteiro; a avaliação periódica continua rodando")
+    ap.add_argument("--critico", choices=("descentralizado", "centralizado"),
+                    default="descentralizado",
+                    help="`centralizado` = CTDE: Q(s, a) n-tuple sobre observações e "
+                         "ações de TODOS os drones, só no treino; o ator e o deploy "
+                         "não mudam (ver uavwnn/agents/ctde.py)")
+    ap.add_argument("--contrafactual", type=int, default=0,
+                    help="K > 0: vantagem contrafactual por drone (COMA-lite) com K "
+                         "amostras da própria política; 0 = δ compartilhado")
+    ap.add_argument("--res-acao", type=int, default=16,
+                    help="níveis do termômetro de faixa fixa da ação no crítico central")
     ap.add_argument("--sem-guarda-colapso", action="store_true",
                     help="não encerra a corrida quando a cobertura de validação "
                          "cai a menos de 1/4 do melhor por 3 avaliações seguidas")
@@ -551,6 +642,8 @@ def main() -> int:
     # O sufixo só aparece fora do padrão: as células de `T = 32` já publicadas
     # mantêm o caminho que `modelo-e-hiperparametros.md` registra.
     sufixo = "" if a.resolucao == T_RES else f"-T{a.resolucao}"
+    if a.critico == "centralizado":
+        sufixo += f"-ctde{a.contrafactual}"
     saida = a.saida or Path(
         f"runs/spec06-multi/ntupla_dissertacao-a{a.na}s{_rotulo_ns(nss)}{sufixo}")
     print(f"SPEC-06 escalada multiagente · "
@@ -560,7 +653,8 @@ def main() -> int:
     treinar(a.na, nss, a.b_max, a.replica, saida, a.progresso_cada,
             a.resolucao, a.retomar, a.sem_parada, a.passos_previos, a.val_n,
             None if str(a.c_max).lower() == "none" else float(a.c_max), hp=hp,
-            guarda_colapso=not a.sem_guarda_colapso)
+            guarda_colapso=not a.sem_guarda_colapso, critico=a.critico,
+            contrafactual=a.contrafactual, res_acao=a.res_acao)
     return 0
 
 

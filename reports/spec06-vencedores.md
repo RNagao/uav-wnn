@@ -406,13 +406,42 @@ nosso `V(x_i)` recebe só a observação do próprio drone e a recompensa do tim
 ÷ Na — não distingue "o time coletou" de "eu coletei", e o δ do drone redundante
 sai positivo.
 
-**Correção em curso:** crítico centralizado n-tuple para a WNN — uma rede de
-regressão com esquecimento que receba, só no treino, as observações e ações
-concatenadas dos `Na` drones; o ator implantado fica idêntico (mesma observação,
-mesmo deploy), então não altera o problema de Lamenza nem a comparação no voo.
-Critério de sucesso: a separação subir em direção à do MADDPG e o CT cair, com SR
-mantido. Segunda frente: PPO sobre a rede n-tuple do anbubus
-(`vendor/ntn_neurocomputing_v0`), estendendo a grade de 1 drone ao multiagente.
+**Correção implementada (2026-10-28), ainda sem treino longo:** crítico
+centralizado n-tuple em `src/uavwnn/agents/ctde.py`, ligado no treinador por
+`--critico centralizado`:
+
+| modo | crítico | vantagem do drone `i` | o que dá |
+|---|---|---|---|
+| `--contrafactual 0` | `V_c(s)` sobre `[obs_1..obs_Na]` | `δ = G − V_c(s)`, igual para todos | vê o time → menos variância; sem crédito por drone |
+| `--contrafactual K` | `Q_c(s, a)` sobre `[obs_1..obs_Na, ação_1..ação_Na]` | `A_i = G − (1/K) Σ_k Q_c(s, (a_{−i}, ã_i^k))`, `ã ~ π_i` | crédito por drone (COMA) — o análogo do `∂Q/∂a_i` do MADDPG |
+
+`G − Q_c(s, a)` **não** é usado como vantagem: a base dependeria da própria ação
+e o gradiente sumiria com o crítico convergindo (a classe recusa `K = 0` com
+crítico de ação). O ator, a observação, o deploy (`*ator.npz` + termômetro) e o
+problema de Lamenza não mudam; o crítico central vai só nos checkpoints de
+treino (`critico-central.npz`). Recompensa segue ÷ Na. Custo medido no smoke
+`a2s24`: 114 passos/s com K = 4 contra 126–139 sem (10–20 % mais lento).
+
+*Guard rails* (`tests/test_ctde.py`, 8 testes): entrada = `Na·(bits_obs +
+bits_ação)` na ordem dos drones e a troca da ação do drone `i` só mexe na fatia
+dele; ator e deploy inalterados; ida e volta do checkpoint; K × tipo de crítico
+coerentes; e o **eval de crédito**: num time de 2 drones em que a recompensa é
+a velocidade do drone 0, com `K = 8` a vantagem do drone irrelevante cai a 0,55
+da do drone que decide (dispersão 0,35), e com `V_c(s)` as duas são iguais. A
+razão não chega a 0 porque a rede n-tuple prevê pela média das RAMs e explica só
+~40–60 % do efeito da ação (estável de 1 200 a 6 000 episódios: viés, não
+ruído). No treino, `metrics.jsonl` grava `separacao_m` por eval e, no CTDE,
+`credito.dispersao_credito` (0 = todos recebem o mesmo sinal; no smoke de 5 000
+passos ainda é ~0,01 porque o crítico está quase vazio — tem de subir ao longo
+de uma corrida longa, senão o contrafactual não está agindo).
+
+**Corrida de aceitação proposta (a decidir):** `a4s12-24-36`, T16, config id 60
+da grade, 10 M passos, três braços — descentralizado, `--contrafactual 0` e
+`--contrafactual 4` —, comparando na mesma avaliação `separacao_m`, CT e SR
+contra a corrida de 50 M e o MADDPG (94 m em a4s24). Critério de sucesso: a
+separação subir em direção à do MADDPG e o CT cair, com SR mantido. Segunda
+frente: PPO sobre a rede n-tuple do anbubus (`vendor/ntn_neurocomputing_v0`),
+estendendo a grade de 1 drone ao multiagente.
 
 ## Como atualizar
 
