@@ -377,6 +377,43 @@ MADDPG (10 MB). Os números batem com a medição canônica de a2s24 do deck do 
 (`spec06-merito.json`: 47/52 MB, 22/25/49 µs). O `T32` novo de a2s24 ocupa 3,2× mais
 entradas que o publicado (três Ns no treino) e por isso 73 contra 54 MB de pico.
 
+## Coordenação: a lacuna de CT medida pela separação entre drones (2026-10-28)
+
+Coluna `separacao_media_m` dos CSVs da campanha (distância média entre os drones
+ao longo do episódio), regime sem ruído, média de 100 runs:
+
+| célula | WNN T16 novo | WNN T32 novo | MADDPG | WNN / MADDPG |
+|---|---|---|---|---|
+| a2s12 | 72 m | 76 m | 93 m | 0,78–0,82 |
+| a2s24 | 89 m | 99 m | 101 m | 0,89–0,98 |
+| a2s36 | 99 m | 96 m | 117 m | 0,83–0,85 |
+| a4s12 | 55 m | 53 m | 80 m | 0,66–0,68 |
+| a4s24 | 70 m | 62 m | 94 m | 0,65–0,75 |
+| a4s36 | 79 m | 72 m | 95 m | 0,75–0,83 |
+| a8s12 | 37 m | 38 m | 77 m | 0,49 |
+| a8s24 | 45 m | 45 m | 74 m | 0,61 |
+| a8s36 | 50 m | 51 m | 88 m | 0,56–0,58 |
+
+Os drones da WNN voam mais perto uns dos outros em todas as 9 células, e a razão
+cai com `Na`: ~0,85 em 2 drones, ~0,7 em 4, ~0,55 em 8. É a assinatura de drones
+que competem pelos mesmos sensores em vez de dividir a área, e explica a lacuna de
+CT (3 a 6×) com cobertura quase igual.
+
+**Mecanismo.** O ator vê os vizinhos nos dois métodos (observação idêntica). O que
+difere é o crítico, que só existe no treino: o do MADDPG é centralizado (CTDE),
+recebe observações e ações de todos os drones e faz a atribuição de crédito; o
+nosso `V(x_i)` recebe só a observação do próprio drone e a recompensa do time
+÷ Na — não distingue "o time coletou" de "eu coletei", e o δ do drone redundante
+sai positivo.
+
+**Correção em curso:** crítico centralizado n-tuple para a WNN — uma rede de
+regressão com esquecimento que receba, só no treino, as observações e ações
+concatenadas dos `Na` drones; o ator implantado fica idêntico (mesma observação,
+mesmo deploy), então não altera o problema de Lamenza nem a comparação no voo.
+Critério de sucesso: a separação subir em direção à do MADDPG e o CT cair, com SR
+mantido. Segunda frente: PPO sobre a rede n-tuple do anbubus
+(`vendor/ntn_neurocomputing_v0`), estendendo a grade de 1 drone ao multiagente.
+
 ## Como atualizar
 
 Com o JSON da grade em mãos:
