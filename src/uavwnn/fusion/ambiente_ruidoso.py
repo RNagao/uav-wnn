@@ -7,14 +7,11 @@ recompensa, terminação — continua exatamente a de Lamenza (RNF-07 permanece
 verdadeiro: nada em `refenv/` importa isto).
 
 O que muda, e só isto (D13): a **posição própria** do drone é corrompida por GPS
-e filtrada. A posição dos sensores chega exata. A posição dos **vizinhos** é a
-que cada vizinho **divulga** — a mesma que ele usa para si: a medida crua no
-degrau 1, a estimativa do seu filtro nos degraus 2–4 (o canal correlacionado e
-atrasado entre UAVs é da Etapa 3, SPEC-09; aqui a divulgação é instantânea e sem
-perda). Como toda entrada da observação tem a forma `(p_k − p_i + S)/(2S)`, o
-erro de posição própria é um **deslocamento comum** a todas as entradas: filtrar
-esse único canal melhora a observação inteira (ARQUITETURA §3.7). A entrada do
-vizinho carrega, além disso, o erro da posição divulgada por ele.
+e filtrada. A posição dos sensores e dos vizinhos chega exata — o canal
+correlacionado entre UAVs é da Etapa 3 (SPEC-09). Como toda entrada da observação
+tem a forma `(p_k − p_i + S)/(2S)`, o erro de posição própria é um **deslocamento
+comum** a todas as entradas: filtrar esse único canal melhora a observação
+inteira (ARQUITETURA §3.7).
 
 A escada de ablação (degraus 0–4):
 
@@ -26,9 +23,8 @@ A escada de ablação (degraus 0–4):
   como entrada de controle.
 
 **A verdade não vaza (RF-04):** o método só devolve observação derivada de `z`
-ou `x̂` — a própria e a dos vizinhos; a posição verdadeira de um drone entra
-apenas no registro de métricas (`self.log_estimacao`), nunca no vetor que
-qualquer política recebe. As posições
+ou `x̂`; a posição verdadeira do drone entra apenas no registro de métricas
+(`self.log_estimacao`), nunca no vetor que a política recebe. As posições
 verdadeiras no `Simulator` ficam intocadas — as métricas de tempo de conclusão
 saem delas, como no ambiente puro.
 
@@ -193,19 +189,9 @@ def criar_ambiente_ruidoso(
                 [self.simulator.get_node(aid).position[:2] for aid in self.agent_node_ids]
             )
 
-            # A posição DIVULGADA de cada drone: a que ele mesmo usa — medida crua
-            # (degrau 1) ou estimativa do filtro (2–4). É o que entra na observação
-            # própria E o que os vizinhos recebem dele; a verdade em `drones` só
-            # alimenta o canal de GPS e o log. Uma chamada por drone por
-            # observação, na ordem dos índices: cada uma consome um ε do canal
-            # daquele drone e avança o filtro dele (CRN preservado).
-            divulgadas = np.array(
-                [self._posicao_usada(i, drones[i], t) for i in range(self.num_drones)]
-            )
-
             estado = {}
             for i in range(self.num_drones):
-                p_own = divulgadas[i]
+                p_own = self._posicao_usada(i, drones[i], t)  # medida ou estimativa
 
                 # sensores não visitados mais próximos, ranqueados pela ESTIMATIVA
                 d_sensores = np.linalg.norm(sensores_livres - p_own, axis=1)
@@ -215,12 +201,11 @@ def criar_ambiente_ruidoso(
                 sensores_obs[: len(escolhidos)] = (p_own - escolhidos + S) / (2 * S)
 
                 # vizinhos mais próximos, EXCLUINDO o próprio (por índice, não por
-                # "distância zero" — sob ruído o próprio não está a distância zero),
-                # na posição que cada um DIVULGA, ranqueados por essa posição
+                # "distância zero" — sob ruído o próprio não está a distância zero)
                 outros = [j for j in range(self.num_drones) if j != i]
                 vizinhos_obs = np.full((self.state_num_closest_drones, 2), -1.0)
                 if outros:
-                    pos_outros = divulgadas[outros]
+                    pos_outros = drones[outros]
                     d_viz = np.linalg.norm(pos_outros - p_own, axis=1)
                     ordem_v = np.argsort(d_viz)
                     escolhidos_v = pos_outros[ordem_v[: self.state_num_closest_drones]]

@@ -87,7 +87,7 @@ Cada etapa acrescenta **uma única** fonte de dificuldade, para que qualquer deg
 | **2** | 1 UAV, ruído no **GPS do drone** | KF com entrada de controle | H2, H3 | G2 |
 | 3 | `Na` UAVs, com ruído | coordenação e erros correlacionados | H5, H6 | G3 |
 
-A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O erro é deslocamento **comum** a todas as entradas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)` — estrutura que a álgebra do filtro aproveita. A posição dos sensores permanece exata. A posição de um **vizinho** é a que ele **divulga** — a mesma que usa para si (medida crua no degrau 1, estimativa do filtro nos degraus 2–4), nunca a verdade do simulador; o ranking por distância também sai das posições divulgadas. O canal correlacionado e atrasado entre UAVs fica para a Etapa 3.
+A Etapa 2 roda em **um bloco** (D13): o ruído incide só no GPS do drone. O erro é deslocamento **comum** a todas as entradas da observação, porque toda entrada tem a forma `(p_k − p_i + S)/(2S)` — estrutura que a álgebra do filtro aproveita. A posição dos sensores permanece exata; a única costura é que o ranking por distância passa a sair da estimativa filtrada, nunca da verdade.
 
 Como as features entram **sem tocar no cenário**, com os diagramas do fluxo: [`specs/ARQUITETURA.md`](specs/ARQUITETURA.md).
 
