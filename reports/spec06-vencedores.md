@@ -319,12 +319,43 @@ Três leituras, a confirmar na análise:
 - **O MADDPG domina** em todas as células e regimes: SR 99–100 % e CT 3 a 6×
   menor. A WNN chega perto em SR nas células de `Na = 4` (93–98 %) e fica mais
   longe em `Na = 2` (70–89 % no limpo), onde o `T32` do `final` degradado pesa.
-- **Ruído sem filtro MELHORA a WNN** (sem-kf > limpo em todas as 18 células, +3 a
-  +19 pp de SR, CT menor). É o padrão da memória de ruído do projeto: as falhas
-  da WNN são estagnação, e o ruído por passo tira o drone do estado parado. O KF
-  (`com-kf`) devolve parte disso ao remover o ruído: fica entre os dois.
+- **Ruído sem filtro MELHORA a WNN a σ = 10** (sem-kf > limpo em todas as 18
+  células, +0,4 a +19 pp de SR, CT menor). É o padrão da memória de ruído do
+  projeto: as falhas da WNN são estagnação, e o ruído por passo tira o drone do
+  estado parado. O KF (`com-kf`) devolve parte disso ao remover o ruído: fica
+  entre os dois. **A σ = 25 o efeito se inverte em `Na = 4` e `8`** — ver a
+  tabela abaixo.
 - **`T16 ≥ T32`** em quase todas as células, com 2 a 4× menos memória; a exceção é
   `a4s12`, onde o `T32` ganha por 2 pp.
+
+**σ = 25 (medido em 2026-10-29; 48 corridas, 9 h, 6 em paralelo; MADDPG e
+publicados em `a2` já tinham σ = 25 de 2026-09-09, mesma convenção — o vizinho
+entra com a posição verdadeira sob ruído em TODAS as campanhas; a correção
+"posição divulgada" (f263c77) foi mesclada e revertida em 2026-10-28 por decisão
+do usuário, e fica como trabalho futuro). SR % · CT s:**
+
+| célula | T16 σ25 sem-kf | T32 σ25 sem-kf | MADDPG σ25 sem-kf | T16 σ25 com-kf | T32 σ25 com-kf | MADDPG σ25 com-kf |
+|---|---|---|---|---|---|---|
+| a2s12 | 91,6 · 94 s | 85,4 · 131 s | 99,9 · 29 s | 90,8 · 76 s | 84,2 · 112 s | 99,9 · 21 s |
+| a2s24 | 88,4 · 136 s | 79,2 · 183 s | 100 · 43 s | 84,2 · 121 s | 76,9 · 159 s | 99,8 · 30 s |
+| a2s36 | 89,5 · 144 s | 79,4 · 193 s | 100 · 54 s | 83,3 · 132 s | 78,2 · 161 s | 99,7 · 38 s |
+| a4s12 | 90,4 · 95 s | 91,3 · 87 s | 100 · 16 s | 96,1 · 50 s | 96,7 · 44 s | 100 · 11 s |
+| a4s24 | 84,0 · 143 s | 74,9 · 182 s | 100 · 24 s | 94,8 · 67 s | 93,6 · 71 s | 100 · 15 s |
+| a4s36 | 84,0 · 149 s | 75,8 · 184 s | 100 · 28 s | 94,5 · 73 s | 93,8 · 74 s | 100 · 17 s |
+| a8s12 | 93,0 · 77 s | 94,1 · 66 s | 100 · 20 s | 89,7 · 80 s | 86,1 · 92 s | 100 · 16 s |
+| a8s24 | 83,1 · 145 s | 76,5 · 173 s | 100 · 14 s | 90,1 · 91 s | 82,7 · 120 s | 100 · 10 s |
+| a8s36 | 72,3 · 200 s | 65,1 · 232 s | 100 · 19 s | 87,1 · 111 s | 82,3 · 127 s | 100 · 14 s |
+
+Leitura: a σ = 25 **sem filtro** a WNN perde em `Na = 4` (SR −4 a −18 pp, CT +40
+a +113 s) e `Na = 8` (−10 a −21 pp em s24/s36, CT +72 a +123 s), e só ganha em
+`Na = 2` (+3 a +12 pp). A dose de ruído passou do ponto: o erro de 25 m na própria
+posição desordena os sensores mais próximos e custa mais do que o destravamento
+rende, e pesa mais com mais drones. **Com o KF** a σ = 25 a WNN volta ao nível do
+limpo em `Na = 4` (±1 pp) e fica 3 a 5 pp abaixo em `Na = 8`; em `Na = 2` segue
+acima do limpo. O MADDPG mantém SR 100 %; só o CT sobe sem filtro (+5 a +19 s) e o
+filtro o devolve (+0 a +2 s). Em `Na = 2` os publicados continuam à frente dos
+novos a σ = 25 (exceção: T16 novo 91,6 × 90,0 em `a2s12` sem filtro). CSVs:
+`reports/campanha/*-sigma25-*.csv`.
 
 **Alerta em `Na = 2`: os modelos novos perdem para os publicados** (`wnn-T16`/
 `wnn-T32`, treinados em `a2s24` fixo com a MESMA config da T-06.4, campanha
