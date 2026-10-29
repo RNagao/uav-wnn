@@ -12,7 +12,9 @@
 #   3. atestados RF-05 dos dois modelos nas 3 células de Na=2 (pré-requisito do
 #      regime com-kf);
 #   4. campanha de Na=2 (a2s12/24/36 × limpo, sem-kf, com-kf) com o rótulo
-#      `wnn-ctde` — os CSVs do MADDPG e dos `wnn-v2` já existem nessas células.
+#      `wnn-ctde`, σ = 10 e σ = 25 nos regimes de ruído (SIGMAS) — os CSVs do
+#      MADDPG e dos `wnn-v2` nessas células vêm da refeita pós-"vizinho
+#      divulgado" (`spec06_campanha_ruido_vizinho.sh`).
 #
 #     nohup bash scripts/spec06_ctde_na2.sh > /home/rnagao/mestrado/fusao/reports/spec06-ctde-na2.log 2>&1 &
 #     tail -n 3 -f /home/rnagao/mestrado/fusao/reports/spec06-ctde-na2.log \
@@ -29,6 +31,7 @@ export RAIZ_DADOS=${RAIZ_DADOS:-/home/rnagao/mestrado/fusao}
 export RUNS=${RUNS:-spec06-50M-ctde}
 ROT=${ROT:-wnn-ctde}
 K=${K:-4}
+SIGMAS=${SIGMAS:-10 25}
 TS=( ${TS:-16 32} )
 EXTRA=${EXTRA:---c-max none}        # como nos treinos de Na=2 de 2026-10-15/16
 EXTRA_T16=${EXTRA_T16:-}
@@ -70,6 +73,10 @@ done
 
 echo "[$(ts)] atestados RF-05 ($ROT, Na=2)"
 NAS=2 PARALELO=2 ROT="$ROT" bash scripts/spec06_gates_novos.sh
-echo "[$(ts)] campanha Na=2 ($ROT)"
-NAS=2 ROT="$ROT" COM_MADDPG=0 bash scripts/spec06_campanha_novos.sh
+echo "[$(ts)] campanha Na=2 ($ROT) · limpo"
+NAS=2 ROT="$ROT" COM_MADDPG=0 REGIMES=limpo bash scripts/spec06_campanha_novos.sh
+for S in $SIGMAS; do
+  echo "[$(ts)] campanha Na=2 ($ROT) · σ=$S · sem-kf,com-kf"
+  NAS=2 ROT="$ROT" COM_MADDPG=0 REGIMES=sem-kf,com-kf SIGMAS=$S bash scripts/spec06_campanha_novos.sh
+done
 echo "[$(ts)] FIM — CSVs em $RAIZ_DADOS/reports/campanha/$ROT-T*-a2s*.csv"
