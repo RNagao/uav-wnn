@@ -34,7 +34,8 @@ EXTRA=${EXTRA:---c-max none}
 case "$NA" in
   2) : "${EXTRA_T16:=}";                    : "${EXTRA_T32:=--passo 8e-4 --phi 0.99}" ;;
   4) : "${EXTRA_T16:=--passo 8e-4 --phi 0.7}"; : "${EXTRA_T32:=--passo 8e-4 --phi 0.85}" ;;
-  8) : "${EXTRA_T16:=--passo 1.5e-3 --phi 0.85}"; : "${EXTRA_T32:=--passo 1.5e-3 --phi 0.85}" ;;
+  # σ explícito: o ponto 80 da grade de Na=8 (T32) tem σ 0,20, mas o modelo de 50 M usou 0,35
+  8) : "${EXTRA_T16:=--passo 1.5e-3 --phi 0.85 --sigma 0.35}"; : "${EXTRA_T32:=--passo 1.5e-3 --phi 0.85 --sigma 0.35}" ;;
   *) : "${EXTRA_T16:?Na=$NA sem config padrão: defina EXTRA_T16}"; : "${EXTRA_T32:?defina EXTRA_T32}" ;;
 esac
 CEL="a${NA}s12-24-36"
