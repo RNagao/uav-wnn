@@ -13,6 +13,8 @@
 #   Na=2  T16 ponto 61 da grade (8e-4 · φ 0,85)   T32 8e-4 · φ 0,99 (escolha do registro)
 #   Na=4  T16 8e-4 · φ 0,70 (id 60)               T32 8e-4 · φ 0,85  — ambos c_max off,
 #         guarda de colapso ligada, pararam por platô em 33,8 M
+#   Na=8  T16 e T32 1,5e-3 · φ 0,85 (ids 110 e 80 com flags explícitas); T16 foi a
+#         50 M (125 passos/s), T32 parou por platô em 42,5 M (81 passos/s)
 #   Outro Na: passe EXTRA_T16 e EXTRA_T32 explicitamente.
 #
 #     NA=4 nohup bash scripts/spec06_ctde_na.sh > /home/rnagao/mestrado/fusao/reports/spec06-ctde-na4.log 2>&1 &
@@ -32,6 +34,7 @@ EXTRA=${EXTRA:---c-max none}
 case "$NA" in
   2) : "${EXTRA_T16:=}";                    : "${EXTRA_T32:=--passo 8e-4 --phi 0.99}" ;;
   4) : "${EXTRA_T16:=--passo 8e-4 --phi 0.7}"; : "${EXTRA_T32:=--passo 8e-4 --phi 0.85}" ;;
+  8) : "${EXTRA_T16:=--passo 1.5e-3 --phi 0.85}"; : "${EXTRA_T32:=--passo 1.5e-3 --phi 0.85}" ;;
   *) : "${EXTRA_T16:?Na=$NA sem config padrão: defina EXTRA_T16}"; : "${EXTRA_T32:?defina EXTRA_T32}" ;;
 esac
 CEL="a${NA}s12-24-36"
