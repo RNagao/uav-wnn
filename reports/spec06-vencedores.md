@@ -437,7 +437,7 @@ nosso `V(x_i)` recebe só a observação do próprio drone e a recompensa do tim
 ÷ Na — não distingue "o time coletou" de "eu coletei", e o δ do drone redundante
 sai positivo.
 
-**Correção implementada (2026-10-28), ainda sem treino longo:** crítico
+**Correção implementada (2026-10-28) e medida em `Na = 2` (2026-10-30, abaixo):** crítico
 centralizado n-tuple em `src/uavwnn/agents/ctde.py`, ligado no treinador por
 `--critico centralizado`:
 
@@ -466,13 +466,61 @@ ruído). No treino, `metrics.jsonl` grava `separacao_m` por eval e, no CTDE,
 passos ainda é ~0,01 porque o crítico está quase vazio — tem de subir ao longo
 de uma corrida longa, senão o contrafactual não está agindo).
 
-**Corrida de aceitação proposta (a decidir):** `a4s12-24-36`, T16, config id 60
-da grade, 10 M passos, três braços — descentralizado, `--contrafactual 0` e
-`--contrafactual 4` —, comparando na mesma avaliação `separacao_m`, CT e SR
-contra a corrida de 50 M e o MADDPG (94 m em a4s24). Critério de sucesso: a
-separação subir em direção à do MADDPG e o CT cair, com SR mantido. Segunda
-frente: PPO sobre a rede n-tuple do anbubus (`vendor/ntn_neurocomputing_v0`),
-estendendo a grade de 1 drone ao multiagente.
+**Resultado em `Na = 2` (treino 2026-10-28 → 30, campanha 2026-10-30).** O usuário
+decidiu ir direto ao treino completo em vez da corrida de aceitação de 10 M.
+Mesmas configs dos modelos descentralizados (T16 8e-4 · φ 0,85; T32 8e-4 · φ
+0,99; c_max off), `--critico centralizado --contrafactual 4`; os dois pararam por
+platô em 33,75 M (~42 h, em paralelo com outras cargas). Checkpoint de deploy do
+`final`; atestados RF-05 aprovados nas 3 células (q_w 4); campanha `wnn-ctde` nas
+mesmas 100 sementes, limpo + σ 10 e 25. Saídas: `runs/spec06-50M-ctde/T*-a2s12-24-36`,
+`reports/campanha/wnn-ctde-*.csv`.
+
+| regime · célula | T16 CTDE | T16 desc. | T16 pub. | T32 CTDE | T32 desc. | T32 pub. | MADDPG |
+|---|---|---|---|---|---|---|---|
+| sem ruído · a2s12 | 85,3 · 98 s · 88 m | 88,9 · 83 s · 72 m | 90,5 · 78 s · 83 m | 96,1 · 45 s · 76 m | 77,0 · 143 s · 76 m | 89,8 · 80 s · 75 m | 100 · 18 s · 93 m |
+| sem ruído · a2s24 | 81,8 · 125 s · 99 m | 78,3 · 144 s · 89 m | 91,8 · 81 s · 96 m | 93,3 · 68 s · 89 m | 69,5 · 189 s · 99 m | 94,3 · 68 s · 84 m | 99,4 · 30 s · 101 m |
+| sem ruído · a2s36 | 83,1 · 124 s · 96 m | 77,8 · 153 s · 99 m | 92,8 · 82 s · 98 m | 95,7 · 63 s · 94 m | 69,8 · 193 s · 96 m | 96,4 · 62 s · 92 m | 99,6 · 35 s · 117 m |
+| σ 10 sem KF · a2s12 | 90,4 · 77 s | 95,9 · 54 s | 98,3 · 47 s | 99,9 · 30 s | 92,8 · 76 s | 98,2 · 46 s | 100 · 19 s |
+| σ 10 sem KF · a2s24 | 91,2 · 85 s | 91,2 · 91 s | 98,3 · 58 s | 99,6 · 44 s | 88,7 · 111 s | 98,1 · 57 s | 100 · 30 s |
+| σ 10 sem KF · a2s36 | 90,9 · 94 s | 89,2 · 109 s | 97,9 · 66 s | 99,7 · 51 s | 88,3 · 121 s | 98,3 · 61 s | 100 · 36 s |
+| σ 10 com KF · a2s12 | 87,9 · 86 s | 91,8 · 70 s | 95,9 · 54 s | 99,1 · 31 s | 86,0 · 103 s | 94,9 · 58 s | 100 · 19 s |
+| σ 10 com KF · a2s24 | 87,6 · 98 s | 84,6 · 116 s | 96,6 · 60 s | 98,3 · 45 s | 79,3 · 146 s | 96,6 · 59 s | 99,8 · 29 s |
+| σ 10 com KF · a2s36 | 87,6 · 104 s | 83,2 · 129 s | 97,4 · 62 s | 98,9 · 49 s | 80,6 · 147 s | 97,7 · 57 s | 99,8 · 35 s |
+| σ 25 sem KF · a2s12 | 80,2 · 141 s | 91,6 · 94 s | 90,0 · 107 s | 99,2 · 50 s | 85,4 · 131 s | 90,6 · 103 s | 99,9 · 29 s |
+| σ 25 sem KF · a2s24 | 81,8 · 149 s | 88,4 · 136 s | 93,8 · 109 s | 99,0 · 74 s | 79,2 · 183 s | 93,0 · 111 s | 100 · 43 s |
+| σ 25 sem KF · a2s36 | 81,5 · 159 s | 89,5 · 144 s | 94,4 · 117 s | 99,1 · 87 s | 79,4 · 193 s | 95,0 · 112 s | 100 · 54 s |
+| σ 25 com KF · a2s12 | 87,4 · 90 s | 90,8 · 76 s | 95,3 · 59 s | 98,9 · 34 s | 84,2 · 112 s | 93,4 · 67 s | 99,9 · 21 s |
+| σ 25 com KF · a2s24 | 86,4 · 106 s | 84,2 · 121 s | 95,8 · 66 s | 98,2 · 48 s | 76,9 · 159 s | 95,9 · 65 s | 99,8 · 30 s |
+| σ 25 com KF · a2s36 | 86,7 · 110 s | 83,3 · 132 s | 96,6 · 69 s | 98,9 · 52 s | 78,2 · 161 s | 97,1 · 63 s | 99,7 · 38 s |
+
+Leitura:
+
+- **T32: a correção funciona.** No limpo, SR 93–96 % e CT 45–68 s contra 70–77 %
+  e 143–193 s do descentralizado da mesma geração (+19 a +26 pp, CT 3×); empata
+  com o publicado (`a2s24`, `a2s36`) e passa dele em `a2s12`. Sob ruído, SR
+  98–100 % nos quatro regimes — o melhor modelo WNN de 2 drones até aqui. No
+  teste do `melhor` (300 sementes): SR 98,7 %, CT 40 s.
+- **T16: misto.** +3,5 e +5,3 pp em `a2s24`/`a2s36`, −3,6 pp em `a2s12`; sob ruído
+  perde para o descentralizado em `a2s12`. O deploy saiu do `final` num vale da
+  curva de validação (eval final SR 84 %; o `melhor` testa 93,7 % e 69 s) — o
+  mesmo problema de "final degradado" do T16 descentralizado de `Na = 2`.
+- **Separação:** T16 72 → 88 m (`a2s12`) e 89 → 99 m (`a2s24`); T32 igual ou
+  menor (99 → 89 m em `a2s24`). MADDPG 93–117 m. A hipótese "CTDE abre a
+  formação" confirma-se só em parte; o ganho de CT do T32 veio sem abrir a formação.
+- **O crédito por drone NÃO agiu.** `credito.dispersao_credito` ficou em ≈0,01
+  (T16) e ≈0,004 (T32) do início ao fim (no brinquedo com crédito isolado: 0,35).
+  Com 64 bits de ação (32 por drone, `res_acao` 16) em 928 bits (T16) ou 1 792
+  (T32), tuplas de 12 bits raramente capturam a ação e o contrafactual devolve
+  quase o mesmo valor para os dois drones. O ganho veio do crítico ver o ESTADO conjunto
+  (menos variância no δ), não da atribuição de crédito — exatamente o alerta do
+  guard rail. Correção candidata: aumentar `--res-acao` (bits de ação) ou
+  construir tuplas que incluam ao menos um bit de ação; repetir `Na = 2`.
+
+Em curso: `Na = 4` (desde 2026-10-29, T16 8e-4 · φ 0,70, T32 8e-4 · φ 0,85) e
+`Na = 8` (desde 2026-10-30, 1,5e-3 · φ 0,85 · σ 0,35 nos dois), mesmo protocolo,
+via `scripts/spec06_ctde_na.sh`. Segunda frente: PPO sobre a rede n-tuple do
+anbubus (`vendor/ntn_neurocomputing_v0`), estendendo a grade de 1 drone ao
+multiagente.
 
 ## Como atualizar
 
