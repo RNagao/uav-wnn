@@ -4,7 +4,9 @@
 #   1. treina T16 e T32 do Na pedido em paralelo, MESMAS configs dos modelos
 #      descentralizados daquele Na (ver tabela abaixo), só trocando o crítico
 #      (`--critico centralizado --contrafactual K`, vantagem por drone); adota um
-#      treino da célula já em curso em vez de duplicar;
+#      treino da célula já em curso em vez de duplicar; e RETOMA de
+#      `checkpoints/ultimo` (gravado a cada avaliação, 1,25 M) se o treino morreu
+#      — ator, crítico central, termômetro e contagem de passos vêm de lá;
 #   2. espera os dois terminarem;
 #   3. atestados RF-05 dos dois modelos nas 3 células do Na (pré-requisito do com-kf);
 #   4. campanha do Na: limpo + σ 10 e 25 (sem-kf, com-kf), rótulo `wnn-ctde`.
@@ -48,9 +50,15 @@ for T in "${TS[@]}"; do
     echo "[$(ts)] treino T$T Na=$NA já em curso (pid $pid) — adotado"; PIDS+=("$pid"); continue
   fi
   por_t="EXTRA_T$T"
-  echo "[$(ts)] lançando treino T$T Na=$NA (CTDE, K=$K) em runs/$RUNS · flags: $EXTRA ${!por_t}"
+  ultimo="$RAIZ_DADOS/runs/$RUNS/T$T-$CEL/checkpoints/ultimo"
+  RET=""
+  if [ -f "$ultimo/procedencia.json" ] && [ ! -d "$RAIZ_DADOS/runs/$RUNS/T$T-$CEL/checkpoints/deploy" ]; then
+    RET="--retomar $ultimo"
+    echo "[$(ts)] treino T$T Na=$NA morto com checkpoint: retomando de $(grep -oE '"passos": [0-9]+' "$ultimo/procedencia.json") passos"
+  fi
+  echo "[$(ts)] lançando treino T$T Na=$NA (CTDE, K=$K) em runs/$RUNS · flags: $EXTRA ${!por_t} $RET"
   # shellcheck disable=SC2086
-  saida=$(bash scripts/spec06_treino_celula.sh "$NA" "$T" --critico centralizado --contrafactual "$K" $EXTRA ${!por_t}) || {
+  saida=$(bash scripts/spec06_treino_celula.sh "$NA" "$T" --critico centralizado --contrafactual "$K" $EXTRA ${!por_t} $RET) || {
     echo "[$(ts)] FALHOU ao lançar T$T:"; echo "$saida"; continue; }
   echo "$saida"
   pid=$(echo "$saida" | grep -oE 'pid [0-9]+' | head -1 | cut -d' ' -f2)
