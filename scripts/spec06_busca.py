@@ -172,7 +172,8 @@ GRADE = {
     #   separar "este mapeamento é melhor" de "esta semente de treino teve sorte".
     #   O valor é a semente crua do sorteio — ver `SEED_MAPEAMENTO`.
     #
-    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 5 = 1 620 pontos
+    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 5 = 1 620 pontos, a 500 mil passos por corrida
+    #   (`B_SWEEP_POR_NIVEL`)
     "mapeamento": {
         "passo_efetivo": (8e-4,),
         "sigma": (0.20, 0.35, 0.50),
@@ -309,6 +310,20 @@ Ele existe porque o braço `ntupla_anbubus` **estagnou** em ~37 % de cobertura (
 pontos ao dobrar o orçamento, contra +14 do outro braço) usando o nosso codificador,
 enquanto todas as configurações dos autores usam `MeanStdFilter`. Sem este eixo, não
 há como distinguir "saturou" de "codificador errado"."""
+
+
+B_SWEEP_PADRAO = 400_000
+B_SWEEP_POR_NIVEL = {"mapeamento": 500_000}
+"""Orçamento padrão por nível, quando `--b-sweep` não é passado. A grade
+`mapeamento` roda a 500 mil passos; os demais níveis e modos ficam nos 400 mil de
+sempre, para o padrão deles não mudar debaixo de quem os reproduz."""
+
+
+def b_sweep_padrao(modo: str, nivel: str) -> int:
+    """O orçamento por corrida quando `--b-sweep` é omitido."""
+    if modo == "grade":
+        return B_SWEEP_POR_NIVEL.get(nivel, B_SWEEP_PADRAO)
+    return B_SWEEP_PADRAO
 
 
 def grade(nivel: str) -> list[dict]:
@@ -699,7 +714,9 @@ def main() -> int:
     ap.add_argument("--amostras", type=int, default=24,
                     help="só no modo `aleatoria`: sorteios COMPARTILHADOS")
     ap.add_argument("--sementes", type=int, default=3)
-    ap.add_argument("--b-sweep", type=int, default=400_000)
+    ap.add_argument("--b-sweep", type=int, default=None,
+                    help="passos por corrida; padrão 500 000 na grade `mapeamento` "
+                         "e 400 000 nos demais níveis e modos")
     ap.add_argument("--n-val", type=int, default=20)
     ap.add_argument("--n-test", type=int, default=100)
     ap.add_argument("--processos", type=int, default=12)
@@ -710,6 +727,8 @@ def main() -> int:
                     help="pula corridas já concluídas no .progresso.jsonl "
                          "existente, em vez de truncá-lo e refazer tudo")
     a = ap.parse_args()
+    if a.b_sweep is None:
+        a.b_sweep = b_sweep_padrao(a.modo, a.niveis)
 
     modelos = a.modelos.split(",")
     if a.modo == "longa":

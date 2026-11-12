@@ -357,6 +357,13 @@ def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
     for nivel in ("desempate", "decisao", "reduzido", "completo"):
         assert "seed_mapeamento" not in busca.GRADE[nivel]
 
+    # 500 mil passos só nesta grade; o padrão dos outros níveis e modos não muda
+    assert busca.b_sweep_padrao("grade", "mapeamento") == 500_000
+    for nivel in ("desempate", "decisao", "reduzido", "completo"):
+        assert busca.b_sweep_padrao("grade", nivel) == 400_000
+    assert busca.b_sweep_padrao("aleatoria", "mapeamento") == 400_000
+    assert busca.b_sweep_padrao("longa", "mapeamento") == 400_000
+
     pontos = busca.grade("mapeamento")
     assert len(pontos) == 3 * 3 * 3 * 4 * 3 * len(eixos["seed_mapeamento"])
     assert "seed_mapeamento" in busca._EIXOS
