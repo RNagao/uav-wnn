@@ -345,9 +345,9 @@ def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
     assert eixos["passo_efetivo"] == (8e-4,)
     assert eixos["normalizar"] == (False,)
     assert eixos["sigma"] == busca.GRADE["completo"]["sigma"]
-    assert eixos["resolucao"] == busca.GRADE["completo"]["resolucao"]
+    assert eixos["resolucao"] == (16, 32)       # T = 64 saiu por custo
     assert eixos["passos_m"] == busca.GRADE["completo"]["passos_m"]
-    assert eixos["tupla"] == busca.GRADE["reduzido"]["tupla"]
+    assert eixos["tupla"] == (8, 12, 16)        # n = 16 no lugar do 24, por custo
     assert [busca.PHI[i] for i in eixos["idx_critico"]] == [0.70, 0.85, 0.90]
     # os índices antigos não podem mudar de φ: registros gravados guardam o índice
     assert busca.PHI[:4] == (0.70, 0.85, 0.99, 1.0)
@@ -365,7 +365,7 @@ def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
     assert busca.b_sweep_padrao("longa", "mapeamento") == 400_000
 
     pontos = busca.grade("mapeamento")
-    assert len(pontos) == 3 * 3 * 3 * 4 * 3 * len(eixos["seed_mapeamento"])
+    assert len(pontos) == 3 * 2 * 3 * 4 * 3 * len(eixos["seed_mapeamento"])
     assert "seed_mapeamento" in busca._EIXOS
     # dois pontos que só diferem no mapeamento são corridas DISTINTAS na retomada
     a, b = (dict(p, aproximador="x", seed_train=0) for p in pontos[:2])

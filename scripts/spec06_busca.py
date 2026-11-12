@@ -199,13 +199,18 @@ GRADE = {
     #   separar "este mapeamento é melhor" de "esta semente de treino teve sorte".
     #   O valor é a semente crua do sorteio — ver `SEED_MAPEAMENTO`.
     #
-    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 5 = 1 620 pontos, a 500 mil passos por corrida
+    # `T = 64` e `n = 24` SAÍRAM, por custo: em Na = 2 a grade com eles foi
+    #   estimada em 18–25 dias, e `T64/n24` passava de 0,9 GB por worker já em 64
+    #   mil passos. `n = 16` entra no lugar do 24: ficam `T ∈ {16, 32}` e
+    #   `n ∈ {8, 12, 16}`.
+    #
+    #   1 × 3 × 2 × 3 × 4 × 3 × 1 × 5 = 1 080 pontos, a 500 mil passos por corrida
     #   (`B_SWEEP_POR_NIVEL`)
     "mapeamento": {
         "passo_efetivo": (8e-4,),
         "sigma": (0.20, 0.35, 0.50),
-        "resolucao": (16, 32, 64),
-        "tupla": (8, 12, 24),
+        "resolucao": (16, 32),
+        "tupla": (8, 12, 16),
         "passos_m": (4, 8, 16, 32),
         # φ = 0,70, 0,85 e 0,90 — o 0,90 no lugar do 0,99 do `desempate`
         "idx_critico": (0, 1, 4),
