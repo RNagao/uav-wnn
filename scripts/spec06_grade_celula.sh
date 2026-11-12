@@ -34,6 +34,10 @@ if pgrep -f "spec06_busca.py --modo grade --niveis $NIVEL --na $NA " >/dev/null;
   echo "já há uma grade de Na=$NA rodando:"; pgrep -af "spec06_busca.py.*--na $NA " | head -1; exit 1
 fi
 mkdir -p "$RAIZ_DADOS/reports" "$RAIZ_DADOS/runs"
+# Se faltar memória, que o matador do sistema escolha ESTA grade e não um treino
+# longo que divide a máquina: uma corrida de grade se refaz com `--retomar`, um
+# treino de 50 M não. Os workers herdam o valor.
+echo 800 > /proc/$$/oom_score_adj 2>/dev/null || true
 nohup uv run python scripts/spec06_busca.py \
   --modo grade --niveis "$NIVEL" --na "$NA" --ns "$NS" \
   --b-sweep "$B" --sementes 3 --processos "$PROCESSOS" \
