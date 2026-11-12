@@ -38,6 +38,9 @@ mkdir -p "$RAIZ_DADOS/reports" "$RAIZ_DADOS/runs"
 # longo que divide a máquina: uma corrida de grade se refaz com `--retomar`, um
 # treino de 50 M não. Os workers herdam o valor.
 echo 800 > /proc/$$/oom_score_adj 2>/dev/null || true
+# O log ACUMULA entre lançamentos: guarda onde este começa, para mostrar o
+# cabeçalho DESTE e não o do primeiro.
+INICIO=$(( $(wc -l < "$LOG" 2>/dev/null || echo 0) + 1 ))
 nohup uv run python scripts/spec06_busca.py \
   --modo grade --niveis "$NIVEL" --na "$NA" --ns "$NS" \
   --b-sweep "$B" --sementes 3 --processos "$PROCESSOS" \
@@ -47,4 +50,4 @@ nohup uv run python scripts/spec06_busca.py \
 echo "lançada: grade $NIVEL Na=$NA Ns=$NS (pid $!) · log: $LOG"
 sleep 15
 if ! kill -0 "$!" 2>/dev/null; then echo "MORREU na inicialização — veja $LOG"; tail -5 "$LOG"; exit 1; fi
-head -6 "$LOG" | grep -v "^nohup"
+tail -n +"$INICIO" "$LOG" | head -8 | grep -v "^nohup"
