@@ -16,6 +16,13 @@ precisa ver.
 A corrida de controle com `seed_tuple` **fixo** e `seed_train` variável roda **uma
 vez**, no ponto base, para quantificar quanto da variância vem do ladrilhamento.
 `PapeisDeSemente(..., ladrilhamento_fixo=True)` é essa corrida.
+
+**`seed_mapeamento` — o ladrilhamento como EIXO de busca.** A grade `mapeamento` do
+`spec06_busca.py` varre a semente do mapeamento como hiperparâmetro, cruzada com
+`seed_train`. Aí os dois deixam de andar juntos: `PapeisDeSemente(seed_train=s,
+seed_mapeamento=k)` usa o ladrilhamento `k` com o ruído e os cenários de `s`. O
+valor `k` produz o MESMO mapeamento que `seed_train = k` produz sob a D-06.1, então
+os pontos novos se comparam diretamente com as corridas antigas.
 """
 
 from __future__ import annotations
@@ -39,6 +46,8 @@ class PapeisDeSemente:
     """Fixa. Governa os bancos `test` e `val` de **todas** as células e métodos."""
     ladrilhamento_fixo: bool = False
     """`True` só na corrida de controle da D-06.1."""
+    seed_mapeamento: int | None = None
+    """Semente explícita do mapeamento, quando ele é eixo de busca. `None` = D-06.1."""
 
     @property
     def seed_eval(self) -> int:
@@ -52,6 +61,13 @@ class PapeisDeSemente:
         inteiro para inicializar o ladrilhamento e o ruído de exploração criaria
         correlação entre duas coisas que a §4.1 quer independentes dentro da corrida.
         """
+        if self.seed_mapeamento is not None:
+            if self.ladrilhamento_fixo:
+                raise ValueError("`seed_mapeamento` e `ladrilhamento_fixo` são "
+                                 "excludentes: os dois fixam o ladrilhamento")
+            # Mesmo deslocamento da regra amarrada: `seed_mapeamento = k` reproduz o
+            # ladrilhamento que `seed_train = k` tinha.
+            return 7919 + self.seed_mapeamento
         return 7919 if self.ladrilhamento_fixo else 7919 + self.seed_train
 
     def rng_politica(self) -> np.random.Generator:
@@ -68,6 +84,10 @@ class PapeisDeSemente:
         return np.random.default_rng([self.seed_train, 2])
 
     def como_dict(self) -> dict:
-        return {"seed_train": self.seed_train, "seed_eval": self.seed_eval,
-                "seed_tuple": self.seed_tuple,
-                "ladrilhamento_fixo": self.ladrilhamento_fixo}
+        d = {"seed_train": self.seed_train, "seed_eval": self.seed_eval,
+             "seed_tuple": self.seed_tuple,
+             "ladrilhamento_fixo": self.ladrilhamento_fixo}
+        # Só quando explícita: os manifestos das corridas antigas não mudam de forma.
+        if self.seed_mapeamento is not None:
+            d["seed_mapeamento"] = self.seed_mapeamento
+        return d

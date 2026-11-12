@@ -120,6 +120,24 @@ def test_seed_tuple_nunca_coincide_com_seed_train():
         assert p.seed_tuple != p.seed_train
 
 
+def test_seed_mapeamento_desamarra_o_ladrilhamento_de_seed_train():
+    """Com o ladrilhamento como eixo de busca, ele não pode variar com `seed_train`
+    — senão o eixo mediria o sorteio do ruído junto. E `seed_mapeamento = k` tem de
+    reproduzir o ladrilhamento que `seed_train = k` tinha amarrado, para os pontos
+    novos se compararem com as corridas antigas."""
+    for k in range(3):
+        vistos = {PapeisDeSemente(seed_train=s, seed_mapeamento=k).seed_tuple
+                  for s in range(5)}
+        assert vistos == {PapeisDeSemente(seed_train=k).seed_tuple}
+    p = PapeisDeSemente(seed_train=0, seed_mapeamento=2)
+    assert p.como_dict()["seed_mapeamento"] == 2
+    # sem o eixo, o manifesto das corridas antigas não muda de forma
+    assert "seed_mapeamento" not in PapeisDeSemente(seed_train=0).como_dict()
+    with pytest.raises(ValueError):
+        _ = PapeisDeSemente(seed_train=0, seed_mapeamento=1,
+                            ladrilhamento_fixo=True).seed_tuple
+
+
 def test_rngs_de_politica_e_cenario_sao_independentes():
     """Se os cenários de treino saíssem do gerador do ruído, mudar o número de
     passos mudaria os cenários — e duas corridas com orçamentos diferentes
@@ -314,6 +332,32 @@ def test_o_eixo_de_normalizacao_esta_nas_duas_grades():
     for nivel in ("reduzido", "completo"):
         assert "normalizar" in grade[nivel]
         assert set(grade[nivel]["normalizar"]) == {False, True}
+
+
+def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
+    """O nível `mapeamento`: passo e normalização fixos, e a semente do mapeamento
+    como eixo — que só existe nele, para as grades antigas seguirem reprodutíveis."""
+    busca = _busca()
+    eixos = busca.GRADE["mapeamento"]
+    assert eixos["passo_efetivo"] == (8e-4,)
+    assert eixos["normalizar"] == (False,)
+    assert eixos["sigma"] == busca.GRADE["completo"]["sigma"]
+    assert eixos["resolucao"] == busca.GRADE["completo"]["resolucao"]
+    assert eixos["passos_m"] == busca.GRADE["completo"]["passos_m"]
+    assert eixos["tupla"] == busca.GRADE["reduzido"]["tupla"]
+    assert eixos["idx_critico"] == busca.GRADE["desempate"]["idx_critico"]
+    assert len(set(eixos["seed_mapeamento"])) == len(eixos["seed_mapeamento"]) > 1
+    for nivel in ("desempate", "decisao", "reduzido", "completo"):
+        assert "seed_mapeamento" not in busca.GRADE[nivel]
+
+    pontos = busca.grade("mapeamento")
+    assert len(pontos) == 3 * 3 * 3 * 4 * 3 * len(eixos["seed_mapeamento"])
+    assert "seed_mapeamento" in busca._EIXOS
+    # dois pontos que só diferem no mapeamento são corridas DISTINTAS na retomada
+    a, b = (dict(p, aproximador="x", seed_train=0) for p in pontos[:2])
+    assert a["seed_mapeamento"] != b["seed_mapeamento"]
+    assert busca._chave(a, a.keys() & busca._EIXOS) != \
+        busca._chave(b, b.keys() & busca._EIXOS)
 
 
 def test_a_faixa_padronizada_e_a_dos_autores():

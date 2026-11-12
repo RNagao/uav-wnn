@@ -118,6 +118,13 @@ pontos da grade `desempate` foram gerados assim. Apagar o caminho tornaria aquel
 dados irreproduzíveis."""
 
 
+SEED_MAPEAMENTO = (0, 1, 2)
+"""Sementes do mapeamento da n-tupla, eixo só da grade `mapeamento`.
+
+`seed_tuple = 7919 + k` — o mesmo deslocamento da D-06.1. Nos demais níveis e modos
+a chave não existe na amostra e o ladrilhamento segue amarrado a `seed_train`."""
+
+
 # --- a grade fatorial, em dois níveis de cardinalidade ---------------------
 #
 # O custo é aritmética, e ele decide o desenho (12 núcleos, ~6,5 min/corrida a
@@ -135,6 +142,30 @@ dados irreproduzíveis."""
 # cobertura, e é isso que o torna uma escolha de orçamento em vez de um atalho.
 
 GRADE = {
+    # --- grade de MAPEAMENTO: a semente do ladrilhamento vira hiperparâmetro ---
+    #
+    # `passo` fixo em 8e-4 (o dos dois melhores pontos da corrida longa) e
+    # `normalizar` fixo em False (medido: piora). O que se varre é a arquitetura
+    # (`σ`, `T`, `n`, `m`, `φ`) cruzada com o eixo NOVO:
+    #
+    # `seed_mapeamento` é a semente do mapeamento da n-tupla. Nos outros níveis ela
+    #   não é eixo — fica amarrada a `seed_train` pela D-06.1, e o sorteio do
+    #   ladrilhamento se confunde com o do ruído de exploração. Aqui os dois se
+    #   cruzam: cada ladrilhamento roda com todas as `--sementes`, e dá para
+    #   separar "este mapeamento é melhor" de "esta semente de treino teve sorte".
+    #   O valor `k` gera o mesmo mapeamento que `seed_train = k` gerava amarrado.
+    #
+    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 3 = 972 pontos
+    "mapeamento": {
+        "passo_efetivo": (8e-4,),
+        "sigma": (0.20, 0.35, 0.50),
+        "resolucao": (16, 32, 64),
+        "tupla": (8, 12, 24),
+        "passos_m": (4, 8, 16, 32),
+        "idx_critico": (0, 1, 2),
+        "normalizar": (False,),
+        "seed_mapeamento": SEED_MAPEAMENTO,
+    },
     # --- grade de DESEMPATE: a decisão não decidiu, e disse por quê ---------
     #
     # A grade `decisao` (108 corridas) deu Δ = +0,7 pp com IC [-2,9; +3,8] — inclui
@@ -263,7 +294,7 @@ há como distinguir "saturou" de "codificador errado"."""
 
 
 def grade(nivel: str) -> list[dict]:
-    """Produto cartesiano dos seis eixos — a grade **completa** naquele nível.
+    """Produto cartesiano dos eixos — a grade **completa** naquele nível.
 
     Os pontos são **compartilhados** pelos dois modelos, como na busca aleatória:
     cada configuração tem par exato no outro modelo, e a comparação é pareada por
@@ -364,7 +395,10 @@ def uma(args: tuple) -> dict:
     bancos = carregar_bancos(1, 12)
     val, test = bancos.val.sementes[:n_val], bancos.test.sementes[:n_test]
     ctx_tr, ctx_av = _ctx(cfg_tr), _ctx(cfg_av)
-    sem = PapeisDeSemente(seed_train=seed_train)
+    # `seed_mapeamento` só existe na amostra da grade `mapeamento`; sem ela, `None`
+    # mantém o ladrilhamento amarrado a `seed_train` (D-06.1), como sempre foi.
+    sem = PapeisDeSemente(seed_train=seed_train,
+                          seed_mapeamento=amostra.get("seed_mapeamento"))
 
     try:
         ap, termo, pol, det = _montar(aprox, cfg_tr, sem, amostra)
@@ -544,7 +578,7 @@ comparação "pelo mesmo tempo" que esta corrida existe para fazer.
 
 
 _EIXOS = frozenset({"passo_efetivo", "sigma", "resolucao", "tupla",
-                    "passos_m", "idx_critico", "normalizar"})
+                    "passos_m", "idx_critico", "normalizar", "seed_mapeamento"})
 """Os eixos que identificam uma corrida, e **só** eles.
 
 DUAS EXCLUSÕES, POR MOTIVOS DIFERENTES
@@ -553,6 +587,9 @@ DUAS EXCLUSÕES, POR MOTIVOS DIFERENTES
 podem entrar: os três primeiros são **derivados** do eixo de crítico e do passo por
 família, então incluí-los faria a chave depender do modelo, e duas corridas do mesmo
 ponto nunca casariam.
+
+`seed_mapeamento` entra, e só pesa onde existe: a chave usa `rec.keys() & _EIXOS`,
+então os registros dos níveis que não têm o eixo continuam casando como antes.
 
 `id` fica fora porque ele é o índice do produto cartesiano, e **o índice muda com o
 nível da grade**: a configuração `passo 5e-4, σ 0,20, T 16, n 12, crit 1` é `id=6` no
@@ -814,7 +851,7 @@ def main() -> int:
         por[(x["aproximador"], x["id"])].append(x)
 
     print(f"{'modelo':>18} {'id':>3} {'passo':>8} {'σ':>5} {'T':>4} {'n':>3} "
-          f"{'m':>3} {'crít':>6} {'N':>4} {'cob':>7} {'SR':>6} {'ab':>4}")
+          f"{'m':>3} {'crít':>6} {'map':>4} {'N':>4} {'cob':>7} {'SR':>6} {'ab':>4}")
     linhas = []
     for (m, i), g in sorted(por.items(),
                             key=lambda kv: -float(np.mean([x["cobertura"]
@@ -830,10 +867,15 @@ def main() -> int:
         linhas.append({"modelo": m, "id": i, "cobertura": cob, "sr": sr,
                        "abortos": ab, "n": len(g), **{k: a0[k] for k in
                        ("passo_efetivo", "sigma", "resolucao", "tupla", "passos_m")},
-                       "critico": crit, "n_ram": a0.get("n_ram")})
+                       "critico": crit, "n_ram": a0.get("n_ram"),
+                       "seed_mapeamento": a0.get("seed_mapeamento")})
+        # "—" = ladrilhamento amarrado a `seed_train` (o eixo não existe no nível)
+        mapa = a0.get("seed_mapeamento")
+        mapa_txt = "—" if mapa is None else str(mapa)
         print(f"{m:>18} {i:>3} {a0['passo_efetivo']:>8.1e} {a0['sigma']:>5.2f} "
               f"{a0['resolucao']:>4} {a0['tupla']:>3} {a0['passos_m']:>3} "
-              f"{crit_txt:>6} {a0.get('n_ram') or 0:>4} {cob:>6.1%} {sr:>5.1%} "
+              f"{crit_txt:>6} {mapa_txt:>4} {a0.get('n_ram') or 0:>4} "
+              f"{cob:>6.1%} {sr:>5.1%} "
               f"{ab:>2}/{len(g)}")
 
     print(f"\n{'MELHOR POR MODELO':>40}")
@@ -843,9 +885,11 @@ def main() -> int:
             continue
         b = max(cand, key=lambda l: l["cobertura"])
         b_crit = "—" if b["critico"] is None else f"{b['critico']:g}"
+        b_mapa = ("" if b["seed_mapeamento"] is None
+                  else f" · mapeamento {b['seed_mapeamento']}")
         print(f"  {m}: passo {b['passo_efetivo']:.2e} · σ {b['sigma']:.3f} · "
               f"T {b['resolucao']} · n {b['tupla']} · m {b['passos_m']} · "
-              f"crítico {b_crit} · N {b['n_ram'] or 0}")
+              f"crítico {b_crit}{b_mapa} · N {b['n_ram'] or 0}")
         print(f"      -> cobertura {b['cobertura']:.1%}, SR {b['sr']:.1%}, "
               f"abortos {b['abortos']}/{b['n']}")
 
@@ -853,7 +897,8 @@ def main() -> int:
         "passo_efetivo": list(PASSO_EFETIVO), "sigma": list(SIGMA),
         "resolucao": list(RESOLUCAO), "tupla": list(TUPLA),
         "passos_m": list(PASSOS_M), "phi": list(PHI),
-        "razao_critico": list(RAZAO_CRITICO)},
+        "razao_critico": list(RAZAO_CRITICO),
+        "seed_mapeamento": list(SEED_MAPEAMENTO)},
         "amostras": amostras, "pontos": linhas, "corridas": res,
         "parede_s": parede}
     Path(a.saida).parent.mkdir(parents=True, exist_ok=True)
