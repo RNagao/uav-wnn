@@ -237,7 +237,7 @@ def montar(aprox: str, cfg, checkpoint: Path | None, seed: int = 0,
             return acao_de(ap.f(codificar(np.asarray(observacao, float)))).como_array()
         if consulta is not None:
             f = consulta(np.asarray(observacao, float).ravel())
-            politica_np._concentracoes.append(NormalProjetada.concentracao(f))
+            politica_np.registrar_concentracao(f)
             return NormalProjetada.media_rapida(f)
         obs = Observacao.decodificar(observacao, ctx)
         return politica_np.act(obs).como_array()

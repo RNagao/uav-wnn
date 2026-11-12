@@ -528,7 +528,14 @@ class AtorCriticoContinuo:
     def __post_init__(self) -> None:
         self._buffer: list[tuple[NDArray, NDArray, float]] = []
         self._rng: np.random.Generator | None = None
-        self._concentracoes: list[float] = []
+        # Soma e contagem, NÃO uma lista por decisão. A lista era um vazamento:
+        # 38 bytes por `act` desde o início do treino, nunca esvaziada — a 50 M
+        # passos com 8 drones seriam 400 M entradas, ~15 GB, e as duas corridas
+        # de `Na = 8` chegaram a 3 GB em 10 M antes de alguém perceber (medido:
+        # as LUTs delas somavam uns poucos MB). A média, que é tudo que
+        # `metadados` reporta, não precisa dos termos.
+        self._conc_soma: float = 0.0
+        self._conc_n: int = 0
 
     # -- Policy -------------------------------------------------------------
 
@@ -551,7 +558,7 @@ class AtorCriticoContinuo:
         """
         x = self.codificar(vetor)
         f = self.aproximador.f(x)
-        self._concentracoes.append(NormalProjetada.concentracao(f))
+        self.registrar_concentracao(f)
 
         if not self.treinando:
             return self.politica.media(f)          # avaliação: sem ruído
@@ -562,14 +569,19 @@ class AtorCriticoContinuo:
         self._ultimo = (x, z)
         return acao
 
+    def registrar_concentracao(self, f) -> None:
+        """Acumula `|f|` de uma decisão para a `concentracao_media` dos metadados."""
+        self._conc_soma += NormalProjetada.concentracao(f)
+        self._conc_n += 1
+
     def metadados(self) -> dict[str, Any]:
         return {
             "deterministica": not self.treinando,
             "sigma": self.politica.sigma_corrente,
             "passos_m": self.passos,
             "desconto": self.desconto,
-            "concentracao_media": (float(np.mean(self._concentracoes))
-                                   if self._concentracoes else float("nan")),
+            "concentracao_media": (self._conc_soma / self._conc_n
+                                   if self._conc_n else float("nan")),
             **self.aproximador.custo(),
         }
 

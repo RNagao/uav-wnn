@@ -1,0 +1,638 @@
+{
+  "_doc": "Melhor ponto de cada T por célula de Na, pela cobertura média da grade. Gêmeo de spec06-vencedores.md. `escolhido_treino` fica null até a decisão do treino longo ser registrada.",
+  "metrica_selecao": "cobertura média entre sementes (e entre células de Ns, quando revezado)",
+  "comum": {
+    "aproximador": "ntupla_dissertacao",
+    "replica": "1b",
+    "b_sweep": 200000,
+    "m": 8,
+    "normalizar": false,
+    "sementes": 3
+  },
+  "celulas": {
+    "a1s12": {
+      "na": 1,
+      "ns": [
+        12
+      ],
+      "grade": "reports/spec06-desempate.json",
+      "fechada_em": "2026-08",
+      "T32": {
+        "id": 67,
+        "passo": 0.0008,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.85,
+        "n_ram": 67,
+        "cobertura": 0.501,
+        "sr": 0.213,
+        "abortos": "0/3",
+        "top3": [
+          67,
+          31,
+          42
+        ],
+        "escolhido_treino": {
+          "id": 67,
+          "modelo": "models/T32/a1s12"
+        }
+      },
+      "T16": {
+        "id": 61,
+        "passo": 0.0008,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.85,
+        "n_ram": 34,
+        "cobertura": 0.46,
+        "sr": 0.007,
+        "abortos": "0/3",
+        "top3": [
+          61,
+          36,
+          25
+        ],
+        "escolhido_treino": {
+          "id": 61,
+          "modelo": "models/T16/a1s12"
+        }
+      }
+    },
+    "a2s12-24-36": {
+      "na": 2,
+      "ns": [
+        12,
+        24,
+        36
+      ],
+      "grade": "reports/spec06-busca-a2s12-24-36.json",
+      "fechada_em": "2026-10-10",
+      "corridas": 360,
+      "abortos": 138,
+      "parede_h": 8.7,
+      "T32": {
+        "id": 90,
+        "passo": 0.0015,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.7,
+        "n_ram": 72,
+        "cobertura": 0.829,
+        "sr": 0.51,
+        "abortos": "1/3",
+        "top3": [
+          90,
+          68,
+          56
+        ],
+        "por_celula": {
+          "a2s12": [
+            0.74,
+            0.54
+          ],
+          "a2s24": [
+            0.86,
+            0.53
+          ],
+          "a2s36": [
+            0.88,
+            0.46
+          ]
+        },
+        "alternativa_estavel": {
+          "id": 68,
+          "passo": 0.0008,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.99,
+          "cobertura": 0.813,
+          "sr": 0.432,
+          "abortos": "0/3"
+        },
+        "escolhido_treino": {
+          "id": 68,
+          "lancado_em": "2026-10-14",
+          "corrida": "runs/spec06-50M/T32-a2s12-24-36",
+          "c_max": null,
+          "nota": "id 68 (0/3 abortos na grade) em vez do 1º (id 90, 1/3). Primeiro lançamento caiu na asserção c_max=0,5 a 1,08 M passos (passo 0,51, pico isolado, sem checkpoint); relançado com --c-max none, como o T32-a2s24 publicado.",
+          "concluido_em": "2026-10-16",
+          "passos": 50000000,
+          "test_final": {
+            "cobertura": 0.896,
+            "sr": 0.723,
+            "ct_cens": 173.3,
+            "por_ns": {
+              "12": [
+                0.86,
+                0.76
+              ],
+              "24": [
+                0.89,
+                0.67
+              ],
+              "36": [
+                0.94,
+                0.74
+              ]
+            }
+          },
+          "test_melhor": {
+            "cobertura": 0.961,
+            "sr": 0.77,
+            "ct_cens": 142.7,
+            "passo_melhor": 1250017
+          },
+          "deploy": {
+            "poda": 0.0,
+            "kb": 1567,
+            "sr_cheio": 0.78,
+            "sr_podado": 0.66,
+            "motivo": "poda 70% derrubou SR; deploy sem poda"
+          },
+          "alerta": "a curva de validação degradou após 1,25 M e nunca voltou ao pico; final (50 M) < melhor (1,25 M) em cobertura e SR"
+        }
+      },
+      "T16": {
+        "id": 61,
+        "passo": 0.0008,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.85,
+        "n_ram": 36,
+        "cobertura": 0.717,
+        "sr": 0.171,
+        "abortos": "0/3",
+        "top3": [
+          61,
+          62,
+          50
+        ],
+        "por_celula": {
+          "a2s12": [
+            0.58,
+            0.17
+          ],
+          "a2s24": [
+            0.75,
+            0.18
+          ],
+          "a2s36": [
+            0.82,
+            0.16
+          ]
+        },
+        "escolhido_treino": {
+          "id": 61,
+          "lancado_em": "2026-10-14",
+          "corrida": "runs/spec06-50M/T16-a2s12-24-36",
+          "c_max": 0.5,
+          "concluido_em": "2026-10-16",
+          "passos": 50000000,
+          "test_final": {
+            "cobertura": 0.955,
+            "sr": 0.853,
+            "ct_cens": 109.5,
+            "por_ns": {
+              "12": [
+                0.95,
+                0.93
+              ],
+              "24": [
+                0.94,
+                0.78
+              ],
+              "36": [
+                0.98,
+                0.85
+              ]
+            }
+          },
+          "test_melhor": {
+            "cobertura": 0.951,
+            "sr": 0.897,
+            "ct_cens": 89.6,
+            "passo_melhor": 18750918
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 259,
+            "sr_cheio": 0.79,
+            "sr_podado": 0.78
+          },
+          "nota": "T16 caiu na asserção c_max a 29,05 M (passo 0,5037); retomado de 28,75 M com --c-max none."
+        }
+      }
+    },
+    "a4s12-24-36": {
+      "na": 4,
+      "ns": [
+        12,
+        24,
+        36
+      ],
+      "grade": "reports/spec06-busca-a4s12-24-36.json",
+      "fechada_em": "2026-10-11",
+      "corridas": 360,
+      "abortos": 80,
+      "parede_h": 20.9,
+      "T32": {
+        "id": 92,
+        "passo": 0.0015,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 83,
+        "cobertura": 0.966,
+        "sr": 0.759,
+        "abortos": "0/3",
+        "top3": [
+          92,
+          90,
+          55
+        ],
+        "por_celula": {
+          "a4s12": [
+            0.95,
+            0.77
+          ],
+          "a4s24": [
+            0.97,
+            0.76
+          ],
+          "a4s36": [
+            0.98,
+            0.75
+          ]
+        },
+        "escolhido_treino": {
+          "id": 67,
+          "passo": 0.0008,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-17",
+          "corrida": "runs/spec06-50M/T32-a4s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "config da T-06.4 (mesma dos a4s24 publicados); φ 0,99 + passo 1,5e-3 colapsou — ver autópsia no .md",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-20",
+          "passos": 33751623,
+          "motivo_parada": "platô da cobertura (parada antecipada da §4.4), SEM colapso; c_max nunca disparou",
+          "val_final": {
+            "passo": 33751623,
+            "cobertura": 0.977,
+            "sr": 0.95
+          },
+          "melhor_val": 0.993,
+          "test_melhor": {
+            "cobertura": 0.988,
+            "sr": 0.96,
+            "ct_cens": 49.1,
+            "por_ns": {
+              "12": [
+                0.998,
+                0.98
+              ],
+              "24": [
+                0.967,
+                0.91
+              ],
+              "36": [
+                0.999,
+                0.98
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.0,
+            "kb": 1833,
+            "sr_cheio": 0.97,
+            "sr_podado": 0.93,
+            "ns_verificacao": 36,
+            "motivo": "poda 70% derrubou SR 97→93; deploy sem poda"
+          }
+        },
+        "colapsado": {
+          "id": 92,
+          "lancado_em": "2026-10-15",
+          "corrida": "runs/spec06-50M/T32-a4s12-24-36",
+          "c_max": null,
+          "estado": "COLAPSOU",
+          "pico_val": {
+            "passo": 1250001,
+            "cobertura": 0.987,
+            "sr": 0.933
+          },
+          "colapso_em": 12500531,
+          "parou_em": 30727401,
+          "motivo_parada": "interrompida à mão em 2026-10-17 (18 M passos a 3,5 %)",
+          "final": "sem final; `melhor` (1,25 M) e `ultimo` (30 M, colapsado) em disco",
+          "pasta": "runs/spec06-50M/T32-a4s12-24-36.colapso-p1.5e-3-phi0.99"
+        }
+      },
+      "T16": {
+        "id": 86,
+        "passo": 0.0015,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 42,
+        "cobertura": 0.933,
+        "sr": 0.634,
+        "abortos": "0/3",
+        "top3": [
+          86,
+          84,
+          85
+        ],
+        "por_celula": {
+          "a4s12": [
+            0.89,
+            0.63
+          ],
+          "a4s24": [
+            0.95,
+            0.64
+          ],
+          "a4s36": [
+            0.96,
+            0.64
+          ]
+        },
+        "escolhido_treino": {
+          "id": 60,
+          "passo": 0.0008,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.7,
+          "m": 8,
+          "lancado_em": "2026-10-17",
+          "corrida": "runs/spec06-50M/T16-a4s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "melhor ponto da grade sob o filtro que exclui as causas do colapso (φ 0,99, passo >8e-4, σ 0,20): id 60 (82,8 %, SR 8,6 %, 13º) contra id 61 (80,1 %, SR 2,9 %, 18º). Decisão do usuário em 2026-10-17; o lançamento com φ 0,85 foi interrompido minutos depois de subir.",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-19",
+          "passos": 33751919,
+          "motivo_parada": "platô da cobertura (parada antecipada da §4.4), SEM colapso",
+          "val_final": {
+            "passo": 33751919,
+            "cobertura": 0.967,
+            "sr": 0.923
+          },
+          "melhor_val": 0.987,
+          "test_melhor": {
+            "cobertura": 0.976,
+            "sr": 0.94,
+            "ct_cens": 67.1,
+            "por_ns": {
+              "12": [
+                0.965,
+                0.93
+              ],
+              "24": [
+                0.978,
+                0.95
+              ],
+              "36": [
+                0.986,
+                0.93
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 288,
+            "sr_cheio": 0.88,
+            "sr_podado": 0.92,
+            "ns_verificacao": 36
+          }
+        },
+        "colapsado": {
+          "id": 86,
+          "lancado_em": "2026-10-16",
+          "corrida": "runs/spec06-50M/T16-a4s12-24-36",
+          "c_max": null,
+          "estado": "COLAPSOU",
+          "pico_val": {
+            "passo": 2500039,
+            "cobertura": 0.967,
+            "sr": 0.83
+          },
+          "colapso_em": 6250301,
+          "parou_em": 33750848,
+          "motivo_parada": "platô (parada antecipada), já colapsada",
+          "test_melhor": {
+            "cobertura": 0.978,
+            "sr": 0.86,
+            "ct_cens": 103.2,
+            "passo_melhor": 2500039
+          },
+          "final": "inútil (cobertura 3,5 %, SR 0 na validação); deploy gerado a partir dele, NÃO usar",
+          "pasta": "runs/spec06-50M/T16-a4s12-24-36.colapso-p1.5e-3-phi0.99"
+        }
+      },
+      "licao": "passo 1,5e-3 com --c-max none diverge entre 6 e 12 M: a grade a 200 mil não enxerga isso. Retreinar com a asserção ligada e/ou passo um nível abaixo (8e-4). Guarda de colapso adicionada ao treinador em 2026-10-17.",
+      "autopsia": {
+        "mecanismo": "f2 (velocidade) -> fortemente negativo em todos os estados visitados; velocidade 0; stalled aos 30 s; δ negativo enorme realimenta; LUT estoura (max |f| 35 -> 423)",
+        "fator": "φ=0,99 infla V (~1/(1-φ)) e δ; com passo 1,5e-3 o passo efetivo do ator estoura; c_max=0,5 teria abortado"
+      }
+    },
+    "a8s12-24-36": {
+      "na": 8,
+      "ns": [
+        12,
+        24,
+        36
+      ],
+      "grade": "reports/spec06-busca-a8s12-24-36.json",
+      "fechada_em": "2026-10-14",
+      "corridas": 360,
+      "abortos": 35,
+      "parede_h": 51.4,
+      "nota": "três trechos (dois reinícios da máquina), retomados com --retomar",
+      "T32": {
+        "id": 80,
+        "passo": 0.0015,
+        "sigma": 0.2,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 104,
+        "cobertura": 0.964,
+        "sr": 0.561,
+        "abortos": "2/3",
+        "top3": [
+          80,
+          116,
+          115
+        ],
+        "por_celula": {
+          "a8s12": [
+            0.94,
+            0.58
+          ],
+          "a8s24": [
+            0.97,
+            0.56
+          ],
+          "a8s36": [
+            0.98,
+            0.55
+          ]
+        },
+        "alternativa_estavel": {
+          "id": 115,
+          "passo": 0.003,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "cobertura": 0.933,
+          "sr": 0.436,
+          "abortos": "0/3"
+        },
+        "alternativa_2": {
+          "id": 116,
+          "passo": 0.003,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.99,
+          "cobertura": 0.956,
+          "sr": 0.531,
+          "abortos": "1/3"
+        },
+        "escolhido_treino": {
+          "id": 91,
+          "passo": 0.0015,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-19",
+          "corrida": "runs/spec06-50M/T32-a8s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "idem T16; o 1º da grade (id 80) tinha σ 0,20 e 2/3 abortos",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-25",
+          "passos": 42502159,
+          "motivo_parada": "platô da cobertura (parada antecipada); c_max nunca disparou; retomada de 8,75 M após a correção do vazamento",
+          "val_final": {
+            "passo": 42502159,
+            "cobertura": 0.985,
+            "sr": 0.9
+          },
+          "melhor_val": 0.992,
+          "passo_melhor": 23750893,
+          "test_melhor": {
+            "cobertura": 0.992,
+            "sr": 0.89,
+            "ct_cens": 85.2,
+            "por_ns": {
+              "12": [
+                0.99,
+                0.88
+              ],
+              "24": [
+                0.996,
+                0.91
+              ],
+              "36": [
+                0.989,
+                0.88
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 654,
+            "sr_cheio": 0.84,
+            "sr_podado": 0.83,
+            "ns_verificacao": 36
+          }
+        }
+      },
+      "T16": {
+        "id": 110,
+        "passo": 0.003,
+        "sigma": 0.35,
+        "tupla": 12,
+        "phi": 0.99,
+        "n_ram": 52,
+        "cobertura": 0.973,
+        "sr": 0.704,
+        "abortos": "0/3",
+        "top3": [
+          110,
+          108,
+          109
+        ],
+        "por_celula": {
+          "a8s12": [
+            0.97,
+            0.72
+          ],
+          "a8s24": [
+            0.97,
+            0.69
+          ],
+          "a8s36": [
+            0.98,
+            0.7
+          ]
+        },
+        "escolhido_treino": {
+          "id": 85,
+          "passo": 0.0015,
+          "sigma": 0.35,
+          "tupla": 12,
+          "phi": 0.85,
+          "m": 8,
+          "lancado_em": "2026-10-20",
+          "corrida": "runs/spec06-50M/T16-a8s12-24-36",
+          "c_max": 0.5,
+          "guarda_colapso": true,
+          "motivo": "análogo do que funcionou em Na=4 pela escala α/Na (1,5e-3 em Na=8 ≡ 8e-4 em Na=4); o 1º da grade (id 110, 3e-3, φ 0,99) repetiria a receita do colapso",
+          "estado": "CONCLUIDO",
+          "concluido_em": "2026-10-25",
+          "passos": 50000000,
+          "motivo_parada": "orçamento de 50 M esgotado; c_max nunca disparou; retomada de 7,5 M após a correção do vazamento de memória",
+          "val_final": {
+            "passo": 48753164,
+            "cobertura": 0.974,
+            "sr": 0.88
+          },
+          "melhor_val": 0.985,
+          "passo_melhor": 36252298,
+          "test_melhor": {
+            "cobertura": 0.978,
+            "sr": 0.93,
+            "ct_cens": 72.1,
+            "por_ns": {
+              "12": [
+                0.973,
+                0.95
+              ],
+              "24": [
+                0.975,
+                0.93
+              ],
+              "36": [
+                0.986,
+                0.92
+              ]
+            }
+          },
+          "deploy": {
+            "poda": 0.7,
+            "kb": 308,
+            "sr_cheio": 0.93,
+            "sr_podado": 0.96,
+            "ns_verificacao": 36
+          }
+        }
+      }
+    }
+  }
+}

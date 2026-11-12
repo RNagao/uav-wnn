@@ -106,8 +106,8 @@ O que torna a medição comparável entre corridas.
 ### 1. Treino WNN — Algoritmo 4.4
 
 ```
-spec06_busca.py  (--modo grade|aleatoria|longa)
-spec06_treino_multiagente.py  (Na > 1, parameter sharing)
+spec06_busca.py  (--modo grade|aleatoria|longa; --na/--ns escalares ou listas revezadas, ex. --na 1,2,4 --ns 12,24)
+spec06_treino_multiagente.py  (Na > 1, parameter sharing; --config-de <grade>, --ns em lista)
         └─> spec06_treinar.py  ─> refenv · encoding · agents · campanha · wnn
                                 └─> runs/…/checkpoints/{melhor,final,deploy}
 ```
@@ -137,7 +137,10 @@ Roda automaticamente ao fim de todo treino (§ pós-treino padrão).
 ### 4. Campanha comparável — o experimento principal
 
 ```
-spec06_campanha_fila.sh     (a fila de 33 corridas)
+spec06_campanha_fila.sh     (a fila de 33 corridas — a campanha publicada)
+spec06_campanha_fila.py     (fila livre: --modelos × --celulas × --regimes, manifesto por corrida)
+spec06_campanha_novos.sh    (embrulho da fila livre: modelos revezados, cada um só nas células do seu Na)
+spec06_gates_novos.sh       (atestados RF-05 dos modelos revezados, pré-requisito do regime com-kf)
 spec06_campanha_uma.sh      (uma corrida)
 spec06_campanha_supervisor.py (mantém N em voo sem derrubar treino)
         └─> spec06_campanha_completa.py  ─> MADDPG | WNN T16 | WNN T32

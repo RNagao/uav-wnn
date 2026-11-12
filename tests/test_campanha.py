@@ -380,3 +380,188 @@ def test_a_faixa_padronizada_e_a_dos_autores():
     from uavwnn.campanha import FAIXA_PADRONIZADA
 
     assert FAIXA_PADRONIZADA == (-1.5, 1.5)
+
+
+
+# --- revezamento de célula na busca (spec06_busca.py --na 1,2,4 --ns 12,24) --
+
+
+def test_celulas_revezadas_tem_a_mesma_largura_de_observacao(tmp_path):
+    """Uma rede só vê vários `Na` se a observação tiver a MESMA largura em todos:
+    `state_num_closest_drones = max(Na) − 1` em cada célula. Com um `Na` só, a
+    largura é a de Lamenza (`2·(Na−1) + 2·12 + 1`), para não mudar a grade antiga."""
+    b = _busca()
+    cel = b._celulas("1b", (1, 2, 4), (12, 24), raiz_bancos=tmp_path)
+    # ordem do revezamento: Na por fora, Ns por dentro
+    assert list(cel) == [(1, 12), (1, 24), (2, 12), (2, 24), (4, 12), (4, 24)]
+    larguras = {k: c["cfg_tr"].observation_size for k, c in cel.items()}
+    assert set(larguras.values()) == {31}             # 2·3 + 2·12 + 1, para todo Ns
+    assert all(c["cfg_tr"].state_num_closest_drones == 3 for c in cel.values())
+    assert cel[(2, 24)]["cfg_tr"].num_sensors == 24
+    so_um = b._celulas("1b", (1,), (12,), raiz_bancos=tmp_path)
+    assert so_um[(1, 12)]["cfg_tr"].observation_size == 25
+    assert so_um[(1, 12)]["cfg_tr"].state_num_closest_drones == 0
+
+
+def test_cfgs_recusa_menos_vizinhos_que_na_menos_um():
+    """O `environment.py` escreve `Na − 1` vizinhos nos slots; menos slots que isso
+    estoura a atribuição lá dentro. Melhor falhar aqui, com mensagem."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_treinar import _cfgs
+
+    with pytest.raises(ValueError, match="n_vizinhos"):
+        _cfgs("1b", 4, 12, n_vizinhos=1)
+
+
+def test_registro_de_celula_preserva_o_hash_da_grade_antiga():
+    """`Na = 1` e `Ns = 12` gravam o ESCALAR, como as 720 corridas existentes; só a
+    lista aparece com revezamento. E `_lista_de` lê os dois, mais o registro antigo
+    sem campo."""
+    b = _busca()
+    assert b._registro((1,)) == 1
+    assert b._registro((1, 2, 4)) == [1, 2, 4]
+    assert b._lista_de({"na": 1}, "na", 1) == (1,)
+    assert b._lista_de({"na": [1, 2, 4]}, "na", 1) == (1, 2, 4)
+    assert b._lista_de({}, "na", 1) == (1,)
+    assert b._lista_de({"ns": [12, 24]}, "ns", 12) == (12, 24)
+    assert b._lista_de({}, "ns", 12) == (12,)
+
+
+def test_revezamento_alterna_celula_por_episodio_e_treina_cada_drone(tmp_path):
+    """Round-robin sobre `(1, 2) × (12, 24)`: quatro células, o episódio `k` roda a
+    `k mod 4`-ésima, e cada drone fecha a sua própria transição — o laço
+    single-agente registrava uma só por passo e treinava apenas o último drone."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_treinar import RECOMPENSAS, REPLICAS
+    from uavwnn.agents import AtorCriticoContinuo
+    from uavwnn.agents.politica_continua import NormalProjetada
+    from uavwnn.campanha import PapeisDeSemente
+
+    b = _busca()
+    cel = b._celulas("1b", (1, 2), (12, 24), raiz_bancos=tmp_path)
+    amostra = {"passo_efetivo": 5e-4, "sigma": 0.35, "resolucao": 8, "tupla": 8,
+               "passos_m": 4, "idx_critico": 1, "normalizar": False}
+    sem = PapeisDeSemente(seed_train=0)
+    corpus = np.concatenate([b.corpus_de_observacoes(c["cfg_tr"], n_episodios=1)
+                             for c in cel.values()])
+    ap, _termo, pol, _det = b._montar("ntupla_dissertacao", cel[(1, 12)]["cfg_tr"],
+                                      sem, amostra, corpus=corpus)
+    acs = [pol, AtorCriticoContinuo(aproximador=ap, codificar=pol.codificar,
+                                    politica=NormalProjetada(0.35, None), passos=4,
+                                    id="a1", treinando=True)]
+    registrados = {0: 0, 1: 0}
+    for i, ac in enumerate(acs):
+        orig = ac.registrar
+
+        def _reg(r, _o=orig, _i=i):
+            registrados[_i] += 1
+            return _o(r)
+        ac.registrar = _reg
+
+    r = REPLICAS["1b"]
+    info = b.rodar_episodios_revezando(
+        cel, acs, RECOMPENSAS[r["recompensa"]], sem.rng_cenarios_treino(),
+        orcamento=300, escala=r["escala_recompensa"])
+    assert info["passos"] >= 300
+    por = info["episodios_por_celula"]
+    assert set(por) == set(cel) and min(por.values()) >= 1
+    assert max(por.values()) - min(por.values()) <= 1      # round-robin
+    # o segundo drone só existe nos episódios de Na=2, e registra em todos eles
+    assert 0 < registrados[1] < registrados[0]
+    assert ap.ator.entradas_ocupadas() > 0
+
+
+
+# --- treino longo com a config da grade e Ns revezado -------------------------
+
+
+def _treino():
+    import importlib.util
+    import pathlib
+    import sys
+
+    sys.path.insert(0, "scripts")
+    caminho = (pathlib.Path(__file__).resolve().parents[1] / "scripts"
+               / "spec06_treino_multiagente.py")
+    spec = importlib.util.spec_from_file_location("_treino", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_treino"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_config_da_grade_escolhe_o_melhor_ponto_DO_T_pedido(tmp_path):
+    """A escalada treina T=16 e T=32; o melhor ponto global só diria qual venceu.
+    O que se quer é o melhor de CADA T — e os campos têm o nome da grade."""
+    import json
+
+    t = _treino()
+    pontos = [
+        {"modelo": "ntupla_dissertacao", "id": 0, "cobertura": 0.50, "sr": 0.2,
+         "abortos": 0, "n": 3, "passo_efetivo": 8e-4, "sigma": 0.35,
+         "resolucao": 32, "tupla": 12, "passos_m": 8, "critico": 0.85},
+        {"modelo": "ntupla_dissertacao", "id": 1, "cobertura": 0.46, "sr": 0.0,
+         "abortos": 1, "n": 3, "passo_efetivo": 5e-4, "sigma": 0.20,
+         "resolucao": 16, "tupla": 24, "passos_m": 16, "critico": 0.99},
+        {"modelo": "ntupla_dissertacao", "id": 2, "cobertura": 0.40, "sr": 0.0,
+         "abortos": 0, "n": 3, "passo_efetivo": 3e-4, "sigma": 0.35,
+         "resolucao": 16, "tupla": 12, "passos_m": 8, "critico": 0.85},
+    ]
+    arq = tmp_path / "grade.json"
+    arq.write_text(json.dumps({"pontos": pontos, "celula": {"na": [2], "ns": [12, 24]}}))
+    hp16 = t.config_da_grade(arq, 16)
+    assert (hp16["passo"], hp16["sigma"], hp16["tupla"], hp16["phi"], hp16["m"]) == \
+        (5e-4, 0.20, 24, 0.99, 16)
+    assert hp16["id_grade"] == 1 and hp16["abortos_grade"] == "1/3"
+    assert t.config_da_grade(arq, 32)["id_grade"] == 0
+    assert t.config_da_grade(arq, None)["id_grade"] == 0     # melhor global
+    with pytest.raises(SystemExit):
+        t.config_da_grade(arq, 64)
+
+
+def test_rotulo_de_ns_e_o_nome_da_celula():
+    t = _treino()
+    assert t._ler_ns("24") == (24,)
+    assert t._ler_ns("12,24,36") == t._ler_ns("12-24-36") == (12, 24, 36)
+    assert t._rotulo_ns((24,)) == "24" and t._rotulo_ns((12, 24, 36)) == "12-24-36"
+    import sys
+    sys.path.insert(0, "scripts")
+    from spec06_exportar_deploy import _celula
+
+    assert _celula("a2s24") == (2, (24,))
+    assert _celula("a2s12-24-36") == (2, (12, 24, 36))
+
+
+def test_hp_padrao_e_o_vencedor_da_t064():
+    """Sem flag nenhuma, o treinador tem de produzir EXATAMENTE a config publicada
+    — senão as células já treinadas deixam de ser reproduzíveis por este script."""
+    t = _treino()
+    assert t.HP_PADRAO == {"passo": 8e-4, "sigma": 0.35, "tupla": 12,
+                           "phi": 0.85, "m": 8}
+
+
+def test_fila_resolve_checkpoint_exato_unico_ou_recusa_ambiguidade(tmp_path):
+    """`a2s24` sozinha serve para Ns=12 (transferência); `a2s24` + `a2s12-24-36`
+    é ambiguidade e a fila recusa em vez de escolher por alguém."""
+    import importlib.util
+    import pathlib
+    import sys
+
+    sys.path.insert(0, "scripts")
+    caminho = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "spec06_campanha_fila.py"
+    spec = importlib.util.spec_from_file_location("_fila", caminho)
+    f = importlib.util.module_from_spec(spec)
+    sys.modules["_fila"] = f            # o `@dataclass` procura o módulo aqui
+    spec.loader.exec_module(f)
+
+    (tmp_path / "T16" / "a2s24").mkdir(parents=True)
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 12) == tmp_path / "T16" / "a2s24"
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 24) == tmp_path / "T16" / "a2s24"
+    assert "sem modelo" in f._checkpoint_wnn(tmp_path, 16, 4, 12)
+    (tmp_path / "T16" / "a2s12-24-36").mkdir()
+    assert "ambíguo" in f._checkpoint_wnn(tmp_path, 16, 2, 12)
+    assert f._checkpoint_wnn(tmp_path, 16, 2, 24) == tmp_path / "T16" / "a2s24"  # exata
+    assert f._treinado_em(tmp_path / "T16" / "a2s12-24-36") == "12-24-36"
+    assert f._treinado_em(tmp_path / "T16" / "a2s24") == "24"
