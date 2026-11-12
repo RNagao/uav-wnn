@@ -100,8 +100,18 @@ PASSOS_M = (4, 8, 16, 32)
 """`m` do retorno de `m` passos. Faixa própria: o apêndice A não reporta `m` para as
 tarefas contínuas."""
 
-PHI = (0.70, 0.85, 0.99, 1.0)
-"""Esquecimento do crítico da dissertação. `1,0` é o controle sem esquecimento."""
+PHI = (0.70, 0.85, 0.99, 1.0, 0.90)
+"""Esquecimento do crítico da dissertação. `1,0` é o controle sem esquecimento.
+
+FORA DE ORDEM DE PROPÓSITO: `idx_critico` é um ÍNDICE nesta tupla, e as corridas já
+gravadas guardam o índice. O `0,90` entrou depois, para a grade `mapeamento`, e por
+isso vai no FIM (índice 4) — inseri-lo na posição ordenada trocaria o φ de todo
+registro antigo com `idx_critico ≥ 2`."""
+
+N_PHI_SORTEIO = 4
+"""Quantos φ o modo `aleatoria` sorteia: os quatro originais. Fixo, e não
+`len(PHI)`, porque mudar o limite de `g.integers` mudaria os sorteios de uma
+`--seed-busca` já usada."""
 
 RAZAO_CRITICO = (1.0,)
 """Vestígio: o eixo de crítico da família `anbubus`, que NÃO é mais braço deste
@@ -169,7 +179,8 @@ GRADE = {
         "resolucao": (16, 32, 64),
         "tupla": (8, 12, 24),
         "passos_m": (4, 8, 16, 32),
-        "idx_critico": (0, 1, 2),
+        # φ = 0,70, 0,85 e 0,90 — o 0,90 no lugar do 0,99 do `desempate`
+        "idx_critico": (0, 1, 4),
         "normalizar": (False,),
         "seed_mapeamento": SEED_MAPEAMENTO,
     },
@@ -334,7 +345,7 @@ def amostrar(n: int, seed: int = 20260921) -> list[dict]:
             "tupla": int(g.choice(TUPLA)),
             "passos_m": int(g.choice(PASSOS_M)),
             # os índices do eixo de crítico são compartilhados; cada família traduz
-            "idx_critico": int(g.integers(len(PHI))),
+            "idx_critico": int(g.integers(N_PHI_SORTEIO)),
             "normalizar": bool(g.integers(2)),
         })
     return fora

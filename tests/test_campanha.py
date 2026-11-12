@@ -348,7 +348,11 @@ def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
     assert eixos["resolucao"] == busca.GRADE["completo"]["resolucao"]
     assert eixos["passos_m"] == busca.GRADE["completo"]["passos_m"]
     assert eixos["tupla"] == busca.GRADE["reduzido"]["tupla"]
-    assert eixos["idx_critico"] == busca.GRADE["desempate"]["idx_critico"]
+    assert [busca.PHI[i] for i in eixos["idx_critico"]] == [0.70, 0.85, 0.90]
+    # os índices antigos não podem mudar de φ: registros gravados guardam o índice
+    assert busca.PHI[:4] == (0.70, 0.85, 0.99, 1.0)
+    assert busca.amostrar(24) == busca.amostrar(24)
+    assert max(p["idx_critico"] for p in busca.amostrar(200)) < 4
     assert eixos["seed_mapeamento"] == (7919, 7920, 7921, 0, 42)
     for nivel in ("desempate", "decisao", "reduzido", "completo"):
         assert "seed_mapeamento" not in busca.GRADE[nivel]
