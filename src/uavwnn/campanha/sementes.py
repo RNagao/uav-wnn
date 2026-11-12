@@ -21,8 +21,9 @@ vez**, no ponto base, para quantificar quanto da variância vem do ladrilhamento
 `spec06_busca.py` varre a semente do mapeamento como hiperparâmetro, cruzada com
 `seed_train`. Aí os dois deixam de andar juntos: `PapeisDeSemente(seed_train=s,
 seed_mapeamento=k)` usa o ladrilhamento `k` com o ruído e os cenários de `s`. O
-valor `k` produz o MESMO mapeamento que `seed_train = k` produz sob a D-06.1, então
-os pontos novos se comparam diretamente com as corridas antigas.
+valor é a semente CRUA, entregue sem deslocamento ao sorteio do mapeamento: `7919 +
+s` reproduz o ladrilhamento que `seed_train = s` tinha sob a D-06.1, e `0` o do
+treino multiagente, que cria a rede com `seed=0`.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ class PapeisDeSemente:
     ladrilhamento_fixo: bool = False
     """`True` só na corrida de controle da D-06.1."""
     seed_mapeamento: int | None = None
-    """Semente explícita do mapeamento, quando ele é eixo de busca. `None` = D-06.1."""
+    """Semente CRUA do mapeamento, quando ele é eixo de busca. `None` = D-06.1."""
 
     @property
     def seed_eval(self) -> int:
@@ -65,9 +66,11 @@ class PapeisDeSemente:
             if self.ladrilhamento_fixo:
                 raise ValueError("`seed_mapeamento` e `ladrilhamento_fixo` são "
                                  "excludentes: os dois fixam o ladrilhamento")
-            # Mesmo deslocamento da regra amarrada: `seed_mapeamento = k` reproduz o
-            # ladrilhamento que `seed_train = k` tinha.
-            return 7919 + self.seed_mapeamento
+            # CRUA, sem o deslocamento da regra amarrada: o eixo nomeia o valor que
+            # chega ao sorteio. Pode coincidir com `seed_train` (ex.: 0 e 0) sem
+            # correlacionar nada — o ruído sai de `default_rng([seed_train, 1])`,
+            # outra sequência.
+            return self.seed_mapeamento
         return 7919 if self.ladrilhamento_fixo else 7919 + self.seed_train
 
     def rng_politica(self) -> np.random.Generator:

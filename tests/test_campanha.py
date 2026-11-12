@@ -122,15 +122,18 @@ def test_seed_tuple_nunca_coincide_com_seed_train():
 
 def test_seed_mapeamento_desamarra_o_ladrilhamento_de_seed_train():
     """Com o ladrilhamento como eixo de busca, ele não pode variar com `seed_train`
-    — senão o eixo mediria o sorteio do ruído junto. E `seed_mapeamento = k` tem de
-    reproduzir o ladrilhamento que `seed_train = k` tinha amarrado, para os pontos
-    novos se compararem com as corridas antigas."""
-    for k in range(3):
+    — senão o eixo mediria o sorteio do ruído junto. O valor é a semente CRUA: o
+    que se pede é o que chega ao sorteio, e `7919 + k` reproduz o ladrilhamento que
+    `seed_train = k` tinha amarrado."""
+    for k in (0, 42, 7919, 7920, 7921):
         vistos = {PapeisDeSemente(seed_train=s, seed_mapeamento=k).seed_tuple
                   for s in range(5)}
-        assert vistos == {PapeisDeSemente(seed_train=k).seed_tuple}
-    p = PapeisDeSemente(seed_train=0, seed_mapeamento=2)
-    assert p.como_dict()["seed_mapeamento"] == 2
+        assert vistos == {k}
+    for s in range(3):
+        assert (PapeisDeSemente(seed_train=9, seed_mapeamento=7919 + s).seed_tuple
+                == PapeisDeSemente(seed_train=s).seed_tuple)
+    p = PapeisDeSemente(seed_train=0, seed_mapeamento=42)
+    assert p.como_dict()["seed_mapeamento"] == p.como_dict()["seed_tuple"] == 42
     # sem o eixo, o manifesto das corridas antigas não muda de forma
     assert "seed_mapeamento" not in PapeisDeSemente(seed_train=0).como_dict()
     with pytest.raises(ValueError):
@@ -346,7 +349,7 @@ def test_a_grade_mapeamento_varre_a_semente_do_mapeamento():
     assert eixos["passos_m"] == busca.GRADE["completo"]["passos_m"]
     assert eixos["tupla"] == busca.GRADE["reduzido"]["tupla"]
     assert eixos["idx_critico"] == busca.GRADE["desempate"]["idx_critico"]
-    assert len(set(eixos["seed_mapeamento"])) == len(eixos["seed_mapeamento"]) > 1
+    assert eixos["seed_mapeamento"] == (7919, 7920, 7921, 0, 42)
     for nivel in ("desempate", "decisao", "reduzido", "completo"):
         assert "seed_mapeamento" not in busca.GRADE[nivel]
 

@@ -118,11 +118,18 @@ pontos da grade `desempate` foram gerados assim. Apagar o caminho tornaria aquel
 dados irreproduzíveis."""
 
 
-SEED_MAPEAMENTO = (0, 1, 2)
-"""Sementes do mapeamento da n-tupla, eixo só da grade `mapeamento`.
+SEED_MAPEAMENTO = (7919, 7920, 7921, 0, 42)
+"""Sementes CRUAS do mapeamento da n-tupla, eixo só da grade `mapeamento`.
 
-`seed_tuple = 7919 + k` — o mesmo deslocamento da D-06.1. Nos demais níveis e modos
-a chave não existe na amostra e o ladrilhamento segue amarrado a `seed_train`."""
+O valor vai sem deslocamento para `default_rng(seed).permutation(B)`:
+
+    7919, 7920, 7921   os três ladrilhamentos que as grades anteriores usaram
+                       (`7919 + seed_train`, com `seed_train` em 0..2)
+    0                  o do treino multiagente, que cria a rede com `seed=0`
+    42                 um ladrilhamento novo, nunca medido
+
+Nos demais níveis e modos a chave não existe na amostra e o ladrilhamento segue
+amarrado a `seed_train` pela D-06.1."""
 
 
 # --- a grade fatorial, em dois níveis de cardinalidade ---------------------
@@ -153,9 +160,9 @@ GRADE = {
     #   ladrilhamento se confunde com o do ruído de exploração. Aqui os dois se
     #   cruzam: cada ladrilhamento roda com todas as `--sementes`, e dá para
     #   separar "este mapeamento é melhor" de "esta semente de treino teve sorte".
-    #   O valor `k` gera o mesmo mapeamento que `seed_train = k` gerava amarrado.
+    #   O valor é a semente crua do sorteio — ver `SEED_MAPEAMENTO`.
     #
-    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 3 = 972 pontos
+    #   1 × 3 × 3 × 3 × 4 × 3 × 1 × 5 = 1 620 pontos
     "mapeamento": {
         "passo_efetivo": (8e-4,),
         "sigma": (0.20, 0.35, 0.50),
